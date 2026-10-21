@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'data/models.dart';
+import 'data/api_client.dart';
 import 'ui/sleep_session_screen.dart';
 import 'ui/results_screen.dart';
 import 'ui/alarm_settings_screen.dart';
+import 'ui/login_screen.dart';
+import 'ui/sleep_aid_screen.dart';
+import 'ui/paywall_screen.dart';
 
 void main() => runApp(const SleepApp());
 
@@ -36,10 +40,35 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   AlarmSettings settings = AlarmSettings(alarmTime: const TimeOfDayLike(7, 30));
+  final SleepApi api = SleepApi();
+
+  void _open(Widget screen) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        actions: [
+          IconButton(
+            tooltip: 'Sign in',
+            icon: const Icon(Icons.person_outline),
+            onPressed: () => _open(LoginScreen(api: api)),
+          ),
+          IconButton(
+            tooltip: 'Sleep aid',
+            icon: const Icon(Icons.music_note_outlined),
+            onPressed: () => _open(SleepAidScreen(api: api)),
+          ),
+          IconButton(
+            tooltip: 'Premium',
+            icon: const Icon(Icons.workspace_premium_outlined),
+            onPressed: () => _open(PaywallScreen(api: api)),
+          ),
+        ],
+      ),
+      extendBodyBehindAppBar: true,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),

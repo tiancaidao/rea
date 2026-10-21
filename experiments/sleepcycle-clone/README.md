@@ -16,7 +16,10 @@ models, or brand assets.
 
 | Path | What it is |
 |---|---|
-| `sleep_core/` | **Original** sleep-tracking algorithms (movement detection, sleep staging, smart alarm, snore event detection) built from standard techniques — not ported from any app. Plain, portable logic with tests. Runnable. |
+| `flutter_app/` | **The app.** Original Flutter sleep tracker (iOS + Android): tracking, hypnogram + score, smart-alarm settings, sign-in, sleep-aid, paywall; native accelerometer platform channel (Kotlin + Swift). Runs on a simulated night out of the box. |
+| `sleep_core/` | **Original** sleep-tracking algorithms (movement, staging, smart alarm, snore events) from standard techniques — not ported. Plain Python with tests. |
+| `ml/training/` | Trains your **own** models (sleep stager, snore classifier, 16-D snore-signature embedder) in PyTorch → ONNX, on synthetic or your own data. Runnable. |
+| `mock-api/` | Zero-dependency mock backend (token auth, persisted sessions, computed insights, paywall, sleep-aid catalog). |
 | `ml/audio_pipeline.py` | Reference audio front-end (PCM → FFT → mel → CNN tensor) at the **exact shapes** read from the app's unencrypted TFLite models. Runnable. |
 | `mock-api/server.js` | Zero-dependency Node mock backend mirroring the app's endpoint shape (Ory-style auth, session upload, insights, remote config/paywall). Runnable. |
 | `android/.../net/SleepCloudApi.kt` | Retrofit interface mapped to the mock API. |

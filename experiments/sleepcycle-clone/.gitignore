@@ -1,0 +1,14 @@
+# generated model artifacts (train your own; don't commit)
+*.onnx
+*.npz
+*.tflite
+*.mlmodel
+# python
+__pycache__/
+*.pyc
+# mock backend state
+mock-api/mock-db.json
+# flutter
+flutter_app/.dart_tool/
+flutter_app/build/
+flutter_app/.flutter-plugins*

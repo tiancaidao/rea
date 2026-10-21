@@ -11,11 +11,13 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.2.0
-  # For real device sensing, add e.g.:
-  #   sensors_plus: ^6.0.0        # accelerometer
+  # Enable these as you wire up real device features:
+  #   just_audio: ^0.9.40         # sleep-aid playback (background audio)
   #   record: ^5.0.0              # microphone capture
-  #   tflite_flutter / onnxruntime: on-device ML
+  #   onnxruntime: ^1.4.1         # on-device ML (or tflite_flutter)
   #   health: ^10.0.0             # HealthKit / Health Connect
+  #   in_app_purchase: ^3.2.0     # StoreKit / Play Billing
+  # Native accelerometer uses a platform channel in lib/sensing (no package).
 
 dev_dependencies:
   flutter_test:
