@@ -28,14 +28,22 @@ class SimulatedNight implements AccelerometerSource {
   Stream<List<double>> samples() async* {
     final rng = math.Random(seed);
     final totalEpochs = hours * 60 * 60 ~/ 30;
+    const cycleEpochs = (90 * 60) ~/ 30; // ~90 min
+    // each night gets its own restlessness so scores vary seed-to-seed
+    final nightRestlessness = 0.3 + rng.nextDouble() * 1.9;
     for (var epoch = 0; epoch < totalEpochs; epoch++) {
-      // restless near sleep onset, a mid-night stir, and before wake
       final frac = epoch / totalEpochs;
-      final restless = frac < 0.06 || frac > 0.95 || (0.45 < frac && frac < 0.48);
-      final amp = restless ? 0.5 : 0.04;
+      final pos = (epoch % cycleEpochs) / cycleEpochs; // within cycle
+      // light sleep (more micro-movement) peaks at cycle ends; nights get
+      // lighter toward morning; sleep onset and pre-wake are restless.
+      final lightness = _bell(pos, 0.9, 0.15) + 0.4 * _bell(pos, 0.5, 0.3) + 0.5 * frac;
+      final onsetOrWake = frac < 0.05 || frac > 0.96;
+      // occasional brief awakening
+      final stir = rng.nextDouble() < 0.03 * nightRestlessness;
+      final amp = onsetOrWake || stir ? 0.45 : (0.02 + 0.12 * lightness * nightRestlessness);
+      final moveProb = onsetOrWake || stir ? 0.06 : 0.004 + 0.02 * lightness;
       for (var i = 0; i < sampleHz * 30; i++) {
-        final moving = rng.nextDouble() < (restless ? 0.06 : 0.005);
-        final a = moving ? amp : 0.01;
+        final a = rng.nextDouble() < moveProb ? amp : 0.01;
         yield [
           _g(rng, a),
           _g(rng, a),
@@ -44,6 +52,9 @@ class SimulatedNight implements AccelerometerSource {
       }
     }
   }
+
+  double _bell(double x, double mu, double sigma) =>
+      math.exp(-((x - mu) * (x - mu)) / (2 * sigma * sigma));
 
   double _g(math.Random rng, double sd) => (rng.nextDouble() - 0.5) * 2 * sd;
 }
@@ -104,8 +115,12 @@ class SleepTracker {
     final deep = labels.where((l) => l == 'deep').length / total;
     final rem = labels.where((l) => l == 'rem').length / total;
     final awake = labels.where((l) => l == 'awake').length / total;
-    // simple, transparent score: reward deep+rem, penalize wake
-    final s = 100 * (0.5 + 0.9 * deep + 0.6 * rem - 0.8 * awake);
+    final efficiency = 1.0 - awake; // share of the night actually asleep
+    // Transparent score: mostly sleep efficiency, plus credit for hitting
+    // healthy deep (~18%) and REM (~22%) proportions. Won't peg at 100.
+    final deepTerm = (deep / 0.18).clamp(0.0, 1.0);
+    final remTerm = (rem / 0.22).clamp(0.0, 1.0);
+    final s = 100 * (0.6 * efficiency + 0.22 * deepTerm + 0.18 * remTerm);
     return s.clamp(0, 100).round();
   }
 }

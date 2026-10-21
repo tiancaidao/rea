@@ -9,7 +9,6 @@ const _phaseColors = {
   'light': Color(0xFF6C7BFF),
   'deep': Color(0xFF3949AB),
 };
-const _phaseLevel = {'awake': 0, 'rem': 1, 'light': 2, 'deep': 3};
 
 /// Loads a sample night (SimulatedNight) then shows ResultsScreen.
 class ResultsDemoLoader extends StatelessWidget {
@@ -230,24 +229,75 @@ class _LegendChip extends StatelessWidget {
   }
 }
 
+/// Smooth "wave" hypnogram: a soft depth curve (awake at the top, deep at the
+/// bottom) with a gradient fill, instead of hard stepped bars — the look a
+/// polished sleep app uses. Depth per epoch is smoothed so transitions read as
+/// curves. Stage colors are conveyed by the legend chips below the chart.
 class _HypnogramPainter extends CustomPainter {
   final List<PhasePoint> phases;
   _HypnogramPainter(this.phases);
+
+  // depth: awake=0 (top) ... deep=3 (bottom)
+  static const _depth = {'awake': 0.0, 'rem': 1.0, 'light': 2.0, 'deep': 3.0};
 
   @override
   void paint(Canvas canvas, Size size) {
     if (phases.isEmpty) return;
     final n = phases.length;
-    final rowH = size.height / 4;
-    final paint = Paint()..strokeWidth = 2;
+    // raw depth then a light moving-average smoothing
+    final raw = [for (final p in phases) _depth[p.phase] ?? 0.0];
+    final sm = <double>[];
+    const r = 4;
     for (var i = 0; i < n; i++) {
-      final level = _phaseLevel[phases[i].phase] ?? 0;
-      final x = size.width * i / n;
-      final w = size.width / n + 1;
-      paint.color = _phaseColors[phases[i].phase]!;
-      final y = rowH * level;
-      canvas.drawRect(Rect.fromLTWH(x, y, w, rowH), paint);
+      var acc = 0.0, cnt = 0;
+      for (var j = i - r; j <= i + r; j++) {
+        if (j >= 0 && j < n) {
+          acc += raw[j];
+          cnt++;
+        }
+      }
+      sm.add(acc / cnt);
     }
+    double x(int i) => size.width * i / (n - 1).clamp(1, 1 << 30);
+    double y(double d) => 6 + (d / 3.0) * (size.height - 12);
+    final pts = [for (var i = 0; i < n; i++) Offset(x(i), y(sm[i]))];
+
+    // gridlines per stage row
+    final grid = Paint()..color = Colors.white10..strokeWidth = 1;
+    for (var l = 0; l <= 3; l++) {
+      final yy = y(l.toDouble());
+      canvas.drawLine(Offset(0, yy), Offset(size.width, yy), grid);
+    }
+
+    // smooth path via midpoint quadratics
+    final line = Path()..moveTo(pts.first.dx, pts.first.dy);
+    for (var i = 1; i < pts.length; i++) {
+      final mid = Offset((pts[i - 1].dx + pts[i].dx) / 2, (pts[i - 1].dy + pts[i].dy) / 2);
+      line.quadraticBezierTo(pts[i - 1].dx, pts[i - 1].dy, mid.dx, mid.dy);
+    }
+    line.lineTo(pts.last.dx, pts.last.dy);
+
+    final fill = Path.from(line)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+      fill,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0x668C9EFF), Color(0x11050814)],
+        ).createShader(Offset.zero & size),
+    );
+    canvas.drawPath(
+      line,
+      Paint()
+        ..color = const Color(0xFF8C9EFF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..strokeJoin = StrokeJoin.round,
+    );
   }
 
   @override

@@ -75,17 +75,28 @@ class _SleepAidScreenState extends State<SleepAidScreen> {
                     style: Theme.of(context).textTheme.titleLarge),
               ),
               for (final t in cat.tracks)
-                ListTile(
-                  leading: Icon(
-                    _current?.id == t.id ? Icons.pause_circle : Icons.play_circle,
-                    size: 38,
-                    color: t.premium ? Colors.white24 : AppTheme.primary,
-                  ),
-                  title: Text(t.title),
-                  trailing: t.premium
-                      ? const Icon(Icons.lock_outline, size: 18, color: Colors.white38)
+                Container(
+                  color: _current?.id == t.id
+                      ? AppTheme.primary.withOpacity(0.14)
                       : null,
-                  onTap: () => _toggle(t),
+                  child: ListTile(
+                    leading: Icon(
+                      _current?.id == t.id ? Icons.pause_circle_filled : Icons.play_circle,
+                      size: 38,
+                      color: t.premium ? Colors.white24 : AppTheme.primary,
+                    ),
+                    title: Text(t.title,
+                        style: TextStyle(
+                            fontWeight:
+                                _current?.id == t.id ? FontWeight.w700 : FontWeight.normal)),
+                    subtitle: _current?.id == t.id
+                        ? const Text('Playing', style: TextStyle(color: AppTheme.accent))
+                        : null,
+                    trailing: t.premium
+                        ? const Icon(Icons.lock_outline, size: 18, color: Colors.white38)
+                        : null,
+                    onTap: () => _toggle(t),
+                  ),
                 ),
             ],
           );

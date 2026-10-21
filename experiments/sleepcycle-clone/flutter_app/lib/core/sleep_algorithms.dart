@@ -102,26 +102,69 @@ List<double> _smooth(List<double> xs, int radius, double sigma) {
   return out;
 }
 
+double _bell(double x, double mu, double sigma) =>
+    math.exp(-((x - mu) * (x - mu)) / (2 * sigma * sigma));
+
+/// Estimate 4-stage sleep from per-epoch movement.
+///
+/// Movement alone can tell *asleep vs awake* but cannot by itself separate
+/// deep from REM (both are quiet). So, like actigraphy-based stagers, we add a
+/// transparent population prior over sleep architecture: nights run in ~90 min
+/// cycles, deep sleep dominates the early cycles, and REM grows toward morning
+/// and clusters at the end of each cycle. Movement then pushes an epoch lighter
+/// or marks it awake. This is our own heuristic — swap in a trained model
+/// (lib via ONNX/TFLite) for real staging; the contract (per-epoch features ->
+/// labels) is the same.
 List<String> estimateStages(
   List<EpochFeatures> epochs, {
-  int smoothRadius = 5,
-  double smoothSigma = 2.0,
-  int tailAwakeEpochs = 6,
+  int epochSeconds = 30,
+  int smoothRadius = 3,
+  double smoothSigma = 1.5,
+  double wakeThreshold = 0.55,
+  int onsetEpochs = 6,
+  int tailAwakeEpochs = 4,
 }) {
   if (epochs.isEmpty) return [];
-  final raw = epochs.map((e) => 3.0 * math.min(math.max(e.movement, 0.0), 1.0)).toList();
-  for (var i = 0; i < epochs.length; i++) {
+  final n = epochs.length;
+  final mv = _smooth(
+    epochs.map((e) => math.min(math.max(e.movement, 0.0), 1.0)).toList(),
+    smoothRadius,
+    smoothSigma,
+  );
+  final cycleEpochs = (90 * 60) ~/ epochSeconds; // ~90 min
+  final labels = List<String>.filled(n, 'light');
+  for (var i = 0; i < n; i++) {
+    final m = mv[i];
+    if (m > wakeThreshold) {
+      labels[i] = 'awake';
+      continue;
+    }
+    final cycleIdx = i / cycleEpochs; // 0,1,2...
+    final pos = (i % cycleEpochs) / cycleEpochs; // 0..1 within the cycle
+    // breathing, when available, nudges toward deeper sleep
     final e = epochs[i];
-    if (e.breathingRate != null && e.breathingConf > 0.3) {
-      raw[i] = math.max(0.0, raw[i] - 0.3);
+    final breathBonus =
+        (e.breathingRate != null && e.breathingConf > 0.3) ? 0.15 : 0.0;
+    final deepScore =
+        math.max(0.0, 1.0 - cycleIdx * 0.45) * _bell(pos, 0.3, 0.18) +
+            breathBonus -
+            m; // movement suppresses deep
+    final remScore =
+        (0.15 + cycleIdx * 0.28).clamp(0.0, 1.0) * _bell(pos, 0.85, 0.12);
+    final lightScore = 0.35 + 0.5 * m;
+    if (deepScore >= remScore && deepScore >= lightScore && m < 0.25) {
+      labels[i] = 'deep';
+    } else if (remScore > lightScore && remScore >= deepScore) {
+      labels[i] = 'rem';
+    } else {
+      labels[i] = 'light';
     }
   }
-  final depth = _smooth(raw, smoothRadius, smoothSigma);
-  final labels = depth.map((d) {
-    final level = d.clamp(0.0, 3.0).round();
-    return stages[level];
-  }).toList();
-  for (var i = math.max(0, labels.length - tailAwakeEpochs); i < labels.length; i++) {
+  // sleep onset is light/awake; the last stretch is waking up
+  for (var i = 0; i < math.min(onsetEpochs, n); i++) {
+    if (labels[i] == 'deep' || labels[i] == 'rem') labels[i] = 'light';
+  }
+  for (var i = math.max(0, n - tailAwakeEpochs); i < n; i++) {
     labels[i] = 'awake';
   }
   return labels;

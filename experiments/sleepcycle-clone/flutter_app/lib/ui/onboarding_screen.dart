@@ -43,6 +43,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         S.get('ob_notif_perk_patterns'),
       ].where((e) => e.isNotEmpty).toList(),
     ),
+    _Step(
+      icon: Icons.alarm,
+      title: S.get('wake_window_headline', "Set tomorrow's wake-up time"),
+      body: S.get('wake_window_help', 'Wake me during light sleep no later than'),
+      bigValue: '07:30',
+      footnote: 'We wake you in a ±30 min window, at your lightest moment. '
+          'Fine-tune it anytime in Alarm settings.',
+    ),
   ];
 
   void _next() {
@@ -115,6 +123,7 @@ class _Step {
   final String body;
   final List<String> perks;
   final String? footnote;
+  final String? bigValue;
   const _Step({
     this.lottie,
     required this.icon,
@@ -122,6 +131,7 @@ class _Step {
     this.body = '',
     this.perks = const [],
     this.footnote,
+    this.bigValue,
   });
 }
 
@@ -137,16 +147,28 @@ class _StepView extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          SizedBox(height: 180, child: _Art(step: step)),
-          const SizedBox(height: 36),
+          SizedBox(
+            height: step.lottie != null ? 300 : 170,
+            child: _Art(step: step),
+          ),
+          const SizedBox(height: 32),
           Text(step.title,
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: (step.lottie != null
+                      ? Theme.of(context).textTheme.headlineMedium
+                      : Theme.of(context).textTheme.headlineSmall)
+                  ?.copyWith(fontWeight: FontWeight.w700),
               textAlign: TextAlign.center),
           if (step.body.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(step.body,
                 style: const TextStyle(color: Colors.white70, height: 1.4),
                 textAlign: TextAlign.center),
+          ],
+          if (step.bigValue != null) ...[
+            const SizedBox(height: 16),
+            Text(step.bigValue!,
+                style: const TextStyle(
+                    fontSize: 56, fontWeight: FontWeight.bold, color: AppTheme.accent)),
           ],
           if (step.perks.isNotEmpty) ...[
             const SizedBox(height: 20),

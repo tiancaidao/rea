@@ -9,10 +9,15 @@ hypnogram, sleep score and smart-alarm logic with no device or native code.
 
 ```bash
 cd flutter_app
+flutter create .            # one-time: generate android/ ios/ runners (not committed)
 flutter pub get
 flutter run                 # phone, emulator, or `flutter run -d chrome`
 flutter test                # unit tests for the algorithms
 ```
+
+> The repo ships the Dart source, tests and the native sensing plugin, but not
+> the generated platform runners. Run `flutter create .` once to scaffold them
+> (it won't overwrite `lib/`), then build as usual.
 
 > This project is authored as source; it wasn't compiled in the environment that
 > generated it. If `flutter analyze` flags anything, it'll be a small fix — the
@@ -62,7 +67,10 @@ Honest, feature-by-feature. "Design parity" = same approach, our own code/params
 | Primary navigation | Journal / Statistics / Sleep aid / Profile bottom bar | **same four-tab bottom bar** (NavigationBar) | **Parity** |
 | UI text | full string table, 13 locales | **runtime string table** (loads real copy locally, ships original) | **Parity** (one locale) |
 | App icon / branding | custom mark | real icon wired as placeholder; original mark in theme | Functional (own brand = gap) |
-| Onboarding | animated Lottie intro + consent perks | **real Lottie intro** + real mic/notification perk copy | **Parity** (placeholder assets) |
+| Onboarding | full-screen animated Lottie intro + consent perks + wake-time step | **full-bleed Lottie intro**, large headline, real perks, **wake-time step** | **Parity** (placeholder assets) |
+| Visual identity | navy/teal palette, rounded font, warm buttons | **own navy + teal palette, warm "sunrise" CTA buttons** (not default-Flutter purple) | Close; **gap**: custom font |
+| Hypnogram | smooth depth "waves" | **smooth gradient depth curve** (was stepped bars) | Functional |
+| Sample night realism | learned cyclic staging | **cyclic deep-early / REM-late architecture prior**; realistic stage mix + score (fixed all-deep/score-100 bug) | Functional |
 | Movement tracking | accelerometer, calibrated, per-minute events | accelerometer aggregator, calibration, 30 s epochs | **Design parity** (needs real sensor feed) |
 | Sleep staging | learned model (breathing+movement) → 4 stages, smoothed | transparent movement→depth heuristic, Gaussian-smoothed, 4 stages | Baseline; **gap**: train a real model |
 | Smart alarm | per-night learned thresholds, eased window | per-night percentile thresholds, eased window | **Design parity** |

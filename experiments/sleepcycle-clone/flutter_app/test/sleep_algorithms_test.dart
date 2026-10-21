@@ -14,9 +14,12 @@ void main() {
     expect(emitted.length, 3);
   });
 
-  test('still epochs are deep, active epochs are awake', () {
-    final still = List.generate(20, (_) => EpochFeatures(0.0));
-    expect(estimateStages(still).take(10).toSet(), {'deep'});
+  test('quiet epochs are asleep (deep appears), active epochs are awake', () {
+    final still = List.generate(60, (_) => EpochFeatures(0.0));
+    final labels = estimateStages(still);
+    // mid-night quiet epochs are asleep (not awake) and deep sleep appears
+    expect(labels.sublist(10, 50).contains('awake'), isFalse);
+    expect(labels.contains('deep'), isTrue);
     final active = List.generate(20, (_) => EpochFeatures(1.0));
     expect(estimateStages(active).first, 'awake');
   });
