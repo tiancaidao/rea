@@ -31,6 +31,7 @@ lib/
   data/models.dart             # SleepSession, PhasePoint, AlarmSettings
   data/api_client.dart         # client for ../mock-api
   data/night.dart              # a tracked night + journal extras; synthetic sample nights
+  data/recorded_night.dart     # replays a recorded night (events CSV) into realistic nights
   data/sleep_aid_catalog.dart  # sleep-aid sections (our own placeholder catalog)
   data/programs.dart           # programs + lessons (our own placeholder content)
   sensing/sleep_tracker.dart   # orchestrates a night; SimulatedNight source for dev
@@ -70,7 +71,20 @@ Before the first night, Journal and Statistics show demo content under an
 overlay, as the original does. To explore them without tracking, use
 Profile › More › Database › **Load sample nights (prototype)**. Sign-in and
 the trial purchase are mocked; if the mock API isn't running, sign-in
-continues locally.
+continues locally. State (settings, nights, lesson progress, onboarding) is
+saved with shared_preferences, so later launches open straight on the tabs.
+
+**Realistic test data with the local placeholders.** When
+`extract_placeholders.sh` has been run:
+- sample, demo and "stopped" nights replay the APK's recorded night
+  (`dummy_sleep_events.csv`: movement + snore events) through our staging,
+  jittered per night, instead of the synthetic generator;
+- every sleep-aid item and alarm sound plays one of the bundled audio files
+  (ambiences for soundscapes, the melodic alarm tracks for the rest);
+- video lessons and the microphone snooze tip play the bundled clip.
+
+Without them the app falls back to synthetic nights, mock playback and
+illustrations, so a clean checkout still builds and runs.
 
 The analysis is plain Dart and has no device dependency. Real sensing is the one
 native piece: swap `SimulatedNight` for a platform-channel source backed by

@@ -13,6 +13,8 @@ dependencies:
   http: ^1.2.0
   lottie: ^3.1.2                 # vector onboarding / loading animations
   just_audio: ^0.9.40           # sleep-aid audio playback
+  video_player: ^2.14.1
+  shared_preferences: ^2.5.6
   # Enable these as you wire up the remaining device features:
   #   record: ^5.0.0              # microphone capture
   #   onnxruntime: ^1.4.1         # on-device ML (or tflite_flutter)

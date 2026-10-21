@@ -80,8 +80,10 @@ class WelcomeScreen extends StatelessWidget {
 class TrialScreen extends StatelessWidget {
   const TrialScreen({super.key});
 
-  void _enter(BuildContext context) => Navigator.pushAndRemoveUntil(
-      context, MaterialPageRoute(builder: (_) => const MainShell()), (_) => false);
+  void _enter(BuildContext context) {
+    AppState.I.finishOnboarding();
+    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const MainShell()), (_) => false);
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -1,15 +1,129 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'data/night.dart';
+import 'data/recorded_night.dart';
 import 'data/sleep_aid_catalog.dart';
 
 /// App-wide state for the prototype: alarm, settings, recorded nights and the
-/// chosen sleep-aid track. In memory only (a real build persists this with
-/// shared_preferences / a local DB and syncs via the backend).
+/// chosen sleep-aid track. Persisted locally with shared_preferences (a real
+/// build would use a local DB and sync via the backend).
 class AppState extends ChangeNotifier {
   AppState._();
   static final AppState I = AppState._();
+
+  // ── persistence ───────────────────────────────────────────────────────────
+  static const _storeKey = 'app_state_v1';
+  bool onboarded = false; // finished onboarding + account + trial screens
+  Timer? _saveTimer;
+  bool _loaded = false;
+
+  /// Restore saved state and warm up local assets. Call once before runApp.
+  Future<void> load() async {
+    await RecordedNight.load();
+    await _loadAudioPool();
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final raw = sp.getString(_storeKey);
+      if (raw != null) _restore(json.decode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      // corrupt or unavailable storage: start fresh
+    }
+    _loaded = true;
+  }
+
+  @override
+  void notifyListeners() {
+    super.notifyListeners();
+    if (!_loaded) return;
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 400), _save);
+  }
+
+  void finishOnboarding() {
+    onboarded = true;
+    notifyListeners();
+  }
+
+  void logOut() {
+    onboarded = false;
+    tab = 0;
+    notifyListeners();
+  }
+
+  Future<void> _save() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setString(
+          _storeKey,
+          json.encode({
+            'onboarded': onboarded,
+            'email': email,
+            'premium': premium,
+            'alarmHour': alarmHour,
+            'alarmMinute': alarmMinute,
+            'alarmMode': alarmMode,
+            'prefs': _prefs,
+            'sleepNotes': sleepNotes,
+            'completedLessons': completedLessons.toList(),
+            'nights': [for (final n in nights) n.toJson()],
+          }));
+    } catch (_) {}
+  }
+
+  void _restore(Map<String, dynamic> j) {
+    onboarded = j['onboarded'] as bool? ?? false;
+    email = j['email'] as String? ?? email;
+    premium = j['premium'] as bool? ?? false;
+    alarmHour = j['alarmHour'] as int? ?? alarmHour;
+    alarmMinute = j['alarmMinute'] as int? ?? alarmMinute;
+    alarmMode = j['alarmMode'] as int? ?? alarmMode;
+    (j['prefs'] as Map?)?.forEach((k, v) => _prefs[k as String] = v as String);
+    final notes = (j['sleepNotes'] as List?)?.cast<String>();
+    if (notes != null) sleepNotes
+      ..clear()
+      ..addAll(notes);
+    completedLessons.addAll((j['completedLessons'] as List? ?? const []).cast<String>());
+    nights.addAll([
+      for (final n in j['nights'] as List? ?? const []) Night.fromJson((n as Map).cast<String, dynamic>())
+    ]);
+  }
+
+  // ── local audio ───────────────────────────────────────────────────────────
+  /// Audio files present in assets/audio/ (the extracted comparison
+  /// placeholders). Empty in a clean checkout, where playback is mocked.
+  List<String> ambienceAudio = [];
+  List<String> alarmAudio = [];
+
+  Future<void> _loadAudioPool() async {
+    try {
+      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+      final audio = manifest.listAssets().where((a) => a.startsWith('assets/audio/') &&
+          (a.endsWith('.mp3') || a.endsWith('.ogg') || a.endsWith('.m4a')) &&
+          !a.contains('silence')).toList()
+        ..sort();
+      alarmAudio = audio.where((a) => a.contains('alarm_sound')).toList();
+      ambienceAudio = audio.where((a) => !a.contains('alarm_sound')).toList();
+    } catch (_) {}
+  }
+
+  /// Local file to play for a catalog item: its own asset if it has one,
+  /// otherwise a stable pick from the local pool (ambience first for
+  /// soundscapes, the melodic alarm tracks for music/stories/guides).
+  String? audioFor(SleepAidItem item) {
+    if (item.asset != null && (ambienceAudio.contains(item.asset) || alarmAudio.contains(item.asset))) {
+      return item.asset;
+    }
+    final pool = item.minutes == 0
+        ? (ambienceAudio.isNotEmpty ? ambienceAudio : alarmAudio)
+        : (alarmAudio.isNotEmpty ? alarmAudio : ambienceAudio);
+    if (pool.isEmpty) return null;
+    return pool[item.id.codeUnits.fold(0, (a, b) => a + b) % pool.length];
+  }
 
   // ── navigation ────────────────────────────────────────────────────────────
   int tab = 0; // Sleep · Programs · Journal · Statistics · Profile
@@ -127,7 +241,7 @@ class AppState extends ChangeNotifier {
     for (var d = count; d >= 1; d--) {
       final morning = DateTime(today.year, today.month, today.day - d + 1, 6 + rng.nextInt(2),
           rng.nextInt(60));
-      nights.add(Night.sample(morning, rng.nextInt(1 << 30)));
+      nights.add(sampleNight(morning, 1 + rng.nextInt(1 << 30)));
     }
     nights.sort((a, b) => a.wokeUp.compareTo(b.wokeUp));
     selectedNight = null;
@@ -156,9 +270,10 @@ class AppState extends ChangeNotifier {
     if (item == null) return;
     sleepAidPlaying = true;
     notifyListeners();
-    if (item.asset == null) return; // streamed in a real build: mock playback
+    final file = audioFor(item);
+    if (file == null) return; // streamed in a real build: mock playback
     try {
-      await player.setAsset(item.asset!);
+      await player.setAsset(file);
       await player.play();
     } catch (_) {
       // placeholder audio not extracted locally: keep the mock "playing" state

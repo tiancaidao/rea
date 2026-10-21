@@ -3,6 +3,7 @@ import '../app_state.dart';
 import '../data/programs.dart';
 import '../theme.dart';
 import 'widgets/common.dart';
+import 'widgets/looping_video.dart';
 
 /// Programs tab: a vertical list of illustrated program cards.
 class ProgramsTab extends StatelessWidget {
@@ -155,14 +156,30 @@ class _VideoLessonState extends State<_VideoLesson> {
       backgroundColor: Colors.black,
       body: Stack(children: [
         Positioned.fill(
+          child: LoopingVideo(
+            // the one clip bundled in the APK (local placeholder); a real
+            // build streams each lesson's own video
+            asset: 'assets/video/mic_snooze_reminder.mp4',
+            muted: _muted,
+            fallback: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                    colors: [widget.program.colors.last, Colors.black],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter),
+              ),
+              child: const Icon(Icons.person, size: 260, color: Colors.white10),
+            ),
+          ),
+        ),
+        const Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                  colors: [widget.program.colors.last, Colors.black],
-                  begin: Alignment.topCenter,
+                  colors: [Colors.transparent, Colors.black87],
+                  begin: Alignment.center,
                   end: Alignment.bottomCenter),
             ),
-            child: const Icon(Icons.person, size: 260, color: Colors.white10),
           ),
         ),
         SafeArea(

@@ -44,6 +44,42 @@ class Night {
   /// Night "belongs" to the morning it ends on.
   DateTime get day => DateTime(wokeUp.year, wokeUp.month, wokeUp.day);
 
+  Map<String, dynamic> toJson() => {
+        'session': session.toJson(),
+        'mood': mood,
+        'notes': notes.toList(),
+        'steps': steps,
+        'weatherF': weatherF,
+        'snoreMinutes': snoreMinutes,
+        'coughs': coughs,
+        'breathingPerHour': breathingPerHour,
+        'regularity': regularity,
+      };
+
+  factory Night.fromJson(Map<String, dynamic> j) {
+    final s = j['session'] as Map<String, dynamic>;
+    return Night(
+      session: SleepSession(
+        startedAt: DateTime.fromMillisecondsSinceEpoch(s['startedAt'] as int),
+        endedAt: DateTime.fromMillisecondsSinceEpoch(s['endedAt'] as int),
+        phases: [
+          for (final p in s['phases'] as List) PhasePoint.fromJson((p as Map).cast<String, dynamic>())
+        ],
+        snoreEvents: s['snoreEvents'] as int,
+        snorePercent: (s['snorePercent'] as num).toDouble(),
+        sleepScore: s['sleepScore'] as int,
+      ),
+      mood: j['mood'] as int?,
+      notes: {for (final n in j['notes'] as List) n as String},
+      steps: j['steps'] as int,
+      weatherF: j['weatherF'] as int,
+      snoreMinutes: j['snoreMinutes'] as int,
+      coughs: j['coughs'] as int,
+      breathingPerHour: (j['breathingPerHour'] as num).toDouble(),
+      regularity: j['regularity'] as int,
+    );
+  }
+
   /// Build a night from a finished tracking run, filling the mocked extras.
   factory Night.fromResult(TrackingResult r, {int? seed}) {
     final rng = math.Random(seed ?? r.session.startedAt.millisecondsSinceEpoch);
@@ -68,6 +104,8 @@ class Night {
     final labels = <String>[];
     final onset = 10 + rng.nextInt(30);
     final restless = 0.002 + rng.nextDouble() * 0.04; // per-night chance of a brief wake
+    final deepEnd = 0.2 + rng.nextDouble() * 0.25; // how much deep sleep this night gets
+    final remStart = 0.8 + rng.nextDouble() * 0.12;
     for (var i = 0; i < epochs; i++) {
       final frac = i / epochs;
       final pos = (i % 180) / 180; // 90-min cycle, 30-s epochs
@@ -77,9 +115,9 @@ class Night {
         s = 'awake';
       } else if (rng.nextDouble() < restless) {
         s = 'awake';
-      } else if (pos > 0.12 && pos < 0.45 && cycle < 3) {
+      } else if (pos > 0.12 && pos < deepEnd && cycle < 3) {
         s = 'deep';
-      } else if (pos > 0.78 - 0.05 * cycle) {
+      } else if (pos > remStart - 0.05 * cycle) {
         s = 'rem';
       } else {
         s = 'light';

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../data/night.dart';
+import '../data/recorded_night.dart';
 import '../theme.dart';
 import 'journal_tab.dart' show DemoOverlay;
 import 'widgets/common.dart';
@@ -110,7 +111,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
     final today = DateTime.now();
     return [
       for (var d = 120; d >= 1; d--)
-        Night.sample(DateTime(today.year, today.month, today.day - d + 1, 6 + d % 2, (d * 7) % 60), d)
+        sampleNight(DateTime(today.year, today.month, today.day - d + 1, 6 + d % 2, (d * 7) % 60), d)
     ];
   }();
 

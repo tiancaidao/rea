@@ -4,6 +4,7 @@ import '../theme.dart';
 import 'sleep_aid_sheet.dart';
 import 'tracking_screen.dart';
 import 'widgets/common.dart';
+import 'widgets/looping_video.dart';
 import 'widgets/time_wheel.dart';
 
 /// Sleep tab: sleep-aid pill, alarm time wheel, and a 3-page pager for the
@@ -154,7 +155,19 @@ class _RememberSheetState extends State<_RememberSheet> {
       ]),
       const Divider(height: 1, color: Colors.white12),
       const Spacer(),
-      CircleArt(asset: st.$1, icon: st.$2, size: 260),
+      if (_step == 1 && mic)
+        SizedBox(
+          width: 260,
+          height: 260,
+          child: ClipOval(
+            child: LoopingVideo(
+              asset: 'assets/video/mic_snooze_reminder.mp4',
+              fallback: CircleArt(asset: st.$1, icon: st.$2, size: 260),
+            ),
+          ),
+        )
+      else
+        CircleArt(asset: st.$1, icon: st.$2, size: 260),
       const Spacer(),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),

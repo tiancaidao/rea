@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../data/night.dart';
+import '../data/recorded_night.dart';
 import '../theme.dart';
 import 'settings_pages.dart';
 import 'widgets/common.dart';
@@ -49,8 +50,8 @@ Future<void> showInfoSheet(BuildContext context, String title, String body) => s
 class JournalTab extends StatelessWidget {
   const JournalTab({super.key});
 
-  static final Night _demo = Night.sample(
-      DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, 7, 30), 4);
+  static final Night _demo =
+      sampleNight(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, 7, 30), 0);
 
   @override
   Widget build(BuildContext context) {

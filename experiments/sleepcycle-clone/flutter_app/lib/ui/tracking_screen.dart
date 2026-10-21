@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../data/night.dart';
+import '../data/recorded_night.dart';
 import '../sensing/sleep_tracker.dart';
 import '../theme.dart';
 import 'sleep_aid_sheet.dart';
@@ -89,13 +90,24 @@ class _TrackingScreenState extends State<TrackingScreen> {
     if (_stopping) return;
     setState(() => _stopping = true);
     final seed = DateTime.now().millisecondsSinceEpoch & 0x7fffffff;
-    final hours = 7 + math.Random(seed).nextInt(2);
-    final result = await SleepTracker().run(
-      SimulatedNight(hours: hours, seed: seed),
-      startedAt: DateTime.now().subtract(Duration(hours: hours)),
-    );
+    // Native sensing isn't wired yet. Prefer replaying the bundled recorded
+    // night (jittered) through our staging; else run the accelerometer
+    // pipeline on a SimulatedNight.
+    final recorded = RecordedNight.cached;
+    late final Night night;
+    if (recorded != null) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      night = recorded.toNight(DateTime.now(), seed: seed);
+    } else {
+      final hours = 7 + math.Random(seed).nextInt(2);
+      final result = await SleepTracker().run(
+        SimulatedNight(hours: hours, seed: seed),
+        startedAt: DateTime.now().subtract(Duration(hours: hours)),
+      );
+      night = Night.fromResult(result, seed: seed);
+    }
     AppState.I
-      ..addNight(Night.fromResult(result, seed: seed))
+      ..addNight(night)
       ..pauseSleepAid()
       ..goTab(2); // Journal
     if (mounted) Navigator.popUntil(context, (r) => r.isFirst);

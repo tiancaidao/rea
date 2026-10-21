@@ -33,7 +33,7 @@ jj 'res/mipmap-xxxhdpi-v4/ic_launcher_round.png' -d "$tmp"
 [ -f "$tmp/ic_launcher_round.png" ] && mv "$tmp/ic_launcher_round.png" "$ASSETS/icon/app_icon.png"
 
 echo "data (sleep-aid catalog, star fields)…"
-jj 'res/raw/sleep_aid_index.json' 'res/raw/stars.csv' 'res/raw/night_stars.csv' -d "$ASSETS/data"
+jj 'res/raw/sleep_aid_index.json' 'res/raw/stars.csv' 'res/raw/night_stars.csv' 'res/raw/dummy_sleep_events.csv' -d "$ASSETS/data"
 
 echo "lottie / vector animations…"
 jj 'res/raw/anim_*.json' 'res/raw/animation_*.json' -d "$ASSETS/lottie"

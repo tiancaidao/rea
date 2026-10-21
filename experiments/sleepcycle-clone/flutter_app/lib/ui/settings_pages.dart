@@ -1,4 +1,5 @@
 import 'dart:io' show Directory, File;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../theme.dart';
@@ -53,21 +54,21 @@ class AlarmSoundPage extends StatelessWidget {
     'Winter moon', 'Park bench', 'Metro', 'Good morning',
   ];
 
-  // Local comparison placeholders: alarm sounds extracted from the APK, if present.
-  static const _files = [
-    'alarm_sound_1.mp3', 'alarm_sound_2.mp3', 'alarm_sound_3.mp3', 'alarm_sound_4.mp3',
-    'alarm_sound_5.mp3', 'alarm_sound_6.mp3', 'alarm_sound_7.mp3', 'alarm_sound_8.mp3',
-    'alarm_sound_9.mp3', 'alarm_sound_12.mp3', 'alarm_sound_21.mp3', 'alarm_sound_23.mp3',
-    'alarm_sound_27.mp3', 'alarm_sound_28.mp3', 'alarm_sound_29.mp3', 'alarm_sound_30.mp3',
-    'alarm_sound_1120.mp3', 'alarm_sound_1121.mp3', 'alarm_sound_1122.mp3',
-  ];
+  /// Local file for an alarm sound name: a stable pick from the alarm sounds
+  /// extracted into assets/audio/ (comparison placeholders), if present.
+  static String? fileFor(String name) {
+    final pool = AppState.I.alarmAudio;
+    if (pool.isEmpty) return null;
+    final all = [...free, ...premium];
+    return pool[math.max(0, all.indexOf(name)) % pool.length];
+  }
 
   static Future<void> _preview(String name) async {
-    final all = [...free, ...premium];
-    final f = _files[all.indexOf(name) % _files.length];
+    final f = fileFor(name);
+    if (f == null) return;
     final p = AppState.I.player;
     try {
-      await p.setAsset('assets/audio/$f');
+      await p.setAsset(f);
       await p.play();
       await Future.delayed(const Duration(seconds: 4));
       await p.stop();
@@ -198,6 +199,7 @@ class AccountPage extends StatelessWidget {
           link('Manage account', () => toast(context, 'Opens account management (backend not wired)')),
           link('Log out', () async {
             if (await confirm(context, 'Log out?', 'Your nights stay backed up online.', 'Log out')) {
+              s.logOut();
               if (!context.mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const WelcomeScreen()), (_) => false);
@@ -209,6 +211,7 @@ class AccountPage extends StatelessWidget {
           link('Erase your data and account', () async {
             if (await confirm(context, 'Erase data and account?', 'This cannot be undone.', 'Erase')) {
               s.eraseAll();
+              s.logOut();
               if (!context.mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const WelcomeScreen()), (_) => false);
