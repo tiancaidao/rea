@@ -104,12 +104,14 @@ class SleepTracker {
       phases: phases,
       snoreEvents: snoreEvents,
       snorePercent: snorePercent,
-      sleepScore: _score(labels),
+      sleepScore: scoreFor(labels),
     );
     return TrackingResult(session, norm);
   }
 
-  int _score(List<String> labels) {
+  /// Sleep score for a list of per-epoch stage labels (also used for demo
+  /// and sample nights that skip the sensor pipeline).
+  static int scoreFor(List<String> labels) {
     if (labels.isEmpty) return 0;
     final total = labels.length;
     final deep = labels.where((l) => l == 'deep').length / total;

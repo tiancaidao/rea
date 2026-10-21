@@ -30,10 +30,47 @@ lib/
   core/sleep_algorithms.dart   # movement, staging, smart alarm, snore (Dart port of sleep_core)
   data/models.dart             # SleepSession, PhasePoint, AlarmSettings
   data/api_client.dart         # client for ../mock-api
+  data/night.dart              # a tracked night + journal extras; synthetic sample nights
+  data/sleep_aid_catalog.dart  # sleep-aid sections (our own placeholder catalog)
+  data/programs.dart           # programs + lessons (our own placeholder content)
   sensing/sleep_tracker.dart   # orchestrates a night; SimulatedNight source for dev
-  ui/                          # home, sleep session, results (hypnogram), alarm settings
-test/sleep_algorithms_test.dart
+  app_state.dart               # in-memory app state (alarm, settings, nights, sleep aid)
+  ui/                          # screens, see "Navigation" below
+test/
 ```
+
+## Navigation
+
+Same screen tree and user journey as the original (see
+`comparison/nav_map.md` in the research workspace for the reference capture):
+
+```
+Onboarding → Welcome (Google / email / log in) → Free-trial explainer (✕ skips)
+  → five tabs: Sleep · Programs · Journal · Statistics · Profile
+
+Sleep       sleep-aid pill → catalog sheet → track sheet (download → play)
+            time wheel + pager [smart window | regular alarm | no alarm]
+            Start → "Remember" placement tip → snooze tip → Tracking
+            Tracking: moon, clock, tap alarm → Change alarm sheet, swipe up Stop
+            Stop → night analysed → Journal
+Programs    program cards → detail (n/N completed, lesson grid)
+            → video lesson | swipeable card lesson (completes on last card)
+Journal     day header, week strip with quality rings, calendar, weekly report,
+            quality ring, wave hypnogram, stat grid, sleep goal, notes, cards
+Statistics  Days/Weeks/Months/All; 12 metric charts, each "More ›" → detail
+Profile     tiles, gift → Benefits; Settings (Sleep Goal, Sound, Wake up
+            phase, Watch, Weekly report, More); Premium (Online backup, Sleep
+            aid, Sleep notes → Edit, Wake up mood, Weather, Who's snoring); Help
+More        Account, About you, Consent, Health Connect · Motion/Sound
+            detection, Placement reminders, Snooze, Vibration, Battery warning ·
+            Database (export CSV, **Load sample nights**), Third-party software
+```
+
+Before the first night, Journal and Statistics show demo content under an
+overlay, as the original does. To explore them without tracking, use
+Profile › More › Database › **Load sample nights (prototype)**. Sign-in and
+the trial purchase are mocked; if the mock API isn't running, sign-in
+continues locally.
 
 The analysis is plain Dart and has no device dependency. Real sensing is the one
 native piece: swap `SimulatedNight` for a platform-channel source backed by
@@ -64,7 +101,7 @@ Honest, feature-by-feature. "Design parity" = same approach, our own code/params
 
 | Area | Sleep Cycle | This app | Status |
 |---|---|---|---|
-| Primary navigation | Journal / Statistics / Sleep aid / Profile bottom bar | **same four-tab bottom bar** (NavigationBar) | **Parity** |
+| Primary navigation | Sleep / Programs / Journal / Statistics / Profile bottom bar | **same five tabs, same order and screen tree** | **Parity** |
 | UI text | full string table, 13 locales | **runtime string table** (loads real copy locally, ships original) | **Parity** (one locale) |
 | App icon / branding | custom mark | real icon wired as placeholder; original mark in theme | Functional (own brand = gap) |
 | Onboarding | full-screen animated Lottie intro + consent perks + wake-time step | **full-bleed Lottie intro**, large headline, real perks, **wake-time step** | **Parity** (placeholder assets) |

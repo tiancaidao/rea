@@ -8,7 +8,9 @@ import '../strings.dart';
 /// the consent steps use the real microphone/notification perk copy from the
 /// string table, falling back to an icon when no animation is bundled.
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+  /// Called after the last step; when null the screen pops itself.
+  final VoidCallback? onDone;
+  const OnboardingScreen({super.key, this.onDone});
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
@@ -49,13 +51,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: S.get('wake_window_help', 'Wake me during light sleep no later than'),
       bigValue: '07:30',
       footnote: 'We wake you in a ±30 min window, at your lightest moment. '
-          'Fine-tune it anytime in Alarm settings.',
+          'Change it anytime on the Sleep tab.',
     ),
   ];
 
   void _next() {
     if (_page == _steps.length - 1) {
-      Navigator.pop(context, true);
+      widget.onDone != null ? widget.onDone!() : Navigator.pop(context, true);
     } else {
       _pager.nextPage(duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../app_state.dart';
 import '../data/api_client.dart';
 
 /// Email/password sign-in against the mock identity endpoint. The real backend
@@ -20,9 +21,13 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _busy = true; _error = null; });
     try {
       await widget.api.login(_email.text.trim(), _password.text);
+      AppState.I.email = _email.text.trim();
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      setState(() => _error = 'Sign-in failed: $e');
+      // Prototype: the mock backend (../mock-api) is optional. If it isn't
+      // running, continue signed in locally so the journey can be explored.
+      AppState.I.email = _email.text.trim();
+      if (mounted) Navigator.pop(context, true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

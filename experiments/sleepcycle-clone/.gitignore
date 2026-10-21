@@ -16,12 +16,18 @@ flutter_app/.flutter-plugins*
 # APK-extracted assets used ONLY as local comparison placeholders.
 # These are Northcube's copyrighted material — kept local, never redistributed.
 # Run tools/extract_placeholders.sh against the APK to repopulate for a demo.
-flutter_app/assets/audio/
-flutter_app/assets/video/
-flutter_app/assets/images/
-flutter_app/assets/fonts/
-flutter_app/assets/lottie/
-flutter_app/assets/icon/
+flutter_app/assets/audio/*
+!flutter_app/assets/audio/.gitkeep
+flutter_app/assets/video/*
+!flutter_app/assets/video/.gitkeep
+flutter_app/assets/images/*
+!flutter_app/assets/images/.gitkeep
+flutter_app/assets/fonts/*
+!flutter_app/assets/fonts/.gitkeep
+flutter_app/assets/lottie/*
+!flutter_app/assets/lottie/.gitkeep
+flutter_app/assets/icon/*
+!flutter_app/assets/icon/.gitkeep
 flutter_app/assets/data/*.csv
 flutter_app/assets/data/sleep_aid_index.json
 flutter_app/assets/data/strings.en.json

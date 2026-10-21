@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'theme.dart';
 import 'strings.dart';
-import 'ui/main_shell.dart';
 import 'ui/onboarding_screen.dart';
+import 'ui/welcome_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -10,6 +10,9 @@ Future<void> main() async {
   runApp(const SleepApp());
 }
 
+/// First-run journey, as in the original: onboarding → account → free-trial
+/// explainer → five-tab app. (A real build persists "onboarded"/"signed in"
+/// and skips straight to the tabs on later launches.)
 class SleepApp extends StatelessWidget {
   const SleepApp({super.key});
 
@@ -19,29 +22,12 @@ class SleepApp extends StatelessWidget {
       title: 'Sleep Tracker',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark(),
-      home: const _Root(),
+      home: Builder(
+        builder: (context) => OnboardingScreen(
+          onDone: () => Navigator.pushReplacement(
+              context, MaterialPageRoute(builder: (_) => const WelcomeScreen())),
+        ),
+      ),
     );
   }
-}
-
-class _Root extends StatefulWidget {
-  const _Root();
-  @override
-  State<_Root> createState() => _RootState();
-}
-
-class _RootState extends State<_Root> {
-  @override
-  void initState() {
-    super.initState();
-    // First run: show onboarding once. (Persist a flag with shared_preferences
-    // in a real build; shown every launch here for the demo.)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const OnboardingScreen()));
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) => const MainShell();
 }
