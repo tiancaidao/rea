@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:duplicates_cleaner/models/duplicate_item.dart';
 import 'package:duplicates_cleaner/models/enums.dart';
 import 'package:duplicates_cleaner/services/scan_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,12 +27,14 @@ void main() {
 
   Future<List<List<String>>> scan(ScanAlgorithm a,
       {Set<String> ext = const {'bin', 'jpg', 'png'},
-      FileSizeExclusion ex = FileSizeExclusion.none}) async {
+      FileSizeExclusion ex = FileSizeExclusion.none,
+      bool verify = true}) async {
     final groups = await ScanEngine(ScanRequest(
       roots: [root.path],
       extensions: ext,
       algorithm: a,
       sizeExclusion: ex,
+      verifyContent: verify,
     )).run();
     return [
       for (final g in groups) [for (final i in g.items) p.relative(i.path, from: root.path)]..sort(),
@@ -74,13 +77,51 @@ void main() {
     ]);
   });
 
-  test('same name groups case-insensitively', () async {
-    write('a/Photo.bin', randomBytes(9000, 5));
+  test('same name matches the exact name, as the original groups rows', () async {
+    write('a/photo.bin', randomBytes(9000, 5));
     write('b/photo.bin', randomBytes(12000, 6));
+    write('c/Photo.bin', randomBytes(12000, 8));
     expect(await scan(ScanAlgorithm.sameName), [
+      ['a/photo.bin', 'b/photo.bin'],
+    ]);
+  });
+
+  test('same name and size ignores case but needs equal sizes', () async {
+    write('a/Photo.bin', randomBytes(12000, 5));
+    write('b/photo.bin', randomBytes(12000, 6));
+    write('c/photo.bin', randomBytes(9000, 7));
+    expect(await scan(ScanAlgorithm.sameNameAndSize), [
       ['a/Photo.bin', 'b/photo.bin'],
     ]);
-    expect(await scan(ScanAlgorithm.sameNameAndSize), isEmpty);
+  });
+
+  test('without verification, same content trusts the sampled hash', () async {
+    final a = randomBytes(30000, 3);
+    final b = Uint8List.fromList(a)..[15000] ^= 0xFF;
+    write('x.bin', a);
+    write('y.bin', b);
+    expect(await scan(ScanAlgorithm.sameContent, verify: false), [
+      ['x.bin', 'y.bin'],
+    ]);
+  });
+
+  test('the first file of each group is the one kept', () async {
+    final data = randomBytes(20000, 9);
+    write('a.bin', data);
+    write('b.bin', data);
+    write('c.bin', data);
+    final groups = await ScanEngine(ScanRequest(
+      roots: [root.path],
+      extensions: const {'bin'},
+      algorithm: ScanAlgorithm.sameContent,
+      sizeExclusion: FileSizeExclusion.none,
+    )).run();
+    final restored = [
+      for (final g in groups)
+        DuplicateGroup([for (final i in g.items) DuplicateItem.fromJson(i.toJson())]),
+    ];
+    expect(restored.single.items.map((i) => i.isMainFile), [true, false, false]);
+    expect(restored.single.wastedBytes, 40000);
   });
 
   test('size exclusion drops tiny files', () async {

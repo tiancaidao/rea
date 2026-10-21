@@ -3,20 +3,25 @@ import 'dart:typed_data';
 
 import '../core/xxhash32.dart';
 
-/// Port of `FileCheck.GetXhash`: the original fingerprints a file by its size,
-/// the XXH32 of 4096 bytes starting at offset 2048, and the XXH32 of the last
-/// 2048 bytes. Files below 8 KB never reach this point.
-Future<String> partialContentFingerprint(File file) async {
+/// Port of `FileCheck.GetXhash`: 2 * XXH32(4096 bytes from offset 2048) +
+/// file size + XXH32(last 2048 bytes), as an unsigned 64-bit sum. A short
+/// first read leaves zeros in the buffer, as in the original. Files shorter
+/// than 2048 bytes make the original's seek from the end fail, and it then
+/// returns 0, so this does too.
+Future<int> originalContentHash(File file) async {
   final raf = await file.open();
   try {
     final size = await raf.length();
+    if (size < 2048) return 0;
     final first = Uint8List(4096);
     await raf.setPosition(2048);
     await raf.readInto(first);
     final last = Uint8List(2048);
-    await raf.setPosition(size >= 2048 ? size - 2048 : 0);
+    await raf.setPosition(size - 2048);
     await raf.readInto(last);
-    return '$size:${XxHash32.hash(first)}:${XxHash32.hash(last)}';
+    return 2 * XxHash32.hash(first) + size + XxHash32.hash(last);
+  } on FileSystemException {
+    return 0;
   } finally {
     await raf.close();
   }

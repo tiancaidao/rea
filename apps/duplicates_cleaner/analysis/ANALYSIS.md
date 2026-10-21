@@ -140,7 +140,7 @@ select filters.
 | `KHash`                                    | `lib/core/xxhash32.dart` |
 | `FileCheck.GetXhash`                       | `lib/services/content_fingerprint.dart` |
 | `FilesScanner` + grouping services         | `lib/services/scan_engine.dart`, run on an isolate by `background_scanner.dart` |
-| `SkiaImageMathOperations.GetPHash`         | `lib/services/image_hash.dart` (pHash only, see differences) |
+| `SkiaImageMathOperations`, `SkiaImageOperations`, `GroupFinal` | `lib/services/image_similarity.dart` (all nine features, both passes) |
 | `CommonPageData` / `SettingsData`          | `lib/services/settings_store.dart` (shared_preferences) |
 | `GoogleBillingService`, licence service    | `lib/services/premium_service.dart` (stub) |
 | `ScannerPageActivity` selection and delete | `lib/services/results_controller.dart`, `lib/screens/scanner_screen.dart` |
@@ -148,12 +148,19 @@ select filters.
 
 ### Deliberate differences
 
-- **Byte-for-byte confirmation.** Partial fingerprint matches are confirmed by
-  comparing whole files before they are offered for deletion, so two files that
-  only share their sampled regions are never grouped.
-- **Similar images** use only the pHash with a Hamming threshold of 12,
-  without the region checks, the aspect-ratio bucketing or the second pass. The pure-Dart decoder covers JPEG, PNG, GIF,
-  TIFF and BMP; HEIF, EPS and RAW are skipped in this mode.
+- **Same content** uses the original hash and groups by it alone. An extra
+  step, on by default (Settings → Confirm Same Content Byte by Byte), splits
+  each group by real byte equality, so a hash collision never offers a
+  different file for deletion. Files under 2 KB all hash to 0 in the original;
+  with the setting off the port reproduces that.
+- **Same name** finds candidates by lower-cased name and then groups by the
+  exact name, as the original does. **Name and size** uses the original
+  `NSHash` key (lower-cased name followed by the size).
+- **Similar images** port all nine features, both passes, the aspect-ratio
+  buckets and .NET's half-to-even rounding. Differences: images are decoded
+  and resized by the pure-Dart `image` package rather than Skia, so values can
+  differ by a level or two; HEIF, EPS and RAW are skipped; and groups of one
+  image, which the original can emit from pass 2, are dropped.
 - **Billing and licensing** are not wired. `PremiumService` keeps the same
   gates and can be unlocked from the upgrade dialog in debug builds.
 - **Left out**: PairIP, OneSignal, sideload licensing, cross-promotion links,

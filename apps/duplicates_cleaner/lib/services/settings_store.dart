@@ -47,6 +47,14 @@ class SettingsStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Not in the original, which trusts its sampled hash. On by default so a
+  /// hash collision can never put a different file up for deletion.
+  bool get verifyContent => _prefs.getBool('VerifyContent') ?? true;
+  set verifyContent(bool v) {
+    _prefs.setBool('VerifyContent', v);
+    notifyListeners();
+  }
+
   bool get firstLaunch => _prefs.getBool('FirstLaunch') ?? true;
   set firstLaunch(bool v) => _prefs.setBool('FirstLaunch', v);
 

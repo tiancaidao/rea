@@ -99,6 +99,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
       extensions: widget.scanType.extensions(settings.customExtensions),
       algorithm: algorithm,
       sizeExclusion: exclusion,
+      verifyContent: settings.verifyContent,
     ));
     if (!mounted) {
       await scan.cancel();

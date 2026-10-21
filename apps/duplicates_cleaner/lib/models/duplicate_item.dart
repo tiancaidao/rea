@@ -24,6 +24,8 @@ class DuplicateItem {
         'name': name,
         'size': size,
         'modified': modified.millisecondsSinceEpoch,
+        'isMainFile': isMainFile,
+        'checked': checked,
       };
 
   factory DuplicateItem.fromJson(Map<String, Object?> j) => DuplicateItem(
@@ -31,6 +33,8 @@ class DuplicateItem {
         name: j['name']! as String,
         size: j['size']! as int,
         modified: DateTime.fromMillisecondsSinceEpoch(j['modified']! as int),
+        isMainFile: j['isMainFile'] as bool? ?? false,
+        checked: j['checked'] as bool? ?? false,
       );
 }
 

@@ -6,7 +6,7 @@ import '../core/constants.dart';
 import '../models/duplicate_item.dart';
 import '../models/enums.dart';
 import 'content_fingerprint.dart';
-import 'image_hash.dart';
+import 'image_similarity.dart';
 
 /// Everything a scan needs. Plain data so it can cross an isolate boundary.
 class ScanRequest {
@@ -15,12 +15,17 @@ class ScanRequest {
     required this.extensions,
     required this.algorithm,
     required this.sizeExclusion,
+    this.verifyContent = true,
   });
 
   final List<String> roots;
   final Set<String> extensions;
   final ScanAlgorithm algorithm;
   final FileSizeExclusion sizeExclusion;
+
+  /// Confirm "same content" groups byte-for-byte. The original trusts its
+  /// sampled hash alone; turning this off reproduces that exactly.
+  final bool verifyContent;
 }
 
 enum ScanPhase { enumerating, analyzing, comparing }
@@ -53,9 +58,10 @@ class ScanEngine {
     if (_cancelled) return const [];
     final groups = switch (request.algorithm) {
       ScanAlgorithm.sameContent => await _bySameContent(files),
-      ScanAlgorithm.sameName => _groupBy(files, (f) => f.name.toLowerCase()),
+      ScanAlgorithm.sameName => _bySameName(files),
+      // `NSHash`: lower-cased name followed by the size, with no separator.
       ScanAlgorithm.sameNameAndSize =>
-        _groupBy(files, (f) => '${f.name.toLowerCase()}|${f.size}'),
+        _groupBy(files, (f) => '${f.name.toLowerCase()}${f.size}'),
       ScanAlgorithm.sameSize => _groupBy(files, (f) => '${f.size}'),
       ScanAlgorithm.sameAppearance => await _bySameAppearance(files),
     };
@@ -125,36 +131,46 @@ class ScanEngine {
     ];
   }
 
+  /// `ProcessFileByName`: candidates are found by lower-cased name, but the
+  /// stored rows are grouped by the name as written, so "IMG.jpg" and
+  /// "img.jpg" end up in separate groups.
+  List<DuplicateGroup> _bySameName(List<DuplicateItem> files) {
+    final candidates =
+        _groupBy(files, (f) => f.name.toLowerCase()).expand((g) => g.items).toList();
+    return _groupBy(candidates, (f) => f.name);
+  }
+
+  /// `ProcessFileSizeAndContent`: files sharing a size are hashed with
+  /// `FileCheck.GetXhash`, and the stored rows are grouped by that hash alone.
   Future<List<DuplicateGroup>> _bySameContent(List<DuplicateItem> files) async {
-    // Stage 1: only files sharing a size can be identical.
-    final bySize = _groupBy(files, (f) => '${f.size}');
-    final candidates = bySize.expand((g) => g.items).toList();
-    // Stage 2: the original app's partial XXH32 fingerprint.
-    final byPrint = <String, List<DuplicateItem>>{};
+    final candidates = _groupBy(files, (f) => '${f.size}').expand((g) => g.items).toList();
+    final byHash = <int, List<DuplicateItem>>{};
     for (var i = 0; i < candidates.length && !_cancelled; i++) {
       final f = candidates[i];
       _report(ScanPhase.analyzing, i, candidates.length, f.path);
       try {
-        final key = await partialContentFingerprint(File(f.path));
-        byPrint.putIfAbsent(key, () => []).add(f);
+        final hash = await originalContentHash(File(f.path));
+        byHash.putIfAbsent(hash, () => []).add(f);
       } on FileSystemException {
         continue;
       }
     }
-    // Stage 3: confirm byte-for-byte so a fingerprint collision never leads
-    // to deleting a file that only looks the same at its edges.
+    final buckets = byHash.values.where((b) => b.length > 1).toList();
+    if (!request.verifyContent) return [for (final b in buckets) DuplicateGroup(b)];
+
+    // Optional extra step: split each bucket by real byte equality, so a hash
+    // collision (including every file under 2 KB, which all hash to 0) never
+    // offers a different file for deletion.
     final groups = <DuplicateGroup>[];
-    var done = 0;
-    for (final bucket in byPrint.values.where((b) => b.length > 1)) {
-      if (_cancelled) break;
-      var remaining = [...bucket];
+    for (var done = 0; done < buckets.length && !_cancelled; done++) {
+      var remaining = [...buckets[done]];
       while (remaining.length > 1) {
         final head = remaining.first;
         final same = [head];
         final rest = <DuplicateItem>[];
         for (final other in remaining.skip(1)) {
-          _report(ScanPhase.comparing, done, byPrint.length, other.path);
-          final equal =
+          _report(ScanPhase.comparing, done, buckets.length, other.path);
+          final equal = head.size == other.size &&
               await filesHaveSameBytes(File(head.path), File(other.path))
                   .catchError((_) => false);
           (equal ? same : rest).add(other);
@@ -162,46 +178,35 @@ class ScanEngine {
         if (same.length > 1) groups.add(DuplicateGroup(same));
         remaining = rest;
       }
-      done++;
     }
     return groups;
   }
 
+  /// `ProcessSimilarImageFiles` + `GroupFinal`: nine features per image, then
+  /// the two matching passes in [groupSimilarImages].
   Future<List<DuplicateGroup>> _bySameAppearance(List<DuplicateItem> files) async {
     final images = files
         .where((f) => AppConstants.decodableImageExtensions
             .contains(p.extension(f.name).replaceFirst('.', '').toLowerCase()))
         .toList();
-    final hashed = <(DuplicateItem, int)>[];
+    final analysed = <DuplicateItem>[];
+    final features = <ImageFeatures>[];
     for (var i = 0; i < images.length && !_cancelled; i++) {
       _report(ScanPhase.analyzing, i, images.length, images[i].path);
       try {
-        final h = await perceptualHash(File(images[i].path));
-        if (h != null) hashed.add((images[i], h));
+        final f = await ImageFeatures.fromFile(File(images[i].path));
+        if (f == null) continue;
+        analysed.add(images[i]);
+        features.add(f);
       } catch (_) {
         continue;
       }
     }
-    // Connected components over "close enough" pairs, as the original does
-    // with its breadth-first grouping in `GroupByPhaseOne`.
-    final parent = List<int>.generate(hashed.length, (i) => i);
-    int find(int i) => parent[i] == i ? i : parent[i] = find(parent[i]);
-    for (var i = 0; i < hashed.length && !_cancelled; i++) {
-      _report(ScanPhase.comparing, i, hashed.length, hashed[i].$1.path);
-      for (var j = i + 1; j < hashed.length; j++) {
-        if (hammingDistance(hashed[i].$2, hashed[j].$2) <=
-            AppConstants.similarImageMaxHammingDistance) {
-          parent[find(j)] = find(i);
-        }
-      }
-    }
-    final components = <int, List<DuplicateItem>>{};
-    for (var i = 0; i < hashed.length; i++) {
-      components.putIfAbsent(find(i), () => []).add(hashed[i].$1);
-    }
+    if (_cancelled) return const [];
+    _report(ScanPhase.comparing, 0, 1, '');
     return [
-      for (final c in components.values)
-        if (c.length > 1) DuplicateGroup(c),
+      for (final g in groupSimilarImages(features))
+        DuplicateGroup([for (final i in g) analysed[i]]),
     ];
   }
 

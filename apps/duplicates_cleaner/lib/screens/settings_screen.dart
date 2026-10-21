@@ -100,6 +100,15 @@ class SettingsScreen extends StatelessWidget {
                   onChanged: (v) => settings.promptBeforeDeletion = v,
                 ),
               ),
+              Card(
+                child: SwitchListTile(
+                  secondary: const Icon(Icons.verified_outlined),
+                  title: const Text('Confirm Same Content Byte by Byte'),
+                  subtitle: const Text('Slower, but never groups files that only share sampled bytes'),
+                  value: settings.verifyContent,
+                  onChanged: (v) => settings.verifyContent = v,
+                ),
+              ),
               const SizedBox(height: 12),
               SizedBox(
                 height: 64,
