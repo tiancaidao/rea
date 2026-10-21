@@ -1,0 +1,210 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+
+import '../app.dart';
+import '../core/constants.dart';
+import '../models/enums.dart';
+import '../widgets/dialogs.dart';
+import '../widgets/panel_scaffold.dart';
+
+/// Scan location, scan type, size exclusion, toggles and custom extensions
+/// (`SettingsActivity`).
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final settings = scope.settings, premium = scope.premium;
+    return ListenableBuilder(
+      listenable: Listenable.merge([settings, premium]),
+      builder: (context, _) {
+        final locations = Platform.isIOS
+            ? const [StorageSelection.internal, StorageSelection.customFolder]
+            : StorageSelection.values;
+        return PanelScaffold(
+          title: 'Settings',
+          body: ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
+              _OptionCard(
+                icon: Icons.folder_outlined,
+                title: 'Scan Location',
+                value: settings.storage == StorageSelection.customFolder &&
+                        settings.customFolder != null
+                    ? 'Custom: ${settings.customFolder}'
+                    : settings.storage.label,
+                onTap: () async {
+                  final s = await chooseOne(context,
+                      title: 'Scan Location',
+                      options: locations,
+                      label: (s) => s.label,
+                      selected: settings.storage,
+                      locked: (s) => !premium.allowsStorage(s));
+                  if (s == null || !context.mounted) return;
+                  if (!premium.allowsStorage(s)) return showUpgradeDialog(context);
+                  if (s == StorageSelection.customFolder) {
+                    final folder = await scope.storage.pickFolder();
+                    if (folder == null) return;
+                    settings.customFolder = folder;
+                  }
+                  settings.storage = s;
+                },
+              ),
+              _OptionCard(
+                icon: Icons.manage_search,
+                title: 'Scan Type',
+                value: settings.algorithm.label,
+                onTap: () async {
+                  final a = await chooseOne(context,
+                      title: 'Scan Type',
+                      options: ScanAlgorithm.values,
+                      label: (a) => a.label,
+                      selected: settings.algorithm,
+                      locked: (a) => !premium.allowsAlgorithm(a));
+                  if (a == null || !context.mounted) return;
+                  if (!premium.allowsAlgorithm(a)) return showUpgradeDialog(context);
+                  settings.algorithm = a;
+                },
+              ),
+              _OptionCard(
+                icon: Icons.filter_alt_outlined,
+                title: 'File Size Exclusion',
+                value: settings.sizeExclusion.label,
+                onTap: () async {
+                  final e = await chooseOne(context,
+                      title: 'File Size Exclusion',
+                      options: FileSizeExclusion.values,
+                      label: (e) => e.label,
+                      selected: settings.sizeExclusion,
+                      locked: (e) => !premium.allowsSizeExclusion(e));
+                  if (e == null || !context.mounted) return;
+                  if (!premium.allowsSizeExclusion(e)) return showUpgradeDialog(context);
+                  settings.sizeExclusion = e;
+                },
+              ),
+              Card(
+                child: SwitchListTile(
+                  secondary: const Icon(Icons.done_all),
+                  title: const Text('Auto Select Duplicates'),
+                  value: settings.autoSelectDuplicates,
+                  onChanged: (v) => settings.autoSelectDuplicates = v,
+                ),
+              ),
+              Card(
+                child: SwitchListTile(
+                  secondary: const Icon(Icons.warning_amber_outlined),
+                  title: const Text('Prompt Before File Deletion'),
+                  value: settings.promptBeforeDeletion,
+                  onChanged: (v) => settings.promptBeforeDeletion = v,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 64,
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('Custom Extensions', style: TextStyle(fontSize: 18)),
+                  onPressed: () => premium.allowsCustomExtensions
+                      ? showDialog(context: context, builder: (_) => const _ExtensionsDialog())
+                      : showUpgradeDialog(context),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _OptionCard extends StatelessWidget {
+  const _OptionCard(
+      {required this.icon, required this.title, required this.value, required this.onTap});
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: ListTile(
+          leading: Icon(icon),
+          title: Text(title),
+          subtitle: Text(value, maxLines: 2, overflow: TextOverflow.ellipsis),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: onTap,
+        ),
+      );
+}
+
+/// `CustomExtensionDialogFragment`: add comma separated extensions, remove
+/// existing ones.
+class _ExtensionsDialog extends StatefulWidget {
+  const _ExtensionsDialog();
+
+  @override
+  State<_ExtensionsDialog> createState() => _ExtensionsDialogState();
+}
+
+class _ExtensionsDialogState extends State<_ExtensionsDialog> {
+  final _input = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _input.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final settings = AppScope.of(context).settings;
+    final text = _input.text.replaceAll(' ', '');
+    if (!AppConstants.customExtensionsPattern.hasMatch(text)) {
+      setState(() => _error = 'Use letters and digits separated by commas, e.g. psd,ai');
+      return;
+    }
+    settings.customExtensions = {
+      ...settings.customExtensions,
+      ...text.split(',').where((e) => e.isNotEmpty).map((e) => e.toLowerCase()),
+    };
+    _input.clear();
+    setState(() => _error = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = AppScope.of(context).settings;
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) => AlertDialog(
+        title: const Text('Add Custom Extension'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(
+              controller: _input,
+              decoration: InputDecoration(hintText: 'Enter extensions', errorText: _error),
+              onSubmitted: (_) => _save(),
+            ),
+            const SizedBox(height: 12),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              for (final e in settings.customExtensions)
+                InputChip(
+                  label: Text(e),
+                  onDeleted: () =>
+                      settings.customExtensions = {...settings.customExtensions}..remove(e),
+                ),
+            ]),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
+          FilledButton(onPressed: _save, child: const Text('Save')),
+        ],
+      ),
+    );
+  }
+}
