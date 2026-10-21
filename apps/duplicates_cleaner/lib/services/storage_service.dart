@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -31,6 +32,27 @@ class StorageService {
   }
 
   Future<void> openAccessSettings() => openAppSettings();
+
+  static const _volume = MethodChannel('duplicates_cleaner/volume');
+
+  /// Deletes a file on an SD card or USB drive through the Storage Access
+  /// Framework, asking once per volume for folder access. Used when a plain
+  /// delete is refused. Returns false off Android or for internal storage.
+  Future<bool> deleteOnRemovableVolume(String path) async {
+    if (!Platform.isAndroid ||
+        !path.startsWith('/storage/') ||
+        path.startsWith('/storage/emulated/')) {
+      return false;
+    }
+    try {
+      return await _volume.invokeMethod<bool>('deleteOnVolume', {
+            'path': path,
+          }) ??
+          false;
+    } on PlatformException {
+      return false;
+    }
+  }
 
   Future<String?> pickFolder() =>
       FilePicker.getDirectoryPath(dialogTitle: 'Select a folder to scan');

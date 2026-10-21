@@ -30,7 +30,7 @@ Future<bool> confirm(
       barrierDismissible: false,
       builder: (c) => AlertDialog(
         title: Text(title),
-        content: Text(message),
+        content: message.isEmpty ? null : Text(message),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: Text(no)),
           FilledButton(
@@ -53,30 +53,36 @@ Future<T?> chooseOne<T>(
 }) => showModalBottomSheet<T>(
   context: context,
   showDragHandle: true,
+  isScrollControlled: true,
   builder: (c) => SafeArea(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(title, style: Theme.of(c).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        for (final o in options)
-          ListTile(
-            title: Text(label(o)),
-            leading: Icon(
-              o == selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_off,
-              color: AppColors.accent,
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(c).height * 0.75,
+      ),
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          Center(child: Text(title, style: Theme.of(c).textTheme.titleMedium)),
+          const SizedBox(height: 8),
+          for (final o in options)
+            ListTile(
+              title: Text(label(o)),
+              leading: Icon(
+                o == selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+                color: AppColors.accent,
+              ),
+              trailing: (locked?.call(o) ?? false)
+                  ? const Icon(
+                      Icons.workspace_premium,
+                      color: AppColors.primaryDark,
+                    )
+                  : null,
+              onTap: () => Navigator.pop(c, o),
             ),
-            trailing: (locked?.call(o) ?? false)
-                ? const Icon(
-                    Icons.workspace_premium,
-                    color: AppColors.primaryDark,
-                  )
-                : null,
-            onTap: () => Navigator.pop(c, o),
-          ),
-      ],
+        ],
+      ),
     ),
   ),
 );

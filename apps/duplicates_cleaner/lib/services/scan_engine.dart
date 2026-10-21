@@ -165,8 +165,9 @@ class ScanEngine {
       }
     }
     final buckets = byHash.values.where((b) => b.length > 1).toList();
-    if (!request.verifyContent)
+    if (!request.verifyContent) {
       return [for (final b in buckets) DuplicateGroup(b)];
+    }
 
     // Optional extra step: split each bucket by real byte equality, so a hash
     // collision (including every file under 2 KB, which all hash to 0) never

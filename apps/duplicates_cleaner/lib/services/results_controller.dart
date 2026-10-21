@@ -88,12 +88,19 @@ class ResultsController extends ChangeNotifier {
     return null;
   }
 
-  Future<DeletionResult> deleteSelected() async {
+  /// [fallback] is tried when a plain delete is refused, e.g. on an SD card.
+  Future<DeletionResult> deleteSelected({
+    Future<bool> Function(String path)? fallback,
+  }) async {
     var deleted = 0, freed = 0;
     final failed = <String>[];
     for (final item in selected.toList()) {
       try {
-        await File(item.path).delete();
+        try {
+          await File(item.path).delete();
+        } on FileSystemException {
+          if (fallback == null || !await fallback(item.path)) rethrow;
+        }
         deleted++;
         freed += item.size;
         for (final g in groups) {

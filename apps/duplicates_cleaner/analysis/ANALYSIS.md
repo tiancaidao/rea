@@ -163,11 +163,15 @@ select filters.
   image, which the original can emit from pass 2, are dropped.
 - **Billing and licensing** are not wired. `PremiumService` keeps the same
   gates and can be unlocked from the upgrade dialog in debug builds.
-- **Left out**: PairIP, OneSignal, sideload licensing, cross-promotion links,
-  log export, the rating prompt, and the SQLite results cache.
-- **SD card / USB deletion** uses direct file deletion, which Android may
-  refuse on removable volumes without a Storage Access Framework grant. Those
-  files are reported as failed instead of silently skipped.
+- **Left out**: PairIP, OneSignal, sideload licensing, cross-promotion and
+  support links, and the SQLite results cache.
+- **SD card / USB deletion** tries a direct delete first and, when Android
+  refuses it, asks once per volume for folder access through the Storage
+  Access Framework (`MainActivity.kt`), like the original's `DocumentFile`
+  path. Files that still can't be deleted are reported as failed.
+- **Export Log** shares a plain-text log of scans and deletions; the rating
+  prompt follows `ProcessDeletionThreshold` (every second successful delete)
+  and uses the platform's in-app review sheet.
 - **iOS** has no shared file system, so "internal" scans the app's Documents
   folder (visible in the Files app) and "custom folder" uses the system
   folder picker. The original is Android only.

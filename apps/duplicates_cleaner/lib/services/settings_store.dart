@@ -91,6 +91,12 @@ class SettingsStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  int get reviewThreshold => _prefs.getInt('ReviewThreshold') ?? 0;
+  set reviewThreshold(int v) => _prefs.setInt('ReviewThreshold', v);
+
+  bool get ratingGiven => _prefs.getBool('RatingGiven') ?? false;
+  set ratingGiven(bool v) => _prefs.setBool('RatingGiven', v);
+
   int get deletionSuccessCount => _prefs.getInt('DeletionSuccessCount') ?? 0;
   set deletionSuccessCount(int v) => _prefs.setInt('DeletionSuccessCount', v);
 }

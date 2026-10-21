@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../app.dart';
 import '../core/constants.dart';
 import '../models/enums.dart';
+import '../services/app_log.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/panel_scaffold.dart';
 
@@ -46,8 +47,9 @@ class SettingsScreen extends StatelessWidget {
                     locked: (s) => !premium.allowsStorage(s),
                   );
                   if (s == null || !context.mounted) return;
-                  if (!premium.allowsStorage(s))
+                  if (!premium.allowsStorage(s)) {
                     return showUpgradeDialog(context);
+                  }
                   if (s == StorageSelection.customFolder) {
                     final folder = await scope.storage.pickFolder();
                     if (folder == null) return;
@@ -70,8 +72,9 @@ class SettingsScreen extends StatelessWidget {
                     locked: (a) => !premium.allowsAlgorithm(a),
                   );
                   if (a == null || !context.mounted) return;
-                  if (!premium.allowsAlgorithm(a))
+                  if (!premium.allowsAlgorithm(a)) {
                     return showUpgradeDialog(context);
+                  }
                   settings.algorithm = a;
                 },
               ),
@@ -89,8 +92,9 @@ class SettingsScreen extends StatelessWidget {
                     locked: (e) => !premium.allowsSizeExclusion(e),
                   );
                   if (e == null || !context.mounted) return;
-                  if (!premium.allowsSizeExclusion(e))
+                  if (!premium.allowsSizeExclusion(e)) {
                     return showUpgradeDialog(context);
+                  }
                   settings.sizeExclusion = e;
                 },
               ),
@@ -136,6 +140,26 @@ class SettingsScreen extends StatelessWidget {
                           builder: (_) => const _ExtensionsDialog(),
                         )
                       : showUpgradeDialog(context),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 64,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.ios_share),
+                  label: const Text(
+                    'Export Log',
+                    style: TextStyle(fontSize: 18),
+                  ),
+                  onPressed: () async {
+                    if (!await AppLog.export() && context.mounted) {
+                      await showMessage(
+                        context,
+                        'Export Log',
+                        'Nothing has been logged yet.',
+                      );
+                    }
+                  },
                 ),
               ),
             ],

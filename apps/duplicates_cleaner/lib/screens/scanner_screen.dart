@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:in_app_review/in_app_review.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as p;
 
@@ -9,6 +10,7 @@ import '../core/byte_size.dart';
 import '../core/constants.dart';
 import '../models/duplicate_item.dart';
 import '../models/enums.dart';
+import '../services/app_log.dart';
 import '../services/background_scanner.dart';
 import '../services/results_controller.dart';
 import '../services/scan_engine.dart';
@@ -106,6 +108,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
       return;
     }
 
+    AppLog.info(
+      'Scan started: ${widget.scanType.label}, ${algorithm.label}, '
+      '${storage.label}, ${exclusion.label}, roots: ${roots.join(', ')}',
+    );
     final scan = await BackgroundScan.start(
       ScanRequest(
         roots: roots,
@@ -125,6 +131,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
     });
     try {
       final groups = await scan.result;
+      AppLog.info(
+        'Scan finished: ${groups.length} sets, '
+        '${groups.fold(0, (n, g) => n + g.items.length - 1)} duplicates',
+      );
       if (!mounted) return;
       setState(() {
         _results = ResultsController(
@@ -134,6 +144,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
         _scan = null;
       });
     } catch (e) {
+      AppLog.error('Scan failed: $e');
       if (mounted) setState(() => _error = '$e');
     }
   }
@@ -157,7 +168,15 @@ class _ScannerScreenState extends State<ScannerScreen> {
       if (!ok) return;
     }
     setState(() => _deleting = true);
-    final outcome = await results.deleteSelected();
+    final outcome = await results.deleteSelected(
+      fallback: scope.storage.deleteOnRemovableVolume,
+    );
+    AppLog.info(
+      'Deleted ${outcome.deleted} files, ${formatBytes(outcome.freedBytes)} freed',
+    );
+    for (final f in outcome.failed) {
+      AppLog.error('Could not delete $f');
+    }
     if (!mounted) return;
     setState(() => _deleting = false);
     scope.settings.deletionSuccessCount += outcome.deleted;
@@ -172,33 +191,61 @@ class _ScannerScreenState extends State<ScannerScreen> {
         ),
       ),
     );
+    if (outcome.deleted > 0) await _maybeAskForRating();
+  }
+
+  /// `ProcessDeletionThreshold`: every second successful deletion, until the
+  /// user has rated or bought premium, ask for a rating.
+  Future<void> _maybeAskForRating() async {
+    final scope = AppScope.of(context);
+    final settings = scope.settings;
+    settings.reviewThreshold += 1;
+    if (settings.reviewThreshold.isOdd ||
+        settings.ratingGiven ||
+        scope.premium.isPremium) {
+      return;
+    }
+    final saved = await confirm(
+      context,
+      title: 'Brilliant job done by you!',
+      message:
+          'You saved your device memory from unnecessary Duplicates, right ?',
+    );
+    if (!saved || !mounted) return;
+    final rate = await confirm(
+      context,
+      title: 'Can we get a high five for this through a rating in store :)',
+      message: '',
+      yes: 'Sure!',
+      no: 'later',
+    );
+    if (!rate) return;
+    settings.ratingGiven = true;
+    final review = InAppReview.instance;
+    if (await review.isAvailable()) await review.requestReview();
   }
 
   Future<void> _select() async {
     final scope = AppScope.of(context);
-    if (!scope.premium.allowsSortAndSelectFilters) {
-      return showUpgradeDialog(
-        context,
-        reason: 'Selection filters are a premium feature.',
-      );
-    }
     final f = await chooseOne(
       context,
       title: 'Select an option',
       options: SelectFilter.values,
       label: (f) => f.label,
     );
-    if (f != null) _results!.applySelection(f);
+    if (f == null || !mounted) return;
+    // Like the original, free users can open the filter; applying it is gated.
+    if (!scope.premium.allowsSortAndSelectFilters) {
+      return showUpgradeDialog(
+        context,
+        reason: 'Selection filters are a premium feature.',
+      );
+    }
+    _results!.applySelection(f);
   }
 
   Future<void> _sort() async {
     final scope = AppScope.of(context);
-    if (!scope.premium.allowsSortAndSelectFilters) {
-      return showUpgradeDialog(
-        context,
-        reason: 'Sort filters are a premium feature.',
-      );
-    }
     final options = [
       for (final f in SortField.values) ...[(f, true), (f, false)],
     ];
@@ -210,7 +257,14 @@ class _ScannerScreenState extends State<ScannerScreen> {
       selected: r.sortField == null ? null : (r.sortField!, r.ascending),
       label: (o) => '${o.$1.label} - ${o.$2 ? 'Ascending' : 'Descending'}',
     );
-    if (picked != null) r.sort(picked.$1, ascending: picked.$2);
+    if (picked == null || !mounted) return;
+    if (!scope.premium.allowsSortAndSelectFilters) {
+      return showUpgradeDialog(
+        context,
+        reason: 'Sort filters are a premium feature.',
+      );
+    }
+    r.sort(picked.$1, ascending: picked.$2);
   }
 
   @override
