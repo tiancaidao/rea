@@ -1,65 +1,112 @@
 import 'package:flutter/material.dart';
-import '../data/api_client.dart';
+import 'package:just_audio/just_audio.dart';
+import '../theme.dart';
+import '../strings.dart';
+import '../data/sleep_aid_catalog.dart';
 
-/// Sleep-aid catalog from the backend. Tapping a track would start playback via
-/// an audio package (e.g. just_audio) and an `AVAudioSession` / foreground media
-/// service for background playback; here it shows the catalog + a mock player bar.
+/// Sleep-aid catalog with real playback. Free tracks that have a bundled file
+/// play (looped) via just_audio; premium/streamed tracks show a lock, matching
+/// the original's free/premium split. A now-playing bar controls playback.
 class SleepAidScreen extends StatefulWidget {
-  final SleepApi api;
-  const SleepAidScreen({super.key, required this.api});
+  const SleepAidScreen({super.key});
   @override
   State<SleepAidScreen> createState() => _SleepAidScreenState();
 }
 
 class _SleepAidScreenState extends State<SleepAidScreen> {
-  late Future<List<Map<String, dynamic>>> _packages;
-  String? _playing;
+  final _player = AudioPlayer()..setLoopMode(LoopMode.one);
+  late Future<SleepAidCatalog> _catalog;
+  SleepAidTrack? _current;
 
   @override
   void initState() {
     super.initState();
-    _packages = widget.api.sleepAidPackages();
+    _catalog = SleepAidCatalog.load();
+  }
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle(SleepAidTrack t) async {
+    if (_current?.id == t.id) {
+      await _player.stop();
+      setState(() => _current = null);
+      return;
+    }
+    if (t.premium || t.asset == null) {
+      _lockedSnack();
+      return;
+    }
+    try {
+      await _player.setAsset(t.asset!);
+      await _player.play();
+      setState(() => _current = t);
+    } catch (_) {
+      _lockedSnack(msg: 'Audio unavailable in this build');
+    }
+  }
+
+  void _lockedSnack({String? msg}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg ?? '${S.get('get_premium', 'Get Premium')} to unlock')),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sleep aid')),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _packages,
+      appBar: AppBar(title: Text(S.get('tab_sleep_aid', 'Sleep aid'))),
+      body: FutureBuilder<SleepAidCatalog>(
+        future: _catalog,
         builder: (context, snap) {
           if (!snap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final items = snap.data!;
+          final cat = snap.data!;
           return ListView(
+            padding: const EdgeInsets.only(bottom: 96),
             children: [
-              for (final p in items)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                child: Text(cat.categoryTitle,
+                    style: Theme.of(context).textTheme.titleLarge),
+              ),
+              for (final t in cat.tracks)
                 ListTile(
-                  leading: Icon(_playing == p['id'] ? Icons.pause_circle : Icons.play_circle,
-                      size: 36, color: const Color(0xFF6C7BFF)),
-                  title: Text(p['title'] as String),
-                  subtitle: Text('${p['durationMin']} min'),
-                  onTap: () => setState(() =>
-                      _playing = _playing == p['id'] ? null : p['id'] as String),
+                  leading: Icon(
+                    _current?.id == t.id ? Icons.pause_circle : Icons.play_circle,
+                    size: 38,
+                    color: t.premium ? Colors.white24 : AppTheme.primary,
+                  ),
+                  title: Text(t.title),
+                  trailing: t.premium
+                      ? const Icon(Icons.lock_outline, size: 18, color: Colors.white38)
+                      : null,
+                  onTap: () => _toggle(t),
                 ),
             ],
           );
         },
       ),
-      bottomNavigationBar: _playing == null
+      bottomNavigationBar: _current == null
           ? null
           : Container(
-              color: const Color(0xFF1A1E3A),
-              padding: const EdgeInsets.all(16),
+              color: AppTheme.surface,
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
               child: Row(
                 children: [
-                  const Icon(Icons.graphic_eq, color: Color(0xFF6C7BFF)),
+                  const Icon(Icons.graphic_eq, color: AppTheme.primary),
                   const SizedBox(width: 12),
-                  Expanded(child: Text('Playing $_playing (mock)')),
+                  Expanded(
+                    child: Text('Playing · ${_current!.title}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.stop),
-                    onPressed: () => setState(() => _playing = null),
+                    onPressed: () => _toggle(_current!),
                   ),
                 ],
               ),

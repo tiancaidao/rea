@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../sensing/sleep_tracker.dart';
 import '../data/models.dart';
+import '../strings.dart';
 
 const _phaseColors = {
   'awake': Color(0xFFFF8A80),
@@ -78,11 +79,17 @@ class ResultsScreen extends StatelessWidget {
                   '${s.timeInBed.inMinutes.remainder(60)}m'),
             ),
           ),
-          const SizedBox(height: 16),
-          Text('Sleep notes', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 20),
+          Text(S.get('wake_up_mood', 'Wake-up mood'),
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          const _MoodRow(),
+          const SizedBox(height: 20),
+          Text(S.get('sleep_notes', 'Sleep notes'),
+              style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
-          const Text('Tag what might have affected your night',
-              style: TextStyle(color: Colors.white54, fontSize: 12)),
+          Text(S.get('add_sleep_notes', 'Tag what might have affected your night'),
+              style: const TextStyle(color: Colors.white54, fontSize: 12)),
           const SizedBox(height: 8),
           const _SleepNotes(),
         ],
@@ -91,8 +98,55 @@ class ResultsScreen extends StatelessWidget {
   }
 }
 
-/// Selectable sleep-note tags, correlated with sleep quality over time in a real
-/// build. Local state only here.
+/// Five-point wake-up mood, as in the original. Local state only here; a real
+/// build logs it with the night and correlates it in Statistics.
+class _MoodRow extends StatefulWidget {
+  const _MoodRow();
+  @override
+  State<_MoodRow> createState() => _MoodRowState();
+}
+
+class _MoodRowState extends State<_MoodRow> {
+  static const _faces = [
+    ['😖', 'Awful'],
+    ['🙁', 'Poor'],
+    ['😐', 'Okay'],
+    ['🙂', 'Good'],
+    ['😄', 'Great'],
+  ];
+  int? _selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        for (var i = 0; i < _faces.length; i++)
+          GestureDetector(
+            onTap: () => setState(() => _selected = i),
+            child: Column(
+              children: [
+                AnimatedScale(
+                  scale: _selected == i ? 1.25 : 1,
+                  duration: const Duration(milliseconds: 180),
+                  child: Opacity(
+                    opacity: _selected == null || _selected == i ? 1 : 0.4,
+                    child: Text(_faces[i][0], style: const TextStyle(fontSize: 30)),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(_faces[i][1],
+                    style: const TextStyle(color: Colors.white54, fontSize: 11)),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Selectable sleep-note tags loaded from the string table (the comparison build
+/// uses the real set; otherwise our own). Tapping shows the note's tip.
 class _SleepNotes extends StatefulWidget {
   const _SleepNotes();
   @override
@@ -100,20 +154,35 @@ class _SleepNotes extends StatefulWidget {
 }
 
 class _SleepNotesState extends State<_SleepNotes> {
-  static const _tags = ['Coffee', 'Stress', 'Exercise', 'Late meal', 'Alcohol', 'Screen time'];
   final Set<String> _selected = {};
 
   @override
   Widget build(BuildContext context) {
+    final notes = S.sleepNotes;
+    final tags = notes.isNotEmpty
+        ? notes
+        : const [
+            SleepNote('coffee', 'Coffee', ''),
+            SleepNote('stress', 'Stress', ''),
+            SleepNote('exercise', 'Exercise', ''),
+            SleepNote('alcohol', 'Alcohol', ''),
+          ];
     return Wrap(
       spacing: 8,
       runSpacing: 4,
       children: [
-        for (final t in _tags)
+        for (final n in tags)
           FilterChip(
-            label: Text(t),
-            selected: _selected.contains(t),
-            onSelected: (v) => setState(() => v ? _selected.add(t) : _selected.remove(t)),
+            label: Text(n.title),
+            selected: _selected.contains(n.id),
+            onSelected: (v) {
+              setState(() => v ? _selected.add(n.id) : _selected.remove(n.id));
+              if (v && n.about.isNotEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(n.about), duration: const Duration(seconds: 3)),
+                );
+              }
+            },
           ),
       ],
     );
@@ -136,7 +205,7 @@ class _ScoreCard extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Sleep score'),
+                Text(S.get('sleep_quality', 'Sleep score')),
                 Text('${asleep ~/ 60}h ${asleep.remainder(60)}m asleep',
                     style: const TextStyle(color: Colors.white70)),
               ],

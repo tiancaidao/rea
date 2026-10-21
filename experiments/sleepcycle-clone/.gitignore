@@ -12,3 +12,13 @@ mock-api/mock-db.json
 flutter_app/.dart_tool/
 flutter_app/build/
 flutter_app/.flutter-plugins*
+
+# APK-extracted assets used ONLY as local comparison placeholders.
+# These are Northcube's copyrighted material — kept local, never redistributed.
+# Run tools/extract_placeholders.sh against the APK to repopulate for a demo.
+flutter_app/assets/audio/
+flutter_app/assets/lottie/
+flutter_app/assets/icon/
+flutter_app/assets/data/*.csv
+flutter_app/assets/data/sleep_aid_index.json
+flutter_app/assets/data/strings.en.json

@@ -1,0 +1,118 @@
+{
+  "app_name": "Sleep Tracker",
+  "good_morning": "Good morning",
+  "tab_journal": "Journal",
+  "tab_statistics": "Trends",
+  "tab_sleep_aid": "Sounds",
+  "tab_profile": "You",
+  "sleep_quality": "Sleep score",
+  "sleep_quality_question": "How did you sleep?",
+  "sleep_quality_about": "Your score blends how long you slept, how much you moved, and how often you woke.",
+  "smart_alarm": "Smart alarm",
+  "smart_alarm_desc": "Wakes you during your lightest sleep inside a window you choose.",
+  "wake_window_headline": "Set tomorrow's wake-up time",
+  "wake_window_help": "Wake me during light sleep no later than",
+  "wake_window_select": "Select",
+  "time_in_bed": "Time in bed",
+  "snore": "Snore",
+  "snore_about": "Keep an eye on snoring over time to spot changes.",
+  "sleep_notes": "Sleep notes",
+  "add_sleep_notes": "Add sleep notes",
+  "wake_up_mood": "Wake-up mood",
+  "statistics_empty": "Your trends appear here after your first night.",
+  "bedtime_reminder": "Bedtime is near. Start tracking and put the phone by your bed.",
+  "ob_mic_headline": "Allow microphone access to:",
+  "ob_mic_perk_analysis": "Get a deeper sleep analysis.",
+  "ob_mic_perk_discovery": "Detect snoring, sleep talking and more.",
+  "ob_mic_perk_alarm": "Wake up gently with the smart alarm.",
+  "ob_notif_headline": "Turn on notifications to:",
+  "ob_notif_perk_reminders": "Get wind-down and bedtime reminders.",
+  "ob_notif_perk_patterns": "Understand your patterns with weekly reports.",
+  "ob_next": "Next",
+  "ob_privacy": "Everything is processed on your device. It's yours alone.",
+  "pw_sp_alarm": "Wakes you in light sleep.",
+  "pw_sp_snore": "Track and review your snoring.",
+  "pw_sp_sleep_aid": "Fall asleep easier with soothing sounds.",
+  "pw_sp_stats": "See changes and progress over time.",
+  "pw_sp_mood": "Log your morning mood on waking.",
+  "pw_rating_1_h": "",
+  "pw_rating_1_t": "",
+  "get_premium": "Get Premium",
+  "sleep_notes_list": [
+    {
+      "id": "alcohol",
+      "title": "Alcohol",
+      "about": "A drink may help you drift off but tends to break up your sleep."
+    },
+    {
+      "id": "ate_late",
+      "title": "Ate late",
+      "about": "Eating late can make your sleep less restorative."
+    },
+    {
+      "id": "bath",
+      "title": "Bath",
+      "about": "A warm bath an hour before bed cues your body to wind down."
+    },
+    {
+      "id": "coffee",
+      "title": "Coffee",
+      "about": "Caffeine keeps you alert for hours — try to avoid it after lunch."
+    },
+    {
+      "id": "good_day",
+      "title": "Good day",
+      "about": ""
+    },
+    {
+      "id": "headache",
+      "title": "Headache",
+      "about": ""
+    },
+    {
+      "id": "nap",
+      "title": "Nap",
+      "about": "A short early nap is fine; a long late one disrupts the night."
+    },
+    {
+      "id": "period",
+      "title": "Period",
+      "about": ""
+    },
+    {
+      "id": "sick",
+      "title": "Sick",
+      "about": ""
+    },
+    {
+      "id": "sleep_drug",
+      "title": "Sleep drug",
+      "about": ""
+    },
+    {
+      "id": "stressful_day",
+      "title": "Stressful day",
+      "about": "Empty your thoughts on paper before bed to rest easier."
+    },
+    {
+      "id": "tea",
+      "title": "Tea",
+      "about": ""
+    },
+    {
+      "id": "time_outside",
+      "title": "Time outside",
+      "about": "Daylight earlier in the day helps you feel sleepy at night."
+    },
+    {
+      "id": "tired",
+      "title": "Tired",
+      "about": ""
+    },
+    {
+      "id": "worked_out",
+      "title": "Worked out",
+      "about": ""
+    }
+  ]
+}
