@@ -1,0 +1,6 @@
+
+# ML training: venv, downloaded datasets, trained models (keep out of git)
+.venv/
+data/
+*.onnx
+*.npz

@@ -1,0 +1,39 @@
+rules_version = '2';
+// Owner-only user data. Privileged fields (premium) are written by the API
+// with admin credentials and can't be changed from the app.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /sleepAid/{doc} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && !('premium' in request.resource.data);
+      allow update: if isOwner(uid)
+        && (!('premium' in request.resource.data)
+            || request.resource.data.premium == resource.data.premium);
+      allow delete: if false; // via the API's account deletion
+
+      match /nights/{nightId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.wokeUp is int
+          && request.resource.data.session is map
+          && request.resource.data.session.phases.size() <= 2880; // ≤ 24 h of 30 s epochs
+      }
+      match /reports/{week} {
+        allow read: if isOwner(uid);
+        allow write: if false; // computed by the API
+      }
+    }
+  }
+}

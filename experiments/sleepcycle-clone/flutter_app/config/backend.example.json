@@ -1,0 +1,9 @@
+{
+  "BACKEND": "cloud",
+  "API_BASE_URL": "https://sleep-tracker-api-<hash>-as.a.run.app",
+  "FIREBASE_PROJECT_ID": "<project-id>",
+  "FIREBASE_APP_ID": "1:<number>:android:<id>",
+  "FIREBASE_API_KEY": "<android api key>",
+  "FIREBASE_SENDER_ID": "<project number>",
+  "FIREBASE_STORAGE_BUCKET": "<project-id>.firebasestorage.app"
+}

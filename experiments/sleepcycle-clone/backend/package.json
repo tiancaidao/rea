@@ -1,0 +1,10 @@
+{
+  "name": "sleep-tracker-backend",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "emulators": "firebase emulators:start --project demo-sleep-tracker",
+    "seed:emulators": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8085 FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199 node scripts/seed.js --project demo-sleep-tracker --audio-dir ../flutter_app/assets/audio",
+    "api:emulators": "cd api && GOOGLE_CLOUD_PROJECT=demo-sleep-tracker STORAGE_BUCKET=demo-sleep-tracker.appspot.com FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 FIRESTORE_EMULATOR_HOST=127.0.0.1:8085 FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199 PUBLIC_STORAGE_HOST=10.0.2.2:9199 PORT=8080 node src/index.js"
+  }
+}

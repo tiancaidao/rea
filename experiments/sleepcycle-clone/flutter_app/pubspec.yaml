@@ -1,0 +1,44 @@
+name: sleep_tracker
+description: An original sleep-tracking app (Flutter) built from standard techniques.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  lottie: ^3.1.2                 # vector onboarding / loading animations
+  just_audio: ^0.9.40           # sleep-aid audio playback
+  video_player: ^2.14.1
+  shared_preferences: ^2.5.6
+  firebase_core: ^5.0.0
+  firebase_auth: ^7.0.0
+  cloud_firestore: ^7.0.0
+  in_app_purchase: ^3.3.1
+  geolocator: ^14.0.1
+  sensors_plus: ^7.1.1
+  record: ^7.1.2
+  wakelock_plus: ^1.8.1
+  health: ^13.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/data/
+    - assets/lottie/
+    - assets/audio/
+    - assets/icon/
+    - assets/models/
+    - assets/images/
+    - assets/video/
