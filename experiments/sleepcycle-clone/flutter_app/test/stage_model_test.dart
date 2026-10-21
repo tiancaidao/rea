@@ -26,6 +26,9 @@ void main() {
     expect(maxDiff, lessThan(2e-3), reason: 'max |dart - torch| logit = $maxDiff');
     final wantWake = j['parity']['wake_logit'] as List;
     expect(wake[0], closeTo((wantWake[0] as num).toDouble(), 2e-3));
+    // the decoded stages (Viterbi when the model carries transitions) match Python
+    final wantStages = [for (final s in j['parity']['stages'] as List) StageModel.labels[s as int]];
+    expect(model.stages(raw), wantStages);
   }, skip: skip);
 
   test('LiveTracker uses the stager for nights it can stage', () {

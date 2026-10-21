@@ -45,7 +45,7 @@ void main() {
     expect(events.first.endFrame - events.first.startFrame, greaterThanOrEqualTo(3));
   });
 
-  test('snore detector bridges quiet (NaN) gaps inside an episode only', () {
+  test('snore detector bridges short gaps inside an episode only', () {
     const q = double.nan;
     final probs = <double>[0.9, 0.9, q, q, 0.9, 0.9, q, q, q, q, q, q, q, 0.9, 0.9, 0.9];
     final bridged = detectSnoreEvents(probs, maxGap: 5);
@@ -53,5 +53,9 @@ void main() {
     expect(bridged.first.startFrame, 0);
     expect(bridged.first.endFrame, 6);
     expect(detectSnoreEvents(probs).length, 1); // without bridging only the last run is long enough
+    // brief dips (not just quiet seconds) are bridged the same way
+    final dips = <double>[0.9, 0.9, 0.9, 0.1, 0.1, 0.1, 0.9, 0.9, 0.9];
+    expect(detectSnoreEvents(dips, majorityWindow: 1, maxGap: 5).length, 1);
+    expect(detectSnoreEvents(dips, majorityWindow: 1).length, 2);
   });
 }

@@ -13,7 +13,7 @@ from __future__ import annotations
 from datasets import synth_sound_dataset, CLASSES, N_MELS, N_FRAMES
 
 
-def build_model(n_classes: int = len(CLASSES)):
+def build_model(n_classes: int = len(CLASSES), widths=(16, 32, 64)):
     import torch.nn as nn
 
     def block(ci, co):
@@ -25,9 +25,10 @@ def build_model(n_classes: int = len(CLASSES)):
     class SnoreCNN(nn.Module):
         def __init__(self, n_classes):
             super().__init__()
-            self.features = nn.Sequential(block(1, 16), block(16, 32), block(32, 64))
+            chans = [1, *widths]
+            self.features = nn.Sequential(*[block(a, b) for a, b in zip(chans[:-1], chans[1:])])
             self.head = nn.Sequential(
-                nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(64, n_classes)
+                nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(chans[-1], n_classes)
             )
 
         def forward(self, x):

@@ -96,6 +96,14 @@ def pick_threshold(scores, positive, beta=0.5):
     return best[0]
 
 
+# Training options for the improvements pass (IMPROVEMENTS.md), as JSON in SNORE_CFG.
+# Defaults reproduce the shipped model.
+CFG = dict(aug_pitch=False, aug_stretch=False, aug_reverb=False, aug_lowpass=False, hardneg=1.0,
+           focal=0.0, widths=[16, 32, 64], label_smoothing=0.05, epochs=40)
+CFG.update(json.loads(os.environ.get("SNORE_CFG", "{}")))
+HARD_GROUPS = ("clock", "breathing_nonspeech", "animals")
+
+
 def main():
     import torch
     import torch.nn as nn
@@ -142,7 +150,34 @@ def main():
             idx = torch.randint(0, len(bg), (int(mix.sum()),))
             k = torch.exp(torch.empty(int(mix.sum()), 1, 1, 1).uniform_(-3.0, 0.0))
             lin[mix] = lin[mix] + (torch.exp(bg[idx]) - LOG_FLOOR) * k
-        x = (torch.log(lin.clamp_min(0) + LOG_FLOOR) - mean) / std
+        if CFG["aug_reverb"]:  # simple room tail: exponential smear of energy along time
+            rv = torch.rand(b) < 0.3
+            for i in rv.nonzero(as_tuple=True)[0].tolist():
+                a = float(torch.empty(1).uniform_(0.3, 0.7))
+                for t in range(1, lin.shape[2]):
+                    lin[i, :, t] = lin[i, :, t] + a * lin[i, :, t - 1]
+                lin[i] = lin[i] * (1 - a)
+        x = torch.log(lin.clamp_min(0) + LOG_FLOOR)
+        if CFG["aug_lowpass"]:  # phone-mic style band-limits at ~3-6 kHz
+            for i in (torch.rand(b) < 0.3).nonzero(as_tuple=True)[0].tolist():
+                cut = float(torch.empty(1).uniform_(3000, 6000))
+                x[i, :, :, torch.tensor(centre_hz > cut)] = float(np.log(LOG_FLOOR))
+        if CFG["aug_stretch"]:  # +-10% tempo via time-axis resampling
+            for i in (torch.rand(b) < 0.5).nonzero(as_tuple=True)[0].tolist():
+                r = float(torch.empty(1).uniform_(0.9, 1.1))
+                src = torch.clamp(torch.arange(N_FRAMES) * r, 0, N_FRAMES - 1)
+                lo_, hi_ = src.floor().long(), src.ceil().long()
+                fr = (src - lo_)[:, None]
+                x[i, 0] = x[i, 0, lo_] * (1 - fr) + x[i, 0, hi_] * fr
+        if CFG["aug_pitch"]:  # small pitch shift: +-2 mel bands
+            for i in (torch.rand(b) < 0.5).nonzero(as_tuple=True)[0].tolist():
+                k = int(torch.randint(-2, 3, (1,)))
+                if k:
+                    x[i] = torch.roll(x[i], k, dims=2)
+                    x[i, :, :, :k] = x[i, :, :, k:k + 1] if k > 0 else x[i, :, :, :k]
+                    if k < 0:
+                        x[i, :, :, k:] = x[i, :, :, k - 1:k]
+        x = (x - mean) / std
         for i in range(b):
             if torch.rand(1) < 0.5:
                 f0 = int(torch.randint(0, N_MELS - 8, (1,)))
@@ -176,7 +211,8 @@ def main():
         groups = sorted(set(g[g != ""]))
         for gr in groups:
             m = g == gr
-            w[m] *= (g != "").sum() / (len(groups) * m.sum()) * (boost or {}).get(gr, 1.0)
+            w[m] *= (g != "").sum() / (len(groups) * m.sum()) * (boost or {}).get(gr, 1.0) * \
+                (CFG["hardneg"] if gr in HARD_GROUPS else 1.0)
         # within the narrowband (APSAA) domain, draw non-snore exactly as often as
         # snore, so "band-limited" can't predict the label
         nbm = narrowband[mask]
@@ -184,10 +220,17 @@ def main():
         if nb_sn.any() and nb_ot.any():
             w[nb_ot] *= w[nb_sn].sum() / w[nb_ot].sum()
         sampler_w = torch.tensor(w, dtype=torch.double)
-        model = build_model(len(labels))
+        model = build_model(len(labels), tuple(CFG["widths"]))
         opt = torch.optim.AdamW(model.parameters(), lr=2e-3, weight_decay=1e-3)
         sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=3e-3, total_steps=epochs * steps)
-        lossf = nn.CrossEntropyLoss(label_smoothing=0.05)
+        ce = nn.CrossEntropyLoss(label_smoothing=CFG["label_smoothing"], reduction="none")
+
+        def lossf(logits, target):
+            l_ = ce(logits, target)
+            if CFG["focal"] > 0:
+                pt_ = torch.softmax(logits, 1).gather(1, target[:, None])[:, 0].detach()
+                l_ = l_ * (1 - pt_) ** CFG["focal"]
+            return l_.mean()
         best, best_ep, best_state = -1.0, epochs, None
         for ep in range(epochs):
             model.train()
@@ -214,7 +257,7 @@ def main():
         return model, best_ep
 
     # 1) train on train, pick the epoch count and the snore threshold on val
-    model, best_ep = fit(tr, epochs=40, val_mask=va)
+    model, best_ep = fit(tr, epochs=CFG["epochs"], val_mask=va)
     pv = probs(model, X[va])
     # pick the threshold for the mean F0.5 over val sources with snores (full-band open
     # data vs 4 kHz APSAA), so neither domain alone sets it
@@ -229,6 +272,17 @@ def main():
     near = group_fp(pv[:, SNORE], neg[va], thr / 2)
     boost = {str(g): 3.0 for g, (fp, n) in near.items() if fp >= 2 and fp / n > 0.02}
     print("val leaks into snore:", {g: f"{fp}/{n}" for g, (fp, n) in val_leak.items() if fp}, "boost:", boost)
+    if "--val-only" in sys.argv:  # improvements pass: validation numbers only, test untouched
+        b = binary_at(pv[:, SNORE], y[va] == SNORE, thr)
+        f05 = 1.25 * b[0] * b[1] / (0.25 * b[0] + b[1]) if b[0] + b[1] else 0.0
+        _, per_v, _ = metrics(y[va], pv.argmax(1), labels)
+        cv = clip_level(pv[:, SNORE], y[va], d["group"][va], d["source"][va], thr)
+        print("VAL_RESULT " + json.dumps(dict(
+            snore_ap=average_precision(pv[:, SNORE], y[va] == SNORE), thr=thr, precision=b[0], recall=b[1],
+            fa_h=b[2], f05=f05, macro_f1=float(np.mean([m["f1"] for m in per_v.values() if m["support"]])),
+            clip_p=cv[0], clip_r=cv[1], leaks={g: fp / n for g, (fp, n) in val_leak.items()},
+            params=sum(p.numel() for p in model.parameters()))))
+        return
     # 2) retrain from scratch on train+val for that many epochs (snore data is too
     #    scarce to leave a fifth of it out of the shipped model); test stays untouched
     model, _ = fit(tr | va, epochs=max(best_ep, 10), boost=boost)

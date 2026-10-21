@@ -103,19 +103,35 @@ def evaluate(pred_by_night, true_by_night, valid_by_night):
 
 # --------------------------------------------------------------------------- model
 
-def build_model():
+def viterbi(logits, log_trans):
+    """Most likely stage path given per-epoch logits and stage transition log-probs.
+    Mirrored in flutter_app/lib/sensing/stage_model.dart."""
+    em = logits - logits.max(1, keepdims=True)
+    em = em - np.log(np.exp(em).sum(1, keepdims=True))
+    dp, back = em[0].copy(), np.zeros((len(em), 4), int)
+    for t in range(1, len(em)):
+        c = dp[:, None] + log_trans
+        back[t], dp = c.argmax(0), c.max(0) + em[t]
+    path = [int(dp.argmax())]
+    for t in range(len(em) - 1, 0, -1):
+        path.append(int(back[t][path[-1]]))
+    return np.array(path[::-1])
+
+
+def build_model(width=WIDTH, dilations=DILATIONS):
     import torch.nn as nn
     import torch
 
     class StageTCN(nn.Module):
         def __init__(self):
             super().__init__()
-            self.inp = nn.Conv1d(4, WIDTH, KERNEL, padding=KERNEL // 2)
-            self.blocks = nn.ModuleList([nn.Conv1d(WIDTH, WIDTH, KERNEL, dilation=d, padding=d * (KERNEL // 2))
-                                         for d in DILATIONS])
+            self.dilations = list(dilations)
+            self.inp = nn.Conv1d(4, width, KERNEL, padding=KERNEL // 2)
+            self.blocks = nn.ModuleList([nn.Conv1d(width, width, KERNEL, dilation=d, padding=d * (KERNEL // 2))
+                                         for d in dilations])
             self.drop = nn.Dropout(0.1)
-            self.stage = nn.Conv1d(WIDTH, 4, 1)
-            self.wake = nn.Conv1d(WIDTH, 1, 1)
+            self.stage = nn.Conv1d(width, 4, 1)
+            self.wake = nn.Conv1d(width, 1, 1)
 
         def forward(self, x):  # (B, 4, T) -> (B, 4, T), (B, 1, T)
             h = torch.relu(self.inp(x))
@@ -137,11 +153,23 @@ def main():
     cw = torch.tensor((counts.sum() / (4 * counts)) ** 0.5, dtype=torch.float32)
     print("train epochs per stage", dict(zip(STAGES, counts.tolist())), "weights", cw.numpy().round(2))
 
+    # stage transitions from the train PSG labels, for Viterbi smoothing of the
+    # model's per-epoch probabilities (chosen on val in IMPROVEMENTS.md)
+    A = np.ones((4, 4))
+    for i in idx["train"]:
+        s_ = stages[i]
+        for a, b in zip(s_[:-1], s_[1:]):
+            if a >= 0 and b >= 0:
+                A[a, b] += 1
+    log_trans = np.log(A / A.sum(1, keepdims=True))
+    use_viterbi = [True]
+
     def predict(model, i, variant):
         model.eval()
         with torch.no_grad():
             lo, _ = model(torch.tensor(features(raws[i][variant]))[None])
-        return lo[0].argmax(0).numpy()
+        lo = lo[0].T.numpy()
+        return viterbi(lo, log_trans) if use_viterbi[0] else lo.argmax(1)
 
     def score(model, ids, variant):
         return evaluate([predict(model, i, variant) for i in ids], [stages[i] for i in ids], [valids[i] for i in ids])
@@ -176,7 +204,9 @@ def main():
             opt.step()
         if (ep + 1) % 2 == 0:
             # select on val, averaged over the wrist recording and the phone-like rendering
+            use_viterbi[0] = False  # epoch selection on the raw model, as in the ablation
             sv = np.mean([score(model, idx["val"], v)["kappa4"] for v in (0, PHONE_VARIANT)])
+            use_viterbi[0] = True
             if sv > best:
                 best, best_ep = sv, ep + 1
                 best_state = {k: v.clone() for k, v in model.state_dict().items()}
@@ -185,6 +215,9 @@ def main():
 
     results = {}
     for name, v in (("wrist", 0), ("phone-like", PHONE_VARIANT)):
+        use_viterbi[0] = False
+        results[("model, argmax", name)] = score(model, idx["test"], v)
+        use_viterbi[0] = True
         results[("model", name)] = score(model, idx["test"], v)
         results[("heuristic", name)] = evaluate([heuristic(raws[i][v]) for i in idx["test"]],
                                                 [stages[i] for i in idx["test"]], [valids[i] for i in idx["test"]])
@@ -197,11 +230,11 @@ def main():
     for (who, cond), r in results.items():
         print(f"test {who:9s} {cond:10s} acc={r['acc']:.3f} kappa4={r['kappa4']:.3f} kappa_sw={r['kappa_sw']:.3f} "
               f"recall={np.round(r['recall'], 2).tolist()}")
-    export(model, raws[idx["test"][0]][PHONE_VARIANT])
+    export(model, raws[idx["test"][0]][PHONE_VARIANT], dict(log_trans=log_trans.round(6).tolist()))
     write_results(results, best_ep, {s: len(v) for s, v in idx.items()}, counts, by_source)
 
 
-def export(model, sample_raw):
+def export(model, sample_raw, hmm=None):
     import torch
     model.eval()
     onnx_path = os.path.join(HERE, "stage_model.onnx")
@@ -212,13 +245,16 @@ def export(model, sample_raw):
     with torch.no_grad():
         lo, lw = model(torch.tensor(features(sample_raw))[None])
     blob = dict(
-        version=1, stages=STAGES, kernel=KERNEL, dilations=[1] + list(DILATIONS), width=WIDTH,
+        version=1, stages=STAGES, kernel=KERNEL, dilations=[1] + list(model.dilations),
+        width=model.inp.out_channels, hmm=hmm,
         convs=[dict(out=c.out_channels, inp=c.in_channels, w=c.weight.detach().flatten().tolist(),
                     b=c.bias.detach().tolist()) for c in convs],
         stage_head=dict(w=model.stage.weight.detach().flatten().tolist(), b=model.stage.bias.detach().tolist()),
         wake_head=dict(w=model.wake.weight.detach().flatten().tolist(), b=model.wake.bias.detach().tolist()),
         parity=dict(raw=sample_raw.round(4).tolist(), stage_logits=lo[0].T.numpy().round(5).tolist(),
-                    wake_logit=lw[0, 0].numpy().round(5).tolist()),
+                    wake_logit=lw[0, 0].numpy().round(5).tolist(),
+                    stages=(viterbi(lo[0].T.numpy(), np.array(hmm["log_trans"])) if hmm
+                            else lo[0].argmax(0).numpy()).tolist()),
     )
     os.makedirs(os.path.dirname(FLUTTER_MODEL), exist_ok=True)
     json.dump(blob, open(FLUTTER_MODEL, "w"), separators=(",", ":"))
@@ -241,13 +277,15 @@ def write_results(results, best_ep, n_nights, counts, by_source=None):
          f"{n_nights['test']} test. "
          f"Train epochs: " + ", ".join(f"{s} {c}" for s, c in zip(STAGES, counts)) + ". "
          f"Model chosen on val (epoch {best_ep}); test scored once.\n",
+         "Per-epoch probabilities are smoothed with Viterbi decoding over stage transitions "
+         "estimated from the train PSG labels (picked on val, see IMPROVEMENTS.md).\n",
          "**Conditions:** *wrist* = the sensor as recorded. *phone-like* = the same nights with motion "
          "attenuated 10×, smoothed and given phone sensor noise. That's a stand-in for a phone on the "
          "mattress, which we can't get with PSG labels from open data.\n",
          "| stager | condition | accuracy | κ 4-stage | κ sleep/wake | κ 4-stage (mean per night) | "
          "recall wake / light / deep / REM |", "|---|---|---|---|---|---|---|"]
     for (who, cond), r in results.items():
-        L.append(f"| {'our model' if who == 'model' else 'current heuristic'} | {cond} | {r['acc']:.3f} | "
+        L.append(f"| {dict(model='our model (+ Viterbi, shipped)').get(who, 'our model, no smoothing' if 'argmax' in who else 'current heuristic')} | {cond} | {r['acc']:.3f} | "
                  f"{r['kappa4']:.3f} | {r['kappa_sw']:.3f} | {r['kappa4_night']:.3f} | "
                  + " / ".join(f"{x:.2f}" for x in r["recall"]) + " |")
     if by_source:

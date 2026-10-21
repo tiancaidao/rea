@@ -236,14 +236,16 @@ class LiveTracker {
     await WakelockPlus.disable();
   }
 
-  /// Smoothed snore events over the per-second probabilities: 3-s majority
-  /// vote at the threshold chosen in training, quiet seconds abstaining and
-  /// gaps of up to 5 s inside an episode bridged, events at least 3 s long.
+  /// Smoothed snore events over the per-second probabilities: 5-s majority
+  /// vote at the threshold chosen in training (quiet seconds abstain), gaps of
+  /// up to 5 s inside an episode bridged, events at least 5 s long. Chosen on
+  /// continuous overnight audio of validation patients (ml/training/event_eval.py).
   List<SnoreEvent> get snoreEvents => model == null
       ? const []
       : detectSnoreEvents(snoreProbs,
           onThreshold: model!.snoreThreshold,
-          minEventFrames: 3,
+          majorityWindow: 5,
+          minEventFrames: 5,
           minMeanProb: model!.snoreThreshold,
           maxGap: 5);
 

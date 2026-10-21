@@ -516,6 +516,36 @@ def selftest_clips():
     sf.write(os.path.join(out, "selftest_other.wav"), np.concatenate(negs), SAMPLE_RATE, subtype="PCM_16")
     print(f"wrote selftest clips: snore {len(pcm) / SAMPLE_RATE:.0f} s, other "
           f"{sum(map(len, negs)) / SAMPLE_RATE:.0f} s")
+    selftest_apsaa()
+
+
+def selftest_apsaa():
+    """60 s of annotated snoring and 60 s of quiet from a held-out APSAA patient
+    (research-only data; local test builds only, never committed)."""
+    import soundfile as sf
+    out = os.path.join(DATA, "selftest")
+    os.makedirs(out, exist_ok=True)
+    if os.path.isfile(APSAA_ZIP):
+        import zipfile
+        from scipy.signal import resample_poly
+        z = zipfile.ZipFile(APSAA_ZIP)
+        subjects = sorted({n.split("/")[0] for n in z.namelist() if n.endswith(".wav")})
+        sid = sorted(s_ for s_, sp in _apsaa_split(subjects).items() if sp == "test")[0]
+        rec, sr = sf.read(io.BytesIO(z.read(f"{sid}/{sid}.wav")), dtype="float32")
+        ann = list(csv.DictReader(io.TextIOWrapper(z.open(f"{sid}/{sid}_Annotations.csv"))))
+        secs = lambda t: sum(float(x) * m for x, m in zip(t.split(":"), (3600, 60, 1)))  # noqa: E731
+        sn = sorted((secs(a["Start_Time"]), secs(a["Start_Time"]) + float(a["Duration"]))
+                    for a in ann if a["Event_Name"].strip().lower() == "snore")
+        cover = lambda t: sum(max(0.0, min(e, t + 60) - max(s_, t)) for s_, e in sn)  # noqa: E731
+        t_sn = max(np.arange(0, len(rec) / sr - 60, 5.0), key=cover)
+        t_q = next(t for t in np.arange(600, len(rec) / sr - 60, 30.0)
+                   if all(e < t - 30 or s_ > t + 90 for s_, e in sn))
+        for name, t in (("selftest_apsaa_snore.wav", t_sn), ("selftest_apsaa_quiet.wav", t_q)):
+            seg = rec[int(t * sr):int((t + 60) * sr)]
+            sf.write(os.path.join(out, name), resample_poly(seg, 441, 40).astype(np.float32), SAMPLE_RATE,
+                     subtype="PCM_16")
+        print(f"wrote APSAA selftest clips from held-out patient {sid}: snore stretch at {t_sn:.0f} s "
+              f"({cover(t_sn):.0f} s annotated), quiet stretch at {t_q:.0f} s")
 
 
 def prune():
@@ -536,6 +566,8 @@ if __name__ == "__main__":
         download()
     elif "--apsaa" in sys.argv:
         build_apsaa()
+    elif "--selftest-apsaa" in sys.argv:
+        selftest_apsaa()
     elif "--selftest" in sys.argv:
         selftest_clips()
     elif "--prune" in sys.argv:

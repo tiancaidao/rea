@@ -215,9 +215,10 @@ class SnoreEvent {
 /// mean probability is at least [minMeanProb].
 ///
 /// A NaN frame abstains (the live tracker marks quiet, gated seconds this way):
-/// it doesn't vote, and a run of up to [maxGap] NaN frames between two active
-/// frames is bridged — the silent breath between two snores belongs to the same
-/// snoring episode.
+/// it doesn't vote. A run of up to [maxGap] inactive frames (quiet or a brief
+/// dip) between two active frames is bridged — the breath between two snores
+/// belongs to the same snoring episode. Mirrored by detect() in
+/// ml/training/event_eval.py.
 List<SnoreEvent> detectSnoreEvents(
   List<double> frameProbs, {
   double onThreshold = 0.5,
@@ -241,14 +242,16 @@ List<SnoreEvent> detectSnoreEvents(
     on.add(!frameProbs[i].isNaN && votes * 2 > total);
   }
   if (maxGap > 0) {
+    // bridge any inactive run (quiet NaN seconds or brief dips) of <= maxGap
+    // frames that sits between two active frames
     var i = 0;
     while (i < n) {
-      if (frameProbs[i].isNaN) {
+      if (!on[i]) {
         var j = i;
-        while (j < n && frameProbs[j].isNaN) {
+        while (j < n && !on[j]) {
           j++;
         }
-        if (i > 0 && j < n && on[i - 1] && on[j] && j - i <= maxGap) {
+        if (i > 0 && j < n && j - i <= maxGap) {
           for (var k = i; k < j; k++) {
             on[k] = true;
           }

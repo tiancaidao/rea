@@ -62,6 +62,20 @@ void main() {
         '${other.gatedSeconds} gated, ${other.snoreEvents.length} events, ${secs(other)} s snoring');
     debugPrint('SNORE_SELFTEST ${msPerRun.toStringAsFixed(0)} ms per inference (front-end + CNN, isolate)');
 
+    // held-out APSAA patient (research-only data), when its clips are bundled:
+    // 60 s of technician-annotated snoring and 60 s of quiet hospital night
+    try {
+      final aSnore = await _run(model, 'assets/models/selftest_apsaa_snore.wav');
+      final aQuiet = await _run(model, 'assets/models/selftest_apsaa_quiet.wav');
+      debugPrint('SNORE_SELFTEST apsaa snore-stretch: ${aSnore.snoreProbs.length} s decided, '
+          '${aSnore.snoreEvents.length} events, ${secs(aSnore)} s snoring (60 s annotated)');
+      debugPrint('SNORE_SELFTEST apsaa quiet-stretch: ${aQuiet.snoreProbs.length} s decided, '
+          '${aQuiet.snoreEvents.length} events, ${secs(aQuiet)} s snoring (0 s annotated)');
+      expect(secs(aSnore), greaterThan(0));
+    } on FlutterError {
+      debugPrint('SNORE_SELFTEST apsaa clips not bundled, skipped');
+    }
+
     // pipeline checks; the recall/precision numbers themselves are measured in
     // ml/training/RESULTS.md and printed above for the record
     expect(secs(snore), greaterThan(0), reason: 'no snoring found in held-out snoring');

@@ -15,8 +15,9 @@ class StageModel {
   final List<int> dilations;
   final List<_Conv1d> _convs;
   final _Conv1d _stage, _wake;
+  final List<List<double>>? logTrans; // stage transitions for Viterbi smoothing
 
-  StageModel._(this.kernel, this.dilations, this._convs, this._stage, this._wake);
+  StageModel._(this.kernel, this.dilations, this._convs, this._stage, this._wake, this.logTrans);
 
   static Future<StageModel?> load({String asset = 'assets/models/stage_tcn.json'}) async {
     try {
@@ -39,8 +40,18 @@ class StageModel {
       return _Conv1d(b.length, width, 1, f32(h['w']), b);
     }
 
-    return StageModel._(k, [for (final d in j['dilations'] as List) d as int], convs,
-        head(j['stage_head'] as Map<String, dynamic>), head(j['wake_head'] as Map<String, dynamic>));
+    final hmm = j['hmm'] as Map<String, dynamic>?;
+    return StageModel._(
+        k,
+        [for (final d in j['dilations'] as List) d as int],
+        convs,
+        head(j['stage_head'] as Map<String, dynamic>),
+        head(j['wake_head'] as Map<String, dynamic>),
+        hmm == null
+            ? null
+            : [
+                for (final row in hmm['log_trans'] as List) [for (final v in row as List) (v as num).toDouble()]
+              ]);
   }
 
   /// Per-epoch features, mirroring features() in train_stage.py.
@@ -76,13 +87,52 @@ class StageModel {
     return ([for (var t = 0; t < n; t++) Float32List.fromList([for (var c = 0; c < 4; c++) st[c][t]])], wk[0]);
   }
 
-  /// One stage label per epoch, in the app's vocabulary.
+  /// One stage label per epoch, in the app's vocabulary: Viterbi decoding over
+  /// the model's per-epoch probabilities when the model carries a transition
+  /// matrix, else the per-epoch argmax.
   List<String> stages(List<double> raw) {
     final (lo, _) = logits(raw);
-    return [
-      for (final e in lo)
-        labels[[0, 1, 2, 3].reduce((a, b) => e[b] > e[a] ? b : a)]
-    ];
+    final path = logTrans == null
+        ? [for (final e in lo) [0, 1, 2, 3].reduce((a, b) => e[b] > e[a] ? b : a)]
+        : viterbi(lo, logTrans!);
+    return [for (final s in path) labels[s]];
+  }
+
+  /// Mirrors viterbi() in ml/training/train_stage.py.
+  static List<int> viterbi(List<Float32List> logits, List<List<double>> logTrans) {
+    final n = logits.length;
+    List<double> logSoftmax(Float32List e) {
+      final m = e.reduce(math.max);
+      final z = math.log(e.fold(0.0, (a, v) => a + math.exp(v - m)));
+      return [for (final v in e) v - m - z];
+    }
+
+    var dp = logSoftmax(logits[0]);
+    final back = List.generate(n, (_) => List<int>.filled(4, 0));
+    for (var t = 1; t < n; t++) {
+      final em = logSoftmax(logits[t]);
+      final next = List<double>.filled(4, 0);
+      for (var b = 0; b < 4; b++) {
+        var best = -double.infinity, arg = 0;
+        for (var a = 0; a < 4; a++) {
+          final c = dp[a] + logTrans[a][b];
+          if (c > best) {
+            best = c;
+            arg = a;
+          }
+        }
+        next[b] = best + em[b];
+        back[t][b] = arg;
+      }
+      dp = next;
+    }
+    var s = [0, 1, 2, 3].reduce((a, b) => dp[b] > dp[a] ? b : a);
+    final path = List<int>.filled(n, 0)..[n - 1] = s;
+    for (var t = n - 1; t > 0; t--) {
+      s = back[t][s];
+      path[t - 1] = s;
+    }
+    return path;
   }
 }
 

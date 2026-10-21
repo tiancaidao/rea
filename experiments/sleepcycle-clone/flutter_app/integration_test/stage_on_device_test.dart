@@ -12,7 +12,7 @@ import 'package:sleep_tracker/sensing/stage_model.dart';
 ///
 /// Needs assets/models/stage_tcn.json from ml/training/train_stage.py (gitignored).
 /// It carries a held-out test night (phone-like rendering) and PyTorch's output for
-/// it. The night is replayed epoch by epoch through LiveTracker, the path a real
+/// it (Viterbi-decoded stages). The night is replayed epoch by epoch through LiveTracker, the path a real
 /// night takes, and the staging it produces is compared with PyTorch.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -23,10 +23,7 @@ void main() {
     expect(model, isNotNull, reason: 'assets/models/stage_tcn.json not bundled');
     final j = jsonDecode(await rootBundle.loadString('assets/models/stage_tcn.json'));
     final raw = [for (final v in j['parity']['raw'] as List) (v as num).toDouble()];
-    final want = [
-      for (final e in j['parity']['stage_logits'] as List)
-        StageModel.labels[[0, 1, 2, 3].reduce((a, b) => (e[b] as num) > (e[a] as num) ? b : a)]
-    ];
+    final want = [for (final s in j['parity']['stages'] as List) StageModel.labels[s as int]];
 
     final t = LiveTracker(useMicrophone: false, useStageModel: true)..stageModel = model;
     for (final r in raw) {
@@ -38,7 +35,7 @@ void main() {
     final agree = [for (var i = 0; i < raw.length; i++) phases[i] == want[i]].where((x) => x).length;
     final counts = {for (final l in StageModel.labels) l: phases.where((p) => p == l).length};
     debugPrint('STAGE_SELFTEST ${raw.length} epochs (${(raw.length / 120).toStringAsFixed(1)} h) staged in $ms ms; '
-        'agreement with PyTorch ${agree}/${raw.length}; stages $counts');
+        'agreement with PyTorch $agree/${raw.length}; stages $counts');
     expect(agree, raw.length);
     expect(ms, lessThan(2000));
   });
