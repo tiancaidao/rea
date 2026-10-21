@@ -1,33 +1,45 @@
 import 'package:flutter/material.dart';
 import '../app_state.dart';
-import '../data/api_client.dart';
+import '../backend/backend.dart';
+import '../theme.dart';
+import 'widgets/common.dart';
 
-/// Email/password sign-in against the mock identity endpoint. The real backend
-/// would be Ory Kratos (self-service login) returning a session token.
+/// Email sign-up / log-in. With the backend on this is Firebase Auth and the
+/// account's data is pulled from Firestore afterwards; with it off (local-only
+/// builds) the email is just remembered on the device.
 class LoginScreen extends StatefulWidget {
-  final SleepApi api;
-  const LoginScreen({super.key, required this.api});
+  final bool signUp;
+  const LoginScreen({super.key, this.signUp = false});
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _email = TextEditingController(text: 'demo@example.com');
-  final _password = TextEditingController(text: 'password');
+  final _email = TextEditingController();
+  final _password = TextEditingController();
   bool _busy = false;
   String? _error;
 
   Future<void> _submit() async {
-    setState(() { _busy = true; _error = null; });
+    final email = _email.text.trim();
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
-      await widget.api.login(_email.text.trim(), _password.text);
-      AppState.I.email = _email.text.trim();
+      if (Backend.I.enabled) {
+        widget.signUp
+            ? await Backend.I.signUp(email, _password.text)
+            : await Backend.I.signIn(email, _password.text);
+        await AppState.I.syncFromCloud();
+      } else {
+        AppState.I.email = email;
+      }
       if (mounted) Navigator.pop(context, true);
+    } on BackendException catch (e) {
+      setState(() => _error = e.message);
     } catch (e) {
-      // Prototype: the mock backend (../mock-api) is optional. If it isn't
-      // running, continue signed in locally so the journey can be explored.
-      AppState.I.email = _email.text.trim();
-      if (mounted) Navigator.pop(context, true);
+      setState(() => _error = 'Something went wrong: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -35,22 +47,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Sign in')),
-      body: Padding(
+    final title = widget.signUp ? 'Create account' : 'Log in';
+    return SettingsPage(title: title, children: [
+      Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
+        child: AutofillGroup(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             TextField(
               controller: _email,
               decoration: const InputDecoration(labelText: 'Email'),
               keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _password,
               decoration: const InputDecoration(labelText: 'Password'),
               obscureText: true,
+              autofillHints: [widget.signUp ? AutofillHints.newPassword : AutofillHints.password],
+              onSubmitted: (_) => _submit(),
             ),
             const SizedBox(height: 20),
             if (_error != null)
@@ -58,15 +73,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(_error!, style: const TextStyle(color: Colors.redAccent)),
               ),
-            FilledButton(
-              onPressed: _busy ? null : _submit,
-              child: _busy
-                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Sign in'),
-            ),
-          ],
+            if (!Backend.I.enabled)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text('Offline build: your nights stay on this device.',
+                    style: TextStyle(color: Colors.white54)),
+              ),
+            _busy
+                ? const Center(child: CircularProgressIndicator(color: AppTheme.accent))
+                : PillButton(title, onPressed: _submit),
+          ]),
         ),
       ),
-    );
+    ]);
   }
 }

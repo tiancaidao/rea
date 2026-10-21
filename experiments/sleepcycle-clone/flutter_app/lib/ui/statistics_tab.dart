@@ -56,7 +56,7 @@ final metrics = <Metric>[
       (v) => '${v.round()}m', 'Minutes of snoring per night.'),
   Metric('Coughing', ChartKind.bar, const Color(0xFF2C7F98), (n) => n.coughs.toDouble(),
       (v) => v.toStringAsFixed(0), 'Coughs detected per night.'),
-  Metric('Steps', ChartKind.bar, const Color(0xFF2C7F98), (n) => n.steps.toDouble(),
+  Metric('Steps', ChartKind.bar, const Color(0xFF2C7F98), (n) => (n.steps ?? 0).toDouble(),
       (v) => v.round().toString(), 'Steps the day before each night.'),
   Metric('Deep sleep', ChartKind.bar, const Color(0xFF8C8A4E),
       (n) => (n.session.phaseMinutes['deep'] ?? 0) / 60, (v) => '${v.toStringAsFixed(1)}h',

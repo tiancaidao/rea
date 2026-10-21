@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_state.dart';
+import 'backend/backend.dart';
 import 'theme.dart';
 import 'strings.dart';
 import 'ui/main_shell.dart';
@@ -9,7 +10,9 @@ import 'ui/welcome_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await S.load();
+  await Backend.I.init();
   await AppState.I.load();
+  if (Backend.I.user != null) await AppState.I.syncFromCloud();
   runApp(const SleepApp());
 }
 

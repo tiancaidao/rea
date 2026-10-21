@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../data/night.dart';
+import '../backend/backend.dart';
 import '../data/recorded_night.dart';
 import '../theme.dart';
 import 'settings_pages.dart';
@@ -276,7 +277,7 @@ class _NightView extends StatelessWidget {
                   selected: night.notes.contains(n),
                   onSelected: (v) {
                     setSt(() => v ? night.notes.add(n) : night.notes.remove(n));
-                    AppState.I.notesChanged();
+                    AppState.I.nightChanged(night);
                   },
                 ),
             ]),
@@ -329,7 +330,28 @@ class _WeekStrip extends StatelessWidget {
     ]);
   }
 
-  void _weeklyReport(BuildContext context, DateTime sunday) {
+  Future<void> _weeklyReport(BuildContext context, DateTime sunday) async {
+    if (Backend.I.user != null) {
+      try {
+        // the server report weeks start on Monday
+        final r = await Backend.I.weeklyReport(sunday.add(const Duration(days: 1)));
+        if (r != null && context.mounted) {
+          final n = r['nights'] as int;
+          showInfoSheet(
+              context,
+              'Weekly report',
+              n == 0
+                  ? (r['highlights'] as List).join('\n')
+                  : '$n nights tracked\nAverage quality: ${r['avgQuality']}%\n'
+                      'Average asleep: ${fmtDuration(r['avgAsleepMin'] as int)}\n'
+                      'Regularity: ${r['regularity']}%\n\n${(r['highlights'] as List).join('\n')}');
+          return;
+        }
+      } catch (_) {
+        // fall back to the on-device summary
+      }
+    }
+    if (!context.mounted) return;
     final week = AppState.I.nights
         .where((n) => !n.day.isBefore(sunday) && n.day.isBefore(sunday.add(const Duration(days: 7))))
         .toList();
@@ -409,9 +431,9 @@ class _StatGrid extends StatelessWidget {
       (Icons.nightlight, fmtDt(night.wentToBed), 'Went to bed', 'When you started tracking.'),
       (Icons.alarm, fmtDt(night.wokeUp), 'Woke up', 'When tracking stopped.'),
       (Icons.graphic_eq, '${night.snoreMinutes} min', 'Snore', 'Minutes of detected snoring.'),
-      (Icons.directions_walk, '${night.steps}', 'Steps', 'Steps the day before, from Health Connect.'),
+      (Icons.directions_walk, night.steps == null ? '—' : '${night.steps}', 'Steps', 'Steps the day before, from Health Connect.'),
       (Icons.sentiment_satisfied, night.mood == null ? 'Add' : _moods[night.mood!], 'Wake up mood', ''),
-      (Icons.cloud, '${night.weatherF} °F', 'Weather', 'Morning weather at your location.'),
+      (Icons.cloud, night.weatherF == null ? '—' : '${night.weatherF} °F', 'Weather', 'Morning weather at your location.'),
     ];
     return GridView.count(
       crossAxisCount: 2,
@@ -449,7 +471,7 @@ class _StatGrid extends StatelessWidget {
               GestureDetector(
                 onTap: () {
                   night.mood = i;
-                  AppState.I.notesChanged();
+                  AppState.I.nightChanged(night);
                   Navigator.pop(c);
                 },
                 child: Column(children: [

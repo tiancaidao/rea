@@ -3,7 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../data/night.dart';
+import '../backend/backend.dart';
 import '../data/recorded_night.dart';
+import '../device/health_connect.dart';
+import '../device/location.dart';
+import '../sensing/live_tracker.dart';
 import '../sensing/sleep_tracker.dart';
 import '../theme.dart';
 import 'sleep_aid_sheet.dart';
@@ -13,9 +17,11 @@ import 'widgets/time_wheel.dart';
 /// The overnight screen: sleep-aid pill, tonight's moon, a large dimmed
 /// clock, the alarm window (tap to change it), and a slide-up "Stop".
 ///
-/// Stopping finishes the night. Real sensing is native and not wired yet, so
-/// the night is produced by running the analysis pipeline on a SimulatedNight;
-/// the result lands in the Journal tab exactly like a tracked night would.
+/// While open, [LiveTracker] records accelerometer movement and (in
+/// microphone mode) sound levels. Stopping analyses the recording into a
+/// night in the Journal, adding steps (Health Connect) and morning weather
+/// (API). Sessions under [minMinutes] are too short to analyse — as in the
+/// original — so for testing you can save a replayed sample night instead.
 class TrackingScreen extends StatefulWidget {
   const TrackingScreen({super.key});
   @override
@@ -23,6 +29,9 @@ class TrackingScreen extends StatefulWidget {
 }
 
 class _TrackingScreenState extends State<TrackingScreen> {
+  static const minMinutes = 20;
+  final _tracker =
+      LiveTracker(useMicrophone: AppState.I.pref('motion_detection').startsWith('Microphone'));
   late Timer _clock;
   DateTime _now = DateTime.now();
   double _drag = 0;
@@ -32,11 +41,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
   void initState() {
     super.initState();
     _clock = Timer.periodic(const Duration(seconds: 15), (_) => setState(() => _now = DateTime.now()));
+    _tracker.start();
   }
 
   @override
   void dispose() {
     _clock.cancel();
+    if (!_stopping) _tracker.stop();
     super.dispose();
   }
 
@@ -89,28 +100,66 @@ class _TrackingScreenState extends State<TrackingScreen> {
   Future<void> _stop() async {
     if (_stopping) return;
     setState(() => _stopping = true);
+    await _tracker.stop();
     final seed = DateTime.now().millisecondsSinceEpoch & 0x7fffffff;
-    // Native sensing isn't wired yet. Prefer replaying the bundled recorded
-    // night (jittered) through our staging; else run the accelerometer
-    // pipeline on a SimulatedNight.
-    final recorded = RecordedNight.cached;
     late final Night night;
-    if (recorded != null) {
-      await Future.delayed(const Duration(milliseconds: 600));
-      night = recorded.toNight(DateTime.now(), seed: seed);
+    if (_tracker.elapsed.inMinutes >= minMinutes) {
+      night = Night.fromResult(_tracker.analyze(), snoreMinutes: _tracker.soundMinutes, real: true);
     } else {
-      final hours = 7 + math.Random(seed).nextInt(2);
-      final result = await SleepTracker().run(
-        SimulatedNight(hours: hours, seed: seed),
-        startedAt: DateTime.now().subtract(Duration(hours: hours)),
+      if (!mounted) return;
+      final sample = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Too short to analyze'),
+          content: Text('You tracked ${_tracker.elapsed.inMinutes} min. Nights need at least '
+              '$minMinutes min.\n\nFor testing, you can save a sample night instead.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Discard')),
+            TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Save sample night')),
+          ],
+        ),
       );
-      night = Night.fromResult(result, seed: seed);
+      if (sample != true) {
+        AppState.I.pauseSleepAid();
+        if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
+        return;
+      }
+      night = await _sampleNight(seed);
+    }
+    // steps from Health Connect, written back as a sleep session if enabled
+    if (AppState.I.pref('health_connect') == 'On') {
+      night.steps = await HealthConnect.I.stepsBefore(night.wokeUp) ?? night.steps;
+      await HealthConnect.I.writeSleep(night.session);
+    }
+    // real morning weather via the API when signed in and location is allowed
+    if (Backend.I.user != null) {
+      night.weatherF = null;
+      final loc = await coarseLocation();
+      if (loc != null) {
+        try {
+          final w = await Backend.I.weather(loc.$1, loc.$2);
+          night.weatherF = (w?['tempF'] as num?)?.round();
+        } catch (_) {}
+      }
     }
     AppState.I
       ..addNight(night)
       ..pauseSleepAid()
       ..goTab(2); // Journal
     if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
+  }
+
+  /// Replay of the bundled recorded night, or the simulated accelerometer
+  /// pipeline when the recording isn't available.
+  Future<Night> _sampleNight(int seed) async {
+    final recorded = RecordedNight.cached;
+    if (recorded != null) return recorded.toNight(DateTime.now(), seed: seed);
+    final hours = 7 + math.Random(seed).nextInt(2);
+    final result = await SleepTracker().run(
+      SimulatedNight(hours: hours, seed: seed),
+      startedAt: DateTime.now().subtract(Duration(hours: hours)),
+    );
+    return Night.fromResult(result, seed: seed);
   }
 
   @override

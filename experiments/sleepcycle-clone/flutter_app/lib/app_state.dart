@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'backend/backend.dart';
 import 'data/night.dart';
 import 'data/recorded_night.dart';
 import 'data/sleep_aid_catalog.dart';
@@ -52,8 +53,25 @@ class AppState extends ChangeNotifier {
   void logOut() {
     onboarded = false;
     tab = 0;
+    if (Backend.I.user != null) {
+      // signed-in data lives in the cloud; clear this device's copy
+      nights.clear();
+      selectedNight = null;
+    }
     notifyListeners();
+    unawaited(Backend.I.signOut());
   }
+
+  /// The synced part of the state (everything but nights, which are stored
+  /// one document each).
+  Map<String, dynamic> get _profile => {
+        'alarmHour': alarmHour,
+        'alarmMinute': alarmMinute,
+        'alarmMode': alarmMode,
+        'prefs': _prefs,
+        'sleepNotes': sleepNotes,
+        'completedLessons': completedLessons.toList(),
+      };
 
   Future<void> _save() async {
     try {
@@ -61,18 +79,49 @@ class AppState extends ChangeNotifier {
       await sp.setString(
           _storeKey,
           json.encode({
+            ..._profile,
             'onboarded': onboarded,
             'email': email,
             'premium': premium,
-            'alarmHour': alarmHour,
-            'alarmMinute': alarmMinute,
-            'alarmMode': alarmMode,
-            'prefs': _prefs,
-            'sleepNotes': sleepNotes,
-            'completedLessons': completedLessons.toList(),
             'nights': [for (final n in nights) n.toJson()],
           }));
     } catch (_) {}
+    if (Backend.I.user != null) {
+      unawaited(Backend.I.saveProfile(_profile).catchError((_) {}));
+    }
+  }
+
+  /// After sign-in: pull the account's profile and nights from Firestore and
+  /// upload any nights tracked on this device before signing in.
+  Future<void> syncFromCloud() async {
+    final b = Backend.I;
+    if (b.user == null) return;
+    email = b.user!.email ?? email;
+    try {
+      final profile = await b.loadProfile();
+      if (profile != null) {
+        _restore({...profile, 'nights': const []});
+        premium = (profile['premium'] as Map?)?['active'] == true;
+      }
+      final cloud = await b.loadNights();
+      final cloudIds = {for (final n in cloud) b.nightId(n)};
+      for (final n in nights.where((n) => !cloudIds.contains(b.nightId(n)))) {
+        await b.saveNight(n);
+      }
+      final localIds = {for (final n in nights) b.nightId(n)};
+      nights.addAll(cloud.where((n) => !localIds.contains(b.nightId(n))));
+      nights.sort((a, c) => a.wokeUp.compareTo(c.wokeUp));
+      selectedNight = null;
+    } catch (e) {
+      b.lastError = 'Sync failed: $e';
+    }
+    notifyListeners();
+  }
+
+  /// Persist edits to one night (mood, sleep notes).
+  void nightChanged(Night n) {
+    notifyListeners();
+    unawaited(Backend.I.saveNight(n).catchError((_) {}));
   }
 
   void _restore(Map<String, dynamic> j) {
@@ -214,6 +263,7 @@ class AppState extends ChangeNotifier {
     nights.sort((a, b) => a.wokeUp.compareTo(b.wokeUp));
     selectedNight = nights.indexOf(n);
     notifyListeners();
+    unawaited(Backend.I.saveNight(n).catchError((_) {}));
   }
 
   void selectNight(int i) {
@@ -225,12 +275,14 @@ class AppState extends ChangeNotifier {
     nights.remove(n);
     selectedNight = null;
     notifyListeners();
+    unawaited(Backend.I.deleteNight(n).catchError((_) {}));
   }
 
   void eraseAll() {
     nights.clear();
     selectedNight = null;
     notifyListeners();
+    unawaited(Backend.I.eraseData().catchError((_) {}));
   }
 
   /// Seed a week of synthetic nights so every screen can be exercised
@@ -246,6 +298,9 @@ class AppState extends ChangeNotifier {
     nights.sort((a, b) => a.wokeUp.compareTo(b.wokeUp));
     selectedNight = null;
     notifyListeners();
+    for (final n in nights) {
+      unawaited(Backend.I.saveNight(n).catchError((_) {}));
+    }
   }
 
   // ── programs ──────────────────────────────────────────────────────────────
@@ -270,10 +325,14 @@ class AppState extends ChangeNotifier {
     if (item == null) return;
     sleepAidPlaying = true;
     notifyListeners();
-    final file = audioFor(item);
-    if (file == null) return; // streamed in a real build: mock playback
+    final file = item.url == null ? audioFor(item) : null;
+    if (item.url == null && file == null) return; // nothing to play: mock playback
     try {
-      await player.setAsset(file);
+      if (item.url != null) {
+        await player.setUrl(item.url!); // streamed from Cloud Storage
+      } else {
+        await player.setAsset(file!);
+      }
       await player.play();
     } catch (_) {
       // placeholder audio not extracted locally: keep the mock "playing" state

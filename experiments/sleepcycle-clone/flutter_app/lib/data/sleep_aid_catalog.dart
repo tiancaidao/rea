@@ -1,4 +1,5 @@
 import 'package:flutter/painting.dart';
+import '../backend/backend.dart';
 
 /// Sleep-aid catalog, organised like the original: a featured item, then
 /// themed sections that render as large "hero" cards or a 2-column tile grid,
@@ -17,6 +18,7 @@ class SleepAidItem {
   final String narrator;
   final List<Color> art; // gradient standing in for cover artwork
   final String? asset;
+  final String? url; // streamed media (signed URL from the API)
   const SleepAidItem({
     required this.id,
     required this.title,
@@ -26,7 +28,23 @@ class SleepAidItem {
     this.narrator = '',
     required this.art,
     this.asset,
+    this.url,
   });
+
+  factory SleepAidItem.fromJson(Map<String, dynamic> j) {
+    Color hex(String s) => Color(int.parse(s.replaceFirst('#', 'FF'), radix: 16));
+    final art = (j['art'] as List?)?.cast<String>() ?? const ['#2E7D9A', '#0D2236'];
+    return SleepAidItem(
+      id: j['id'] as String,
+      title: j['title'] as String,
+      description: (j['description'] as String?) ?? '',
+      minutes: (j['minutes'] as num?)?.toInt() ?? 0,
+      author: (j['author'] as String?) ?? 'Sleep Tracker Studio',
+      narrator: (j['narrator'] as String?) ?? '',
+      art: [hex(art[0]), hex(art[1])],
+      url: j['url'] as String?,
+    );
+  }
 }
 
 enum SectionLayout { hero, grid }
@@ -39,6 +57,41 @@ class SleepAidSection {
 }
 
 class SleepAidCatalog {
+  /// What the UI shows: the server catalog once fetched, else the built-in one.
+  static List<SleepAidSection> current = sections;
+  static SleepAidItem currentFeatured = featured;
+
+  static Future<bool> refresh() async {
+    final r = await fetchRemote();
+    if (r == null) return false;
+    currentFeatured = r.$1;
+    current = r.$2;
+    return true;
+  }
+
+  /// Catalog from the API (server-driven, streamed media), or null when the
+  /// backend is off/unreachable — callers then use the built-in [sections].
+  static Future<(SleepAidItem, List<SleepAidSection>)?> fetchRemote() async {
+    try {
+      final j = await Backend.I.sleepAidCatalog();
+      final raw = (j?['sections'] as List?) ?? const [];
+      if (raw.isEmpty) return null;
+      final sections = [
+        for (final s in raw.cast<Map<String, dynamic>>())
+          SleepAidSection(
+            s['title'] as String,
+            s['layout'] == 'grid' ? SectionLayout.grid : SectionLayout.hero,
+            [for (final it in (s['items'] as List).cast<Map<String, dynamic>>()) SleepAidItem.fromJson(it)],
+          ),
+      ];
+      final all = sections.expand((s) => s.items);
+      final feat = all.firstWhere((i) => i.id == j!['featuredId'], orElse: () => all.first);
+      return (feat, sections);
+    } catch (_) {
+      return null;
+    }
+  }
+
   static const _dusk = [Color(0xFFF0A36B), Color(0xFF3B2F5C)];
   static const _sea = [Color(0xFF2E7D9A), Color(0xFF0D2236)];
   static const _rain = [Color(0xFF3C5A78), Color(0xFF101828)];

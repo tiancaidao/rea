@@ -75,10 +75,19 @@ class _CatalogSheetState extends State<_CatalogSheet> {
   int _chip = 0; // 0 = All, else section index + 1
 
   @override
+  void initState() {
+    super.initState();
+    // server-driven catalog with streamed media when the backend is on
+    SleepAidCatalog.refresh().then((changed) {
+      if (changed && mounted) setState(() {});
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final sections = _chip == 0
-        ? SleepAidCatalog.sections
-        : [SleepAidCatalog.sections[_chip - 1]];
+        ? SleepAidCatalog.current
+        : [SleepAidCatalog.current[_chip - 1]];
     return Column(children: [
       _SheetHeader(title: 'Sleep aid'),
       SizedBox(
@@ -87,11 +96,11 @@ class _CatalogSheetState extends State<_CatalogSheet> {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           children: [
-            for (var i = 0; i <= SleepAidCatalog.sections.length; i++)
+            for (var i = 0; i <= SleepAidCatalog.current.length; i++)
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
-                  label: Text(i == 0 ? 'All' : SleepAidCatalog.sections[i - 1].title),
+                  label: Text(i == 0 ? 'All' : SleepAidCatalog.current[i - 1].title),
                   selected: _chip == i,
                   showCheckmark: false,
                   selectedColor: AppTheme.accent,
@@ -106,7 +115,7 @@ class _CatalogSheetState extends State<_CatalogSheet> {
       ),
       Expanded(
         child: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 32), children: [
-          if (_chip == 0) _Featured(item: SleepAidCatalog.featured),
+          if (_chip == 0) _Featured(item: SleepAidCatalog.currentFeatured),
           for (final s in sections) _Section(section: s),
         ]),
       ),
@@ -319,7 +328,7 @@ class _TrackSheetState extends State<_TrackSheet> {
   Widget build(BuildContext context) {
     final it = widget.item;
     final section =
-        SleepAidCatalog.sections.firstWhere((s) => s.items.contains(it), orElse: () => SleepAidCatalog.sections.first);
+        SleepAidCatalog.current.firstWhere((s) => s.items.contains(it), orElse: () => SleepAidCatalog.current.first);
     return ListView(padding: EdgeInsets.zero, children: [
       SizedBox(
         height: 400,

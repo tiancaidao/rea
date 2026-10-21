@@ -1,0 +1,11 @@
+rules_version = '2';
+// Sleep-aid media: readable by signed-in users only, uploaded by the seed
+// script with admin credentials. Nothing else is stored.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /sleep-aid/{path=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

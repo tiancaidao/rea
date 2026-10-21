@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../app_state.dart';
-import '../data/api_client.dart';
+import '../backend/backend.dart';
+import '../backend/billing.dart';
 import '../theme.dart';
 import 'login_screen.dart';
 import 'main_shell.dart';
@@ -50,14 +51,23 @@ class WelcomeScreen extends StatelessWidget {
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
                         backgroundColor: Colors.white, foregroundColor: Colors.black, shape: const StadiumBorder()),
-                    onPressed: () => _signedIn(context),
+                    onPressed: () {
+                      if (Backend.I.enabled) {
+                        // Google sign-in needs the app's SHA-1 registered in Firebase
+                        // (see backend/README.md); use email until then.
+                        toast(context, 'Google sign-in isn\'t set up for this build yet — use email.');
+                        _email(context, signUp: true);
+                      } else {
+                        _signedIn(context);
+                      }
+                    },
                     icon: const Icon(Icons.account_circle),
                     label: const Text('Continue with Google', style: TextStyle(fontSize: 17)),
                   ),
                 ),
                 const SizedBox(height: 12),
                 Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-                  TextButton(onPressed: () => _email(context), child: const Text('Sign up with email', style: TextStyle(color: AppTheme.accent, fontSize: 16))),
+                  TextButton(onPressed: () => _email(context, signUp: true), child: const Text('Sign up with email', style: TextStyle(color: AppTheme.accent, fontSize: 16))),
                   TextButton(onPressed: () => _email(context), child: const Text('Log in', style: TextStyle(color: AppTheme.accent, fontSize: 16))),
                 ]),
               ]),
@@ -68,9 +78,9 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _email(BuildContext context) async {
+  Future<void> _email(BuildContext context, {bool signUp = false}) async {
     final ok = await Navigator.push<bool>(
-        context, MaterialPageRoute(builder: (_) => LoginScreen(api: SleepApi())));
+        context, MaterialPageRoute(builder: (_) => LoginScreen(signUp: signUp)));
     if (ok == true && context.mounted) _signedIn(context);
   }
 }
@@ -137,10 +147,19 @@ class TrialScreen extends StatelessWidget {
               ]),
             ),
             const SizedBox(height: 40),
-            PillButton('Try it free', onPressed: () {
-              // Purchase is mocked: a real build calls Play Billing / StoreKit.
+            PillButton('Try it free', onPressed: () async {
+              // Real Play Billing + server verification when the backend is on;
+              // until the subscription exists in Play Console, a local trial.
+              if (Backend.I.user != null) {
+                final err = await Billing.I.startTrial();
+                if (err == null) {
+                  if (context.mounted) _enter(context);
+                  return;
+                }
+                if (context.mounted) toast(context, '$err Starting a local trial.');
+              }
               AppState.I.premium = true;
-              _enter(context);
+              if (context.mounted) _enter(context);
             }),
             const SizedBox(height: 12),
             const Text('Cancel anytime in your app store subscriptions.',

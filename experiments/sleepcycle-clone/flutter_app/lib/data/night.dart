@@ -11,8 +11,8 @@ class Night {
   final SleepSession session;
   int? mood; // 0 = bad, 1 = okay, 2 = good
   final Set<String> notes;
-  final int steps;
-  final int weatherF;
+  int? steps; // null until known (Health Connect not connected)
+  int? weatherF; // null until known (no location / backend off)
   final int snoreMinutes;
   final int coughs;
   final double breathingPerHour;
@@ -22,7 +22,7 @@ class Night {
     required this.session,
     this.mood,
     Set<String>? notes,
-    required this.steps,
+    this.steps,
     required this.weatherF,
     required this.snoreMinutes,
     required this.coughs,
@@ -71,8 +71,8 @@ class Night {
       ),
       mood: j['mood'] as int?,
       notes: {for (final n in j['notes'] as List) n as String},
-      steps: j['steps'] as int,
-      weatherF: j['weatherF'] as int,
+      steps: j['steps'] as int?,
+      weatherF: j['weatherF'] as int?,
       snoreMinutes: j['snoreMinutes'] as int,
       coughs: j['coughs'] as int,
       breathingPerHour: (j['breathingPerHour'] as num).toDouble(),
@@ -81,13 +81,15 @@ class Night {
   }
 
   /// Build a night from a finished tracking run, filling the mocked extras.
-  factory Night.fromResult(TrackingResult r, {int? seed}) {
+  /// [snoreMinutes] from real sensing; omitted for simulated runs, which get
+  /// plausible mocked extras.
+  factory Night.fromResult(TrackingResult r, {int? seed, int? snoreMinutes, bool real = false}) {
     final rng = math.Random(seed ?? r.session.startedAt.millisecondsSinceEpoch);
     return Night(
       session: r.session,
-      steps: 3000 + rng.nextInt(9000),
-      weatherF: 45 + rng.nextInt(25),
-      snoreMinutes: rng.nextInt(25),
+      steps: real ? null : 3000 + rng.nextInt(9000),
+      weatherF: real ? null : 45 + rng.nextInt(25),
+      snoreMinutes: snoreMinutes ?? rng.nextInt(25),
       coughs: rng.nextInt(4),
       breathingPerHour: 5 + rng.nextDouble() * 15,
       regularity: 70 + rng.nextInt(30),

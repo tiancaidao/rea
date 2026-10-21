@@ -2,6 +2,8 @@ import 'dart:io' show Directory, File;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../app_state.dart';
+import '../backend/backend.dart';
+import '../device/health_connect.dart';
 import '../theme.dart';
 import 'welcome_screen.dart';
 import 'widgets/common.dart';
@@ -139,8 +141,7 @@ class MorePage extends StatelessWidget {
         NavRow(icon: Icons.thumb_up, title: 'Consent and privacy', onTap: () => open(const ConsentPage())),
         NavRow(icon: Icons.favorite, title: 'Health Connect',
             value: s.pref('health_connect') == 'On' ? 'Connected' : 'Not connected',
-            onTap: () => open(const SimpleRadioPage('Health Connect', 'health_connect', ['On', 'Off'],
-                about: 'Read activity from Health Connect and write your sleep back so other health apps can use it.'))),
+            onTap: () => open(const HealthConnectPage())),
         const SectionTitle('Alarm'),
         NavRow(icon: Icons.sensors, title: 'Motion detection', value: s.pref('motion_detection').split(' ').first,
             onTap: () => open(const SimpleRadioPage('Motion detection', 'motion_detection',
@@ -196,7 +197,12 @@ class AccountPage extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Email: ${s.email}', style: const TextStyle(fontSize: 16)),
           const SizedBox(height: 8),
-          link('Manage account', () => toast(context, 'Opens account management (backend not wired)')),
+          link('Manage account', () async {
+            final u = Backend.I.user;
+            if (u == null) return toast(context, 'Sign in to manage your account');
+            await Backend.I.sendPasswordReset();
+            if (context.mounted) toast(context, 'Password reset email sent to ${u.email}');
+          }),
           link('Log out', () async {
             if (await confirm(context, 'Log out?', 'Your nights stay backed up online.', 'Log out')) {
               s.logOut();
@@ -210,7 +216,13 @@ class AccountPage extends StatelessWidget {
           }, color: Colors.redAccent),
           link('Erase your data and account', () async {
             if (await confirm(context, 'Erase data and account?', 'This cannot be undone.', 'Erase')) {
-              s.eraseAll();
+              try {
+                await Backend.I.deleteAccount();
+              } catch (e) {
+                if (context.mounted) toast(context, 'Couldn\'t delete the account: $e');
+                return;
+              }
+              s.nights.clear();
               s.logOut();
               if (!context.mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
@@ -286,7 +298,7 @@ class DatabasePage extends StatelessWidget {
         final rows = ['start,end,quality,asleep_min,in_bed_min,snore_min,steps'];
         for (final n in s.nights) {
           rows.add('${n.wentToBed.toIso8601String()},${n.wokeUp.toIso8601String()},${n.quality},'
-              '${n.asleepMinutes},${n.inBedMinutes},${n.snoreMinutes},${n.steps}');
+              '${n.asleepMinutes},${n.inBedMinutes},${n.snoreMinutes},${n.steps ?? ''}');
         }
         try {
           final f = File('${Directory.systemTemp.path}/sleep_export.csv')..writeAsStringSync(rows.join('\n'));
@@ -316,6 +328,27 @@ class DatabasePage extends StatelessWidget {
       ),
     ]);
   }
+}
+
+class HealthConnectPage extends StatelessWidget {
+  const HealthConnectPage({super.key});
+  @override
+  Widget build(BuildContext context) => SettingsPage(title: 'Health Connect', children: [
+        PrefRadioList(
+          prefKey: 'health_connect',
+          options: const ['On', 'Off'],
+          onPicked: (v) async {
+            if (v != 'On') return;
+            final ok = await HealthConnect.I.connect();
+            if (!ok) {
+              AppState.I.setPref('health_connect', 'Off');
+              if (context.mounted) toast(context, 'Health Connect isn\'t available or permission was declined');
+            }
+          },
+        ),
+        const AboutBlock('Read your daily steps from Health Connect and write each night back as a sleep '
+            'session so other health apps can use it.'),
+      ]);
 }
 
 // ── Profile › Premium ───────────────────────────────────────────────────────

@@ -15,9 +15,26 @@ flutter run                 # phone, emulator, or `flutter run -d chrome`
 flutter test                # unit tests for the algorithms
 ```
 
-> The repo ships the Dart source, tests and the native sensing plugin, but not
-> the generated platform runners. Run `flutter create .` once to scaffold them
-> (it won't overwrite `lib/`), then build as usual.
+> The Android runner is committed (it carries the sensing, location and Health
+> Connect permissions). For iOS, run `flutter create --platforms=ios .` once.
+
+### Backend
+
+By default the app is local-only. To use the real backend (Firebase Auth,
+Firestore sync, streamed sleep aid, weekly reports, weather, Play Billing
+verification) see [`../backend/README.md`](../backend/README.md):
+
+```bash
+flutter run --dart-define=BACKEND=emulator                 # local Firebase emulators + API
+flutter run $(../backend/scripts/app_defines.sh <project> <api-url>)   # deployed project
+```
+
+### Real tracking
+
+The tracking screen records the accelerometer and (in microphone mode) sound
+levels — no audio is kept — and keeps the screen on. Nights shorter than 20
+minutes are too short to analyse; for testing you can save a sample night
+instead.
 
 > This project is authored as source; it wasn't compiled in the environment that
 > generated it. If `flutter analyze` flags anything, it'll be a small fix — the
