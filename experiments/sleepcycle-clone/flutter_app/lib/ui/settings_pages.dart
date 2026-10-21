@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io' show Directory, File;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -302,6 +303,16 @@ class DatabasePage extends StatelessWidget {
         }
         try {
           final f = File('${Directory.systemTemp.path}/sleep_export.csv')..writeAsStringSync(rows.join('\n'));
+          if (context.mounted) toast(context, 'Exported ${s.nights.length} nights to ${f.path}');
+        } catch (_) {
+          if (context.mounted) toast(context, 'Export failed');
+        }
+      }),
+      // Full nights incl. the 30-s hypnogram, for comparison/benchmark/benchmark_night.py
+      NavRow(icon: Icons.compare_arrows, title: 'Export nights for benchmarking (JSON)', onTap: () async {
+        try {
+          final f = File('${Directory.systemTemp.path}/sleep_export.json')
+            ..writeAsStringSync(jsonEncode([for (final n in s.nights) n.toJson()]));
           if (context.mounted) toast(context, 'Exported ${s.nights.length} nights to ${f.path}');
         } catch (_) {
           if (context.mounted) toast(context, 'Export failed');

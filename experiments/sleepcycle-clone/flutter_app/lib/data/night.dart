@@ -81,16 +81,16 @@ class Night {
   }
 
   /// Build a night from a finished tracking run, filling the mocked extras.
-  /// [snoreMinutes] from real sensing; omitted for simulated runs, which get
-  /// plausible mocked extras.
-  factory Night.fromResult(TrackingResult r, {int? seed, int? snoreMinutes, bool real = false}) {
+  /// [snoreMinutes] / [coughs] from real sensing; omitted for simulated runs,
+  /// which get plausible mocked extras.
+  factory Night.fromResult(TrackingResult r, {int? seed, int? snoreMinutes, int? coughs, bool real = false}) {
     final rng = math.Random(seed ?? r.session.startedAt.millisecondsSinceEpoch);
     return Night(
       session: r.session,
       steps: real ? null : 3000 + rng.nextInt(9000),
       weatherF: real ? null : 45 + rng.nextInt(25),
       snoreMinutes: snoreMinutes ?? rng.nextInt(25),
-      coughs: rng.nextInt(4),
+      coughs: coughs ?? rng.nextInt(4),
       breathingPerHour: 5 + rng.nextDouble() * 15,
       regularity: 70 + rng.nextInt(30),
     );

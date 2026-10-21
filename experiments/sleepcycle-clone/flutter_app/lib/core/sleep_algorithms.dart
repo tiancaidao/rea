@@ -210,12 +210,21 @@ class SnoreEvent {
   SnoreEvent(this.startFrame, this.endFrame, this.meanProb);
 }
 
+/// Group per-frame probabilities into events: majority vote over
+/// [majorityWindow] frames, then keep runs of at least [minEventFrames] whose
+/// mean probability is at least [minMeanProb].
+///
+/// A NaN frame abstains (the live tracker marks quiet, gated seconds this way):
+/// it doesn't vote, and a run of up to [maxGap] NaN frames between two active
+/// frames is bridged — the silent breath between two snores belongs to the same
+/// snoring episode.
 List<SnoreEvent> detectSnoreEvents(
   List<double> frameProbs, {
   double onThreshold = 0.5,
   int majorityWindow = 3,
   int minEventFrames = 3,
   double minMeanProb = 0.5,
+  int maxGap = 0,
 }) {
   final n = frameProbs.length;
   if (n == 0) return [];
@@ -224,12 +233,31 @@ List<SnoreEvent> detectSnoreEvents(
   for (var i = 0; i < n; i++) {
     var votes = 0, total = 0;
     for (var j = i - half; j <= i + half; j++) {
-      if (j >= 0 && j < n) {
+      if (j >= 0 && j < n && !frameProbs[j].isNaN) {
         total++;
         if (frameProbs[j] >= onThreshold) votes++;
       }
     }
-    on.add(votes * 2 > total);
+    on.add(!frameProbs[i].isNaN && votes * 2 > total);
+  }
+  if (maxGap > 0) {
+    var i = 0;
+    while (i < n) {
+      if (frameProbs[i].isNaN) {
+        var j = i;
+        while (j < n && frameProbs[j].isNaN) {
+          j++;
+        }
+        if (i > 0 && j < n && on[i - 1] && on[j] && j - i <= maxGap) {
+          for (var k = i; k < j; k++) {
+            on[k] = true;
+          }
+        }
+        i = j;
+      } else {
+        i++;
+      }
+    }
   }
   final events = <SnoreEvent>[];
   int? start;
@@ -238,8 +266,8 @@ List<SnoreEvent> detectSnoreEvents(
     if (active && start == null) {
       start = i;
     } else if (!active && start != null) {
-      final seg = frameProbs.sublist(start, i);
-      final meanP = seg.reduce((a, b) => a + b) / seg.length;
+      final seg = frameProbs.sublist(start, i).where((p) => !p.isNaN).toList();
+      final meanP = seg.isEmpty ? 0.0 : seg.reduce((a, b) => a + b) / seg.length;
       if ((i - start) >= minEventFrames && meanP >= minMeanProb) {
         events.add(SnoreEvent(start, i, meanP));
       }

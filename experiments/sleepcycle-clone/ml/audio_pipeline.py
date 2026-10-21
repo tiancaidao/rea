@@ -28,6 +28,12 @@ N_MELS = 64              # snoracle input mel bins
 N_FRAMES = 86            # snoracle input time frames  ([1, 1, 86, 64])
 EMBED_DIM = 128          # snoracle output embedding    ([1, 1, 128])
 HOP = 1024               # window hop (512/1024 seen as constants)
+WINDOW_SAMPLES = FFT_SIZE + (N_FRAMES - 1) * HOP   # 89088 samples ~= 2.02 s per patch
+# Our training choices (not from the app): mel energy above 8 kHz is dropped so
+# 16 kHz public datasets and a 44.1 kHz phone mic look the same to the CNN, and
+# log uses a fixed floor so silent / band-limited bins don't dominate.
+FMAX_HZ = 8000.0
+LOG_FLOOR = 1e-4
 
 
 def frame_signal(pcm: np.ndarray, frame: int = FFT_SIZE, hop: int = HOP) -> np.ndarray:
@@ -50,7 +56,7 @@ def _mel_filterbank(sr: int = SAMPLE_RATE, n_fft: int = FFT_SIZE, n_mels: int = 
     """Slaney-style mel filterbank -> (n_mels, 1025). Replaces the encrypted ORT model."""
     def hz_to_mel(f): return 2595.0 * np.log10(1.0 + f / 700.0)
     def mel_to_hz(m): return 700.0 * (10.0 ** (m / 2595.0) - 1.0)
-    fmin, fmax = 0.0, sr / 2.0
+    fmin, fmax = 0.0, sr / 2.0           # filter centres span the full band (app contract)
     mels = np.linspace(hz_to_mel(fmin), hz_to_mel(fmax), n_mels + 2)
     freqs = mel_to_hz(mels)
     bins = np.floor((n_fft + 1) * freqs / sr).astype(int)
@@ -63,19 +69,31 @@ def _mel_filterbank(sr: int = SAMPLE_RATE, n_fft: int = FFT_SIZE, n_mels: int = 
         for k in range(c, r):
             if r != c:
                 fb[m - 1, k] = (r - k) / (r - c)
+    fb[:, np.arange(n_fft // 2 + 1) * sr / n_fft > FMAX_HZ] = 0.0   # band-limit (see FMAX_HZ)
     return fb
+
+
+_FB = None
+
+
+def logmel_frames(pcm: np.ndarray) -> np.ndarray:
+    """PCM -> (n_frames, N_MELS) log-mel for a signal of any length."""
+    global _FB
+    if _FB is None:
+        _FB = _mel_filterbank()
+    mag = magnitude_spectrum(frame_signal(pcm))
+    return np.log(mag @ _FB.T + LOG_FLOOR).astype(np.float32)
 
 
 def mel_spectrogram(pcm: np.ndarray) -> np.ndarray:
     """PCM -> (N_FRAMES, N_MELS) log-mel patch ready for the CNN."""
-    mag = magnitude_spectrum(frame_signal(pcm))          # (frames, 1025)
-    mel = mag @ _mel_filterbank().T                       # (frames, 64)
-    logmel = np.log(np.maximum(mel, 1e-10))
+    logmel = logmel_frames(pcm)                           # (frames, 64)
     # center/crop to exactly N_FRAMES so the tensor is [1,1,86,64]
     if len(logmel) >= N_FRAMES:
         logmel = logmel[:N_FRAMES]
     else:
-        logmel = np.pad(logmel, ((0, N_FRAMES - len(logmel)), (0, 0)))
+        logmel = np.pad(logmel, ((0, N_FRAMES - len(logmel)), (0, 0)),
+                        constant_values=np.log(LOG_FLOOR))
     return logmel.astype(np.float32)
 
 

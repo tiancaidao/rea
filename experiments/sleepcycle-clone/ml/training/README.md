@@ -8,7 +8,8 @@ exports a working model today; swap in real data via `datasets.py` for quality.
 | Script | Model | Input → Output | Export |
 |---|---|---|---|
 | `stage_model.py` | sleep stager | 3 features/epoch → 4 stages | `stage_model.onnx` |
-| `snore_classifier.py` | sound classifier | log-mel (1,64,86) → class probs | `snore_classifier.onnx` |
+| `snore_classifier.py` | sound classifier (model definition) | log-mel (1,86,64) → class probs | — |
+| `prepare_data.py` + `train_snore.py` | **snore / cough / speech / other on open data** | log-mel (1,86,64) → 4 classes | `snore_classifier.onnx`, `flutter_app/assets/models/snore_cnn.json` |
 | `snore_embedding.py` | snore signature | log-mel (1,64,86) → 16-D embedding | `snore_embedding.onnx` |
 
 ```bash
@@ -20,6 +21,22 @@ python3 snore_embedding.py
 
 `stage_model.py` also has a dependency-free numpy fallback so it trains and
 exports even without torch.
+
+## Snore model on open data (current)
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install torch onnx onnxruntime numpy soundfile pyarrow
+.venv/bin/python -I training/prepare_data.py --download   # ESC-50, FSD50K (CC0/CC-BY clips), LibriSpeech, EPFL cough
+.venv/bin/python -I training/prepare_data.py              # -> data/features.npz (grouped negatives, capped)
+.venv/bin/python -I training/prepare_data.py --selftest   # held-out clips for the on-device test
+.venv/bin/python -I training/train_snore.py               # train, pick threshold on val, export, RESULTS.md
+.venv/bin/python -I training/make_frontend_fixture.py     # Dart/Python front-end parity fixture
+.venv/bin/python -I training/prepare_data.py --prune      # delete raw audio, keep the feature cache
+```
+
+Licences and the rejected sources are in `DATASETS.md`, metrics in
+`RESULTS.md`. The app picks the model up from `assets/models/snore_cnn.json`
+when built with `--dart-define=SNORE_MODEL=true`.
 
 ## Getting real data
 

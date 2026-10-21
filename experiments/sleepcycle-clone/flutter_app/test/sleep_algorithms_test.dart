@@ -44,4 +44,14 @@ void main() {
     expect(events.length, 1);
     expect(events.first.endFrame - events.first.startFrame, greaterThanOrEqualTo(3));
   });
+
+  test('snore detector bridges quiet (NaN) gaps inside an episode only', () {
+    const q = double.nan;
+    final probs = <double>[0.9, 0.9, q, q, 0.9, 0.9, q, q, q, q, q, q, q, 0.9, 0.9, 0.9];
+    final bridged = detectSnoreEvents(probs, maxGap: 5);
+    expect(bridged.length, 2); // 0..5 joined across the 2-s gap; the 7-s gap splits
+    expect(bridged.first.startFrame, 0);
+    expect(bridged.first.endFrame, 6);
+    expect(detectSnoreEvents(probs).length, 1); // without bridging only the last run is long enough
+  });
 }

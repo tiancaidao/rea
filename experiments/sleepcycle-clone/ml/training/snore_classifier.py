@@ -13,7 +13,7 @@ from __future__ import annotations
 from datasets import synth_sound_dataset, CLASSES, N_MELS, N_FRAMES
 
 
-def build_model():
+def build_model(n_classes: int = len(CLASSES)):
     import torch.nn as nn
 
     def block(ci, co):
@@ -33,7 +33,7 @@ def build_model():
         def forward(self, x):
             return self.head(self.features(x))
 
-    return SnoreCNN(len(CLASSES))
+    return SnoreCNN(n_classes)
 
 
 def main(epochs: int = 12):

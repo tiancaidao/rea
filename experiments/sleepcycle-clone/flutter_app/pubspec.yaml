@@ -28,6 +28,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
   flutter_lints: ^4.0.0
 
 flutter:
@@ -37,5 +39,6 @@ flutter:
     - assets/lottie/
     - assets/audio/
     - assets/icon/
+    - assets/models/
     - assets/images/
     - assets/video/

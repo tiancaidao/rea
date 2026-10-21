@@ -28,6 +28,9 @@ flutter_app/assets/lottie/*
 !flutter_app/assets/lottie/.gitkeep
 flutter_app/assets/icon/*
 !flutter_app/assets/icon/.gitkeep
+# trained models are produced by ml/training/train_snore.py, never committed
+flutter_app/assets/models/*
+!flutter_app/assets/models/.gitkeep
 flutter_app/assets/data/*.csv
 flutter_app/assets/data/sleep_aid_index.json
 flutter_app/assets/data/strings.en.json

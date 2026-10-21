@@ -104,7 +104,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
     final seed = DateTime.now().millisecondsSinceEpoch & 0x7fffffff;
     late final Night night;
     if (_tracker.elapsed.inMinutes >= minMinutes) {
-      night = Night.fromResult(_tracker.analyze(), snoreMinutes: _tracker.soundMinutes, real: true);
+      night = Night.fromResult(_tracker.analyze(),
+          snoreMinutes: _tracker.soundMinutes, coughs: _tracker.coughs, real: true);
     } else {
       if (!mounted) return;
       final sample = await showDialog<bool>(
