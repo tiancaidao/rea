@@ -16,6 +16,7 @@ models, or brand assets.
 
 | Path | What it is |
 |---|---|
+| `sleep_core/` | **Original** sleep-tracking algorithms (movement detection, sleep staging, smart alarm, snore event detection) built from standard techniques — not ported from any app. Plain, portable logic with tests. Runnable. |
 | `ml/audio_pipeline.py` | Reference audio front-end (PCM → FFT → mel → CNN tensor) at the **exact shapes** read from the app's unencrypted TFLite models. Runnable. |
 | `mock-api/server.js` | Zero-dependency Node mock backend mirroring the app's endpoint shape (Ory-style auth, session upload, insights, remote config/paywall). Runnable. |
 | `android/.../net/SleepCloudApi.kt` | Retrofit interface mapped to the mock API. |
@@ -52,9 +53,41 @@ your own signing, don't reuse theirs.
 
 Full analysis: `/mnt/project-files/SleepCycle-analysis/` (blueprint + reports).
 
+## Building your own (not a clone)
+
+`sleep_core/` is an **original, clean-room** implementation of the *category's*
+standard algorithms, with our own parameters — informed by the reverse-engineered
+architecture, but written from scratch, not copied. It is the foundation you build
+a real product on; you supply your own trained ML models for the stages below.
+
+- `movement.py` — accelerometer movement detection (50 Hz, 30 s epochs) + calibration.
+- `sleep_stages.py` — per-epoch features → AWAKE/REM/LIGHT/DEEP, Gaussian-smoothed.
+- `smart_alarm.py` — wake-window firing with thresholds learned from the night's movement.
+- `snore.py` — snore event post-processing over your model's scores + a kNN "who is snoring" vote.
+
+### Platform choice (targeting iOS + Android)
+
+The sensing + on-device ML is inherently native on each platform and cannot be
+shared by any framework:
+
+| Concern | iOS | Android |
+|---|---|---|
+| Motion | CoreMotion (`CMMotionManager`) | `SensorManager` accelerometer |
+| Audio | AVAudioEngine + background `AVAudioSession` | `AudioRecord` + mic foreground service |
+| On-device ML | CoreML (or ONNX/TFLite iOS) | TFLite / ONNX Runtime |
+| Health | HealthKit (`sleepAnalysis`) | Health Connect |
+
+Recommended shape: **Flutter** for the shared app (UI, onboarding, stats, journal,
+paywall, networking) + a thin native sensing/ML module per platform. The
+`sleep_core` algorithms are plain math and port directly to Dart. Kotlin
+Multiplatform is the alternative if you want fully native UI.
+
 ## Run it
 
 ```bash
+# original algorithms: tests + a synthetic-night demo (no deps)
+cd sleep_core && python3 test_sleep_core.py
+
 # mock backend
 cd mock-api && node server.js        # http://127.0.0.1:8787
 
