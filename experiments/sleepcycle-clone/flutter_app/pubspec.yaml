@@ -1,0 +1,26 @@
+name: sleep_tracker
+description: An original sleep-tracking app (Flutter) built from standard techniques.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  # For real device sensing, add e.g.:
+  #   sensors_plus: ^6.0.0        # accelerometer
+  #   record: ^5.0.0              # microphone capture
+  #   tflite_flutter / onnxruntime: on-device ML
+  #   health: ^10.0.0             # HealthKit / Health Connect
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
