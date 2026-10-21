@@ -34,9 +34,16 @@ class GrayImage {
     final w = targetWidth;
     final h = source.width == source.height
         ? targetWidth
-        : math.max(1, roundHalfEven(source.height * (targetWidth / source.width)).toInt());
-    final scaled = img.copyResize(source,
-        width: w, height: h, interpolation: img.Interpolation.linear);
+        : math.max(
+            1,
+            roundHalfEven(source.height * (targetWidth / source.width)).toInt(),
+          );
+    final scaled = img.copyResize(
+      source,
+      width: w,
+      height: h,
+      interpolation: img.Interpolation.linear,
+    );
     return GrayImage(w, h, _toGray(scaled));
   }
 
@@ -49,7 +56,12 @@ class GrayImage {
         rgb.setPixelR(x, y, at(x, y));
       }
     }
-    final out = img.copyResize(rgb, width: w, height: h, interpolation: img.Interpolation.linear);
+    final out = img.copyResize(
+      rgb,
+      width: w,
+      height: h,
+      interpolation: img.Interpolation.linear,
+    );
     final px = Uint8List(w * h);
     for (var y = 0; y < h; y++) {
       for (var x = 0; x < w; x++) {
@@ -66,7 +78,9 @@ class GrayImage {
     for (var y = 0; y < image.height; y++) {
       for (var x = 0; x < image.width; x++) {
         final p = image.getPixel(x, y);
-        final r = p.rNormalized * 255, g = p.gNormalized * 255, b = p.bNormalized * 255;
+        final r = p.rNormalized * 255,
+            g = p.gNormalized * 255,
+            b = p.bNormalized * 255;
         px[i++] = (0.2126 * r + 0.7152 * g + 0.0722 * b).round().clamp(0, 255);
       }
     }
@@ -188,8 +202,12 @@ double mPointDelta(GrayImage g) {
 
 /// `GetArchSpiroDeltaPoints`: pixels visited by the Archimedean spiral
 /// r = a + b * theta from the centre, de-duplicated against the previous point.
-List<(int, int)> archSpiroPoints(GrayImage g,
-    {double a = 2.0, double b = 2.0, double dTheta = 0.3}) {
+List<(int, int)> archSpiroPoints(
+  GrayImage g, {
+  double a = 2.0,
+  double b = 2.0,
+  double dTheta = 0.3,
+}) {
   final w = g.width, h = g.height;
   if (w == 0 || h == 0) return const [];
   final cx = w ~/ 2, cy = h ~/ 2, limit = math.max(w, h) * 2;
@@ -229,10 +247,14 @@ List<double> dct1d(List<double> input) {
 /// `GetArkSPDelta`: root mean square of the DCT of the brightness along the
 /// spiral.
 double archSpiroDeltaOf(GrayImage g) {
-  final values = [for (final (x, y) in archSpiroPoints(g)) g.at(x, y).toDouble()];
+  final values = [
+    for (final (x, y) in archSpiroPoints(g)) g.at(x, y).toDouble(),
+  ];
   if (values.isEmpty) return 0;
   final coeffs = dct1d(values);
-  return roundHalfEven(math.sqrt(coeffs.fold(0.0, (s, c) => s + c * c) / coeffs.length));
+  return roundHalfEven(
+    math.sqrt(coeffs.fold(0.0, (s, c) => s + c * c) / coeffs.length),
+  );
 }
 
 /// `GetPHash(gray, 32, 8)`: resize to [dctSize] square, take the top-left
@@ -243,7 +265,9 @@ int grayPHash(GrayImage gray, {int dctSize = 32, int reducedSize = 8}) {
   final g = gray.resized(n, n);
   final scale = math.pi / (2 * n);
   final cosTable = List.generate(
-      n, (u) => List.generate(n, (x) => math.cos((2 * x + 1) * u * scale)));
+    n,
+    (u) => List.generate(n, (x) => math.cos((2 * x + 1) * u * scale)),
+  );
   final dct = List.generate(n, (_) => List.filled(n, 0.0));
   for (var u = 0; u < n; u++) {
     final cu = u == 0 ? 1 / math.sqrt(n) : math.sqrt(2 / n);
@@ -283,7 +307,9 @@ int grayPHash(GrayImage gray, {int dctSize = 32, int reducedSize = 8}) {
 (double, double, double) rgbToLab((int, int, int) rgb) {
   double lin(int c) {
     final v = c / 255.0;
-    return v > 0.04045 ? math.pow((v + 0.055) / 1.055, 2.4).toDouble() : v / 12.92;
+    return v > 0.04045
+        ? math.pow((v + 0.055) / 1.055, 2.4).toDouble()
+        : v / 12.92;
   }
 
   double fx(double t) =>
@@ -317,9 +343,12 @@ class SimilarityThresholds {
 
 /// Pass 1 test from `GroupByPhaseOne`: all 8 checks pass, or the pHashes are
 /// within [SimilarityThresholds.pHashStrong] on their own.
-bool firstPassMatch(ImageFeatures a, ImageFeatures b,
-    {int regionTolerance = SimilarityThresholds.regionTolerance,
-    int spiroTolerance = SimilarityThresholds.archSpiroTolerance}) {
+bool firstPassMatch(
+  ImageFeatures a,
+  ImageFeatures b, {
+  int regionTolerance = SimilarityThresholds.regionTolerance,
+  int spiroTolerance = SimilarityThresholds.archSpiroTolerance,
+}) {
   final distance = hammingDistance(a.pHash, b.pHash);
   var passed = 0;
   if (distance <= SimilarityThresholds.pHashLoose) passed++;
@@ -335,7 +364,8 @@ bool firstPassMatch(ImageFeatures a, ImageFeatures b,
 
 /// Pass 2 test from `GroupFinal`, for images left alone after pass 1.
 bool secondPassMatch(ImageFeatures a, ImageFeatures b) =>
-    cropChromaDelta(a.cropDelta, b.cropDelta) <= SimilarityThresholds.chromaTolerance &&
+    cropChromaDelta(a.cropDelta, b.cropDelta) <=
+        SimilarityThresholds.chromaTolerance &&
     hammingDistance(a.pHash, b.pHash) <= SimilarityThresholds.pHashSecondPass;
 
 /// Breadth-first connected components over [linked], each in input order.
@@ -384,7 +414,9 @@ List<List<int>> groupSimilarImages(List<ImageFeatures> items) {
   final singletons = <int>[];
   for (final bucket in buckets.values) {
     for (final comp in _components(
-        bucket.length, (a, b) => firstPassMatch(items[bucket[a]], items[bucket[b]]))) {
+      bucket.length,
+      (a, b) => firstPassMatch(items[bucket[a]], items[bucket[b]]),
+    )) {
       final members = [for (final c in comp) bucket[c]];
       if (members.length == 1) {
         singletons.add(members.first);
@@ -402,7 +434,9 @@ List<List<int>> groupSimilarImages(List<ImageFeatures> items) {
     final bucket = byHeight[h]!;
     if (bucket.length < 2) continue;
     for (final comp in _components(
-        bucket.length, (a, b) => secondPassMatch(items[bucket[a]], items[bucket[b]]))) {
+      bucket.length,
+      (a, b) => secondPassMatch(items[bucket[a]], items[bucket[b]]),
+    )) {
       if (comp.length > 1) groups.add([for (final c in comp) bucket[c]]);
     }
   }

@@ -25,24 +25,37 @@ class AboutScreen extends StatelessWidget {
             const CircleAvatar(
               radius: 48,
               backgroundColor: AppColors.primary,
-              child: Icon(Icons.cleaning_services, size: 48, color: Colors.black87),
+              child: Icon(
+                Icons.cleaning_services,
+                size: 48,
+                color: Colors.black87,
+              ),
             ),
             const SizedBox(height: 12),
             Center(
-              child: Text('Duplicates Cleaner${premium.isPremium ? ' Prime' : ''}',
-                  style: Theme.of(context).textTheme.titleLarge),
+              child: Text(
+                'Duplicates Cleaner${premium.isPremium ? ' Prime' : ''}',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
             ),
             const Center(child: Text('Version $version')),
             const SizedBox(height: 16),
             Card(
               child: ListTile(
                 leading: const Icon(Icons.workspace_premium_outlined),
-                title: Text(premium.isPremium
-                    ? 'Premium version is already purchased'
-                    : 'Upgrade - Premium Version'),
-                onTap: premium.isPremium ? null : () => showUpgradeDialog(context),
+                title: Text(
+                  premium.isPremium
+                      ? 'Premium version is already purchased'
+                      : 'Upgrade - Premium Version',
+                ),
+                onTap: premium.isPremium
+                    ? null
+                    : () => showUpgradeDialog(context),
                 trailing: premium.isPremium && premium.canPurchase
-                    ? TextButton(onPressed: premium.reset, child: const Text('Reset'))
+                    ? TextButton(
+                        onPressed: premium.reset,
+                        child: const Text('Reset'),
+                      )
                     : null,
               ),
             ),

@@ -14,29 +14,46 @@ img.Image scene(int w, int h, {int shift = 0}) {
     for (var x = 0; x < w; x++) {
       final u = x * 256 ~/ w, v = y * 256 ~/ h;
       final d = (u - 90) * (u - 90) + (v - 140) * (v - 140) < 3600;
-      im.setPixelRgb(x, y, (d ? 240 : u) + shift, (d ? 40 : v) + shift, d ? 30 : 128);
+      im.setPixelRgb(
+        x,
+        y,
+        (d ? 240 : u) + shift,
+        (d ? 40 : v) + shift,
+        d ? 30 : 128,
+      );
     }
   }
   return im;
 }
 
-ImageFeatures features(int height, {int pHash = 0, (int, int, int) crop = (128, 128, 128), int region = 100}) =>
-    ImageFeatures(
-      height: height,
-      tl: region,
-      tr: region,
-      centreAvg: region,
-      bl: region,
-      br: region,
-      centreDelta: 100,
-      archSpiroDelta: 50,
-      pHash: pHash,
-      cropDelta: crop,
-    );
+ImageFeatures features(
+  int height, {
+  int pHash = 0,
+  (int, int, int) crop = (128, 128, 128),
+  int region = 100,
+}) => ImageFeatures(
+  height: height,
+  tl: region,
+  tr: region,
+  centreAvg: region,
+  bl: region,
+  br: region,
+  centreDelta: 100,
+  archSpiroDelta: 50,
+  pHash: pHash,
+  cropDelta: crop,
+);
 
 void main() {
   test('.NET rounding is half to even', () {
-    expect([0.5, 1.5, 2.5, -0.5, 2.4, 2.6].map(roundHalfEven), [0, 2, 2, 0, 2, 3]);
+    expect([0.5, 1.5, 2.5, -0.5, 2.4, 2.6].map(roundHalfEven), [
+      0,
+      2,
+      2,
+      0,
+      2,
+      3,
+    ]);
   });
 
   test('gray copy is 100 px wide and its height tracks aspect ratio', () {
@@ -58,7 +75,10 @@ void main() {
     for (var i = 1; i < pts.length; i++) {
       expect(pts[i] != pts[i - 1], isTrue);
     }
-    expect(pts.every((p) => p.$1 >= 0 && p.$1 < 100 && p.$2 >= 0 && p.$2 < 75), isTrue);
+    expect(
+      pts.every((p) => p.$1 >= 0 && p.$1 < 100 && p.$2 >= 0 && p.$2 < 75),
+      isTrue,
+    );
   });
 
   test('orthonormal DCT keeps energy', () {
@@ -69,10 +89,28 @@ void main() {
   });
 
   test('pass 1: all checks, or pHash within 5 alone', () {
-    expect(firstPassMatch(features(100, pHash: 0), features(100, pHash: 0xFFF)), isTrue);
-    expect(firstPassMatch(features(100, pHash: 0), features(100, pHash: 0x1FFF)), isFalse);
-    expect(firstPassMatch(features(100, region: 100), features(100, pHash: 0x1F, region: 200)), isTrue);
-    expect(firstPassMatch(features(100, region: 100), features(100, pHash: 0x3F, region: 200)), isFalse);
+    expect(
+      firstPassMatch(features(100, pHash: 0), features(100, pHash: 0xFFF)),
+      isTrue,
+    );
+    expect(
+      firstPassMatch(features(100, pHash: 0), features(100, pHash: 0x1FFF)),
+      isFalse,
+    );
+    expect(
+      firstPassMatch(
+        features(100, region: 100),
+        features(100, pHash: 0x1F, region: 200),
+      ),
+      isTrue,
+    );
+    expect(
+      firstPassMatch(
+        features(100, region: 100),
+        features(100, pHash: 0x3F, region: 200),
+      ),
+      isFalse,
+    );
   });
 
   test('only equal heights are compared, and pass 2 rescues close colours', () {
@@ -81,8 +119,18 @@ void main() {
       features(75, pHash: 0), // other aspect ratio: never compared
       features(100, pHash: 0x1FFF, region: 200), // 13 bits: fails pass 1
       features(60, pHash: 0, crop: (200, 50, 50)),
-      features(60, pHash: 0x1FFF, crop: (201, 50, 50), region: 200), // alone in its bucket for pass 2
-      features(60, pHash: 0, crop: (50, 50, 200), region: 0), // pHash 0 apart: pass 1
+      features(
+        60,
+        pHash: 0x1FFF,
+        crop: (201, 50, 50),
+        region: 200,
+      ), // alone in its bucket for pass 2
+      features(
+        60,
+        pHash: 0,
+        crop: (50, 50, 200),
+        region: 0,
+      ), // pHash 0 apart: pass 1
     ];
     // Pass 1 groups come first; pass 2 then links 0 and 2 (same centre colour,
     // pHash 13 apart). Item 4 is the only pass 1 singleton of height 60.
@@ -104,8 +152,10 @@ void main() {
     final f = File('${dir.path}/a.bin')..writeAsBytesSync(bytes);
     final first = Uint8List(4096)..setRange(0, 2952, bytes, 2048);
     final last = Uint8List.sublistView(bytes, 5000 - 2048);
-    expect(await originalContentHash(f),
-        2 * XxHash32.hash(first) + 5000 + XxHash32.hash(last));
+    expect(
+      await originalContentHash(f),
+      2 * XxHash32.hash(first) + 5000 + XxHash32.hash(last),
+    );
     final tiny = File('${dir.path}/b.bin')..writeAsBytesSync([1, 2, 3]);
     expect(await originalContentHash(tiny), 0);
   });

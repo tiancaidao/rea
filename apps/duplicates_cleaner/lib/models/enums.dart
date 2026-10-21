@@ -13,13 +13,13 @@ enum ScanType {
   final String label;
 
   Set<String> extensions(Set<String> customExtensions) => switch (this) {
-        ScanType.image => AppConstants.imageExtensions,
-        ScanType.audio => AppConstants.audioExtensions,
-        ScanType.video => AppConstants.videoExtensions,
-        ScanType.doc => AppConstants.documentExtensions,
-        ScanType.apk => AppConstants.apkExtensions,
-        ScanType.custom => customExtensions,
-      };
+    ScanType.image => AppConstants.imageExtensions,
+    ScanType.audio => AppConstants.audioExtensions,
+    ScanType.video => AppConstants.videoExtensions,
+    ScanType.doc => AppConstants.documentExtensions,
+    ScanType.apk => AppConstants.apkExtensions,
+    ScanType.custom => customExtensions,
+  };
 }
 
 /// `CommonPageData.ScanAlgorithmType`.
@@ -63,12 +63,12 @@ enum FileSizeExclusion {
 
   /// The 8 KB floor applies only to [none], exactly as in the original.
   bool allows(int size) => switch (this) {
-        FileSizeExclusion.none => size >= AppConstants.minScannableFileSize,
-        FileSizeExclusion.tiny => size > _mb,
-        FileSizeExclusion.small => size < _mb || size > 50 * _mb,
-        FileSizeExclusion.medium => size < 50 * _mb || size > 250 * _mb,
-        FileSizeExclusion.large => size < 250 * _mb,
-      };
+    FileSizeExclusion.none => size >= AppConstants.minScannableFileSize,
+    FileSizeExclusion.tiny => size > _mb,
+    FileSizeExclusion.small => size < _mb || size > 50 * _mb,
+    FileSizeExclusion.medium => size < 50 * _mb || size > 250 * _mb,
+    FileSizeExclusion.large => size < 250 * _mb,
+  };
 }
 
 /// `SortFieldType`.

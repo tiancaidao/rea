@@ -32,8 +32,10 @@ class PremiumService extends ChangeNotifier {
   }
 
   /// Features gated behind premium in the original app.
-  bool allowsAlgorithm(ScanAlgorithm a) => isPremium || a == ScanAlgorithm.sameContent;
-  bool allowsStorage(StorageSelection s) => isPremium || s == StorageSelection.internal;
+  bool allowsAlgorithm(ScanAlgorithm a) =>
+      isPremium || a == ScanAlgorithm.sameContent;
+  bool allowsStorage(StorageSelection s) =>
+      isPremium || s == StorageSelection.internal;
   bool allowsSizeExclusion(FileSizeExclusion e) =>
       isPremium || e == FileSizeExclusion.none;
   bool get allowsCustomExtensions => isPremium;

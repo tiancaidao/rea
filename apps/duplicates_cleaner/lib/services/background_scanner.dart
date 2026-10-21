@@ -38,7 +38,12 @@ class BackgroundScan {
           progress.close();
       }
     });
-    return BackgroundScan._(isolate, progress.stream, result.future, cancelPort);
+    return BackgroundScan._(
+      isolate,
+      progress.stream,
+      result.future,
+      cancelPort,
+    );
   }
 
   Future<void> cancel() async {

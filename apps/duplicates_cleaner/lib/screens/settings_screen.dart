@@ -31,19 +31,23 @@ class SettingsScreen extends StatelessWidget {
               _OptionCard(
                 icon: Icons.folder_outlined,
                 title: 'Scan Location',
-                value: settings.storage == StorageSelection.customFolder &&
+                value:
+                    settings.storage == StorageSelection.customFolder &&
                         settings.customFolder != null
                     ? 'Custom: ${settings.customFolder}'
                     : settings.storage.label,
                 onTap: () async {
-                  final s = await chooseOne(context,
-                      title: 'Scan Location',
-                      options: locations,
-                      label: (s) => s.label,
-                      selected: settings.storage,
-                      locked: (s) => !premium.allowsStorage(s));
+                  final s = await chooseOne(
+                    context,
+                    title: 'Scan Location',
+                    options: locations,
+                    label: (s) => s.label,
+                    selected: settings.storage,
+                    locked: (s) => !premium.allowsStorage(s),
+                  );
                   if (s == null || !context.mounted) return;
-                  if (!premium.allowsStorage(s)) return showUpgradeDialog(context);
+                  if (!premium.allowsStorage(s))
+                    return showUpgradeDialog(context);
                   if (s == StorageSelection.customFolder) {
                     final folder = await scope.storage.pickFolder();
                     if (folder == null) return;
@@ -57,14 +61,17 @@ class SettingsScreen extends StatelessWidget {
                 title: 'Scan Type',
                 value: settings.algorithm.label,
                 onTap: () async {
-                  final a = await chooseOne(context,
-                      title: 'Scan Type',
-                      options: ScanAlgorithm.values,
-                      label: (a) => a.label,
-                      selected: settings.algorithm,
-                      locked: (a) => !premium.allowsAlgorithm(a));
+                  final a = await chooseOne(
+                    context,
+                    title: 'Scan Type',
+                    options: ScanAlgorithm.values,
+                    label: (a) => a.label,
+                    selected: settings.algorithm,
+                    locked: (a) => !premium.allowsAlgorithm(a),
+                  );
                   if (a == null || !context.mounted) return;
-                  if (!premium.allowsAlgorithm(a)) return showUpgradeDialog(context);
+                  if (!premium.allowsAlgorithm(a))
+                    return showUpgradeDialog(context);
                   settings.algorithm = a;
                 },
               ),
@@ -73,14 +80,17 @@ class SettingsScreen extends StatelessWidget {
                 title: 'File Size Exclusion',
                 value: settings.sizeExclusion.label,
                 onTap: () async {
-                  final e = await chooseOne(context,
-                      title: 'File Size Exclusion',
-                      options: FileSizeExclusion.values,
-                      label: (e) => e.label,
-                      selected: settings.sizeExclusion,
-                      locked: (e) => !premium.allowsSizeExclusion(e));
+                  final e = await chooseOne(
+                    context,
+                    title: 'File Size Exclusion',
+                    options: FileSizeExclusion.values,
+                    label: (e) => e.label,
+                    selected: settings.sizeExclusion,
+                    locked: (e) => !premium.allowsSizeExclusion(e),
+                  );
                   if (e == null || !context.mounted) return;
-                  if (!premium.allowsSizeExclusion(e)) return showUpgradeDialog(context);
+                  if (!premium.allowsSizeExclusion(e))
+                    return showUpgradeDialog(context);
                   settings.sizeExclusion = e;
                 },
               ),
@@ -104,7 +114,9 @@ class SettingsScreen extends StatelessWidget {
                 child: SwitchListTile(
                   secondary: const Icon(Icons.verified_outlined),
                   title: const Text('Confirm Same Content Byte by Byte'),
-                  subtitle: const Text('Slower, but never groups files that only share sampled bytes'),
+                  subtitle: const Text(
+                    'Slower, but never groups files that only share sampled bytes',
+                  ),
                   value: settings.verifyContent,
                   onChanged: (v) => settings.verifyContent = v,
                 ),
@@ -114,9 +126,15 @@ class SettingsScreen extends StatelessWidget {
                 height: 64,
                 child: FilledButton.icon(
                   icon: const Icon(Icons.add),
-                  label: const Text('Custom Extensions', style: TextStyle(fontSize: 18)),
+                  label: const Text(
+                    'Custom Extensions',
+                    style: TextStyle(fontSize: 18),
+                  ),
                   onPressed: () => premium.allowsCustomExtensions
-                      ? showDialog(context: context, builder: (_) => const _ExtensionsDialog())
+                      ? showDialog(
+                          context: context,
+                          builder: (_) => const _ExtensionsDialog(),
+                        )
                       : showUpgradeDialog(context),
                 ),
               ),
@@ -129,8 +147,12 @@ class SettingsScreen extends StatelessWidget {
 }
 
 class _OptionCard extends StatelessWidget {
-  const _OptionCard(
-      {required this.icon, required this.title, required this.value, required this.onTap});
+  const _OptionCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String title;
@@ -139,14 +161,14 @@ class _OptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
-        child: ListTile(
-          leading: Icon(icon),
-          title: Text(title),
-          subtitle: Text(value, maxLines: 2, overflow: TextOverflow.ellipsis),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: onTap,
-        ),
-      );
+    child: ListTile(
+      leading: Icon(icon),
+      title: Text(title),
+      subtitle: Text(value, maxLines: 2, overflow: TextOverflow.ellipsis),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
+    ),
+  );
 }
 
 /// `CustomExtensionDialogFragment`: add comma separated extensions, remove
@@ -172,7 +194,10 @@ class _ExtensionsDialogState extends State<_ExtensionsDialog> {
     final settings = AppScope.of(context).settings;
     final text = _input.text.replaceAll(' ', '');
     if (!AppConstants.customExtensionsPattern.hasMatch(text)) {
-      setState(() => _error = 'Use letters and digits separated by commas, e.g. psd,ai');
+      setState(
+        () =>
+            _error = 'Use letters and digits separated by commas, e.g. psd,ai',
+      );
       return;
     }
     settings.customExtensions = {
@@ -192,25 +217,39 @@ class _ExtensionsDialogState extends State<_ExtensionsDialog> {
         title: const Text('Add Custom Extension'),
         content: SizedBox(
           width: double.maxFinite,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(
-              controller: _input,
-              decoration: InputDecoration(hintText: 'Enter extensions', errorText: _error),
-              onSubmitted: (_) => _save(),
-            ),
-            const SizedBox(height: 12),
-            Wrap(spacing: 6, runSpacing: 6, children: [
-              for (final e in settings.customExtensions)
-                InputChip(
-                  label: Text(e),
-                  onDeleted: () =>
-                      settings.customExtensions = {...settings.customExtensions}..remove(e),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _input,
+                decoration: InputDecoration(
+                  hintText: 'Enter extensions',
+                  errorText: _error,
                 ),
-            ]),
-          ]),
+                onSubmitted: (_) => _save(),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final e in settings.customExtensions)
+                    InputChip(
+                      label: Text(e),
+                      onDeleted: () => settings.customExtensions = {
+                        ...settings.customExtensions,
+                      }..remove(e),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Done'),
+          ),
           FilledButton(onPressed: _save, child: const Text('Save')),
         ],
       ),

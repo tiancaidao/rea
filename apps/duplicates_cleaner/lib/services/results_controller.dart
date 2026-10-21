@@ -17,7 +17,9 @@ class DeletionResult {
 /// original `ScannerPageActivity`.
 class ResultsController extends ChangeNotifier {
   ResultsController(this.groups, {required bool autoSelect}) {
-    _applySelection(autoSelect ? SelectFilter.selectDuplicates : SelectFilter.unselectAll);
+    _applySelection(
+      autoSelect ? SelectFilter.selectDuplicates : SelectFilter.unselectAll,
+    );
   }
 
   final List<DuplicateGroup> groups;
@@ -60,8 +62,9 @@ class ResultsController extends ChangeNotifier {
       return switch (field) {
         SortField.size => x.size.compareTo(y.size),
         SortField.nameLength => x.name.length.compareTo(y.name.length),
-        SortField.nameAlphabetical =>
-          x.name.toLowerCase().compareTo(y.name.toLowerCase()),
+        SortField.nameAlphabetical => x.name.toLowerCase().compareTo(
+          y.name.toLowerCase(),
+        ),
         SortField.path => x.path.toLowerCase().compareTo(y.path.toLowerCase()),
         SortField.dateCreated => x.modified.compareTo(y.modified),
       };

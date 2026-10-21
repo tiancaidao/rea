@@ -20,19 +20,40 @@ class AppConstants {
   static const thumbnailSize = 60.0;
 
   /// Validation pattern for the custom extensions input (comma separated).
-  static final customExtensionsPattern = RegExp(r'^,?[A-Za-z0-9]+(,[A-Za-z0-9]+)*$');
+  static final customExtensionsPattern = RegExp(
+    r'^,?[A-Za-z0-9]+(,[A-Za-z0-9]+)*$',
+  );
 
   static const imageExtensions = {
     'jpg', 'jpeg', 'png', 'gif', 'tiff', 'tif', 'bmp', 'heif', 'eps', 'raw', //
   };
   static const audioExtensions = {
-    'mp3', 'wav', 'wma', 'm4a', 'flac', 'aac', 'amr', 'opus', 'asf', 'asx', 'midi', //
+    'mp3',
+    'wav',
+    'wma',
+    'm4a',
+    'flac',
+    'aac',
+    'amr',
+    'opus',
+    'asf',
+    'asx',
+    'midi', //
   };
   static const videoExtensions = {
     'mp4', 'avi', 'vob', 'mkv', 'flv', '3gp', 'mov', 'wmv', 'webm', //
   };
   static const documentExtensions = {
-    'pdf', 'doc', 'docx', 'rtf', 'xls', 'xlsx', 'ppt', 'pptx', 'mobi', 'epub', //
+    'pdf',
+    'doc',
+    'docx',
+    'rtf',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'mobi',
+    'epub', //
     'rar', 'zip', 'txt', 'cbr', 'cbz', 'fb2', 'ttf',
   };
   static const apkExtensions = {'apk'};

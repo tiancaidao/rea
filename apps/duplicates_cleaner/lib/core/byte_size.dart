@@ -10,7 +10,9 @@ String formatBytes(int bytes) {
   }
   var text = value.toStringAsFixed(2);
   if (text.contains('.')) {
-    text = text.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+    text = text
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
   return '$text ${units[unit]}';
 }

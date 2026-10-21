@@ -52,33 +52,42 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
     var algorithm = settings.algorithm;
     if (!premium.allowsAlgorithm(algorithm) ||
-        (algorithm == ScanAlgorithm.sameAppearance && widget.scanType != ScanType.image)) {
+        (algorithm == ScanAlgorithm.sameAppearance &&
+            widget.scanType != ScanType.image)) {
       algorithm = ScanAlgorithm.sameContent;
     }
-    final storage =
-        premium.allowsStorage(settings.storage) ? settings.storage : StorageSelection.internal;
+    final storage = premium.allowsStorage(settings.storage)
+        ? settings.storage
+        : StorageSelection.internal;
     final exclusion = premium.allowsSizeExclusion(settings.sizeExclusion)
         ? settings.sizeExclusion
         : FileSizeExclusion.none;
 
-    if (algorithm == ScanAlgorithm.sameAppearance && !settings.similarImageWarningDisabled) {
-      final dontRemind = await confirm(context,
-          title: 'Similar image scan',
-          message: 'This scan can take time. Please review each image carefully; '
-              'false positives are possible.',
-          yes: 'Dont remind again',
-          no: 'Ok');
+    if (algorithm == ScanAlgorithm.sameAppearance &&
+        !settings.similarImageWarningDisabled) {
+      final dontRemind = await confirm(
+        context,
+        title: 'Similar image scan',
+        message:
+            'This scan can take time. Please review each image carefully; '
+            'false positives are possible.',
+        yes: 'Dont remind again',
+        no: 'Ok',
+      );
       if (dontRemind) settings.similarImageWarningDisabled = true;
     }
 
     if (!await scope.storage.ensureAccess()) {
       if (!mounted) return;
-      final open = await confirm(context,
-          title: 'All files access required',
-          message: 'To access files on device folders and subfolders, the app needs all '
-              'files access. Please enable it now to proceed further.',
-          yes: 'Show me',
-          no: 'Back');
+      final open = await confirm(
+        context,
+        title: 'All files access required',
+        message:
+            'To access files on device folders and subfolders, the app needs all '
+            'files access. Please enable it now to proceed further.',
+        yes: 'Show me',
+        no: 'Back',
+      );
       if (open) await scope.storage.openAccessSettings();
       if (mounted) Navigator.of(context).pop();
       return;
@@ -86,7 +95,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
     List<String> roots;
     try {
-      roots = await scope.storage.rootsFor(storage, customFolder: settings.customFolder);
+      roots = await scope.storage.rootsFor(
+        storage,
+        customFolder: settings.customFolder,
+      );
     } on StorageUnavailable catch (e) {
       if (!mounted) return;
       await showMessage(context, e.title, e.message);
@@ -94,13 +106,15 @@ class _ScannerScreenState extends State<ScannerScreen> {
       return;
     }
 
-    final scan = await BackgroundScan.start(ScanRequest(
-      roots: roots,
-      extensions: widget.scanType.extensions(settings.customExtensions),
-      algorithm: algorithm,
-      sizeExclusion: exclusion,
-      verifyContent: settings.verifyContent,
-    ));
+    final scan = await BackgroundScan.start(
+      ScanRequest(
+        roots: roots,
+        extensions: widget.scanType.extensions(settings.customExtensions),
+        algorithm: algorithm,
+        sizeExclusion: exclusion,
+        verifyContent: settings.verifyContent,
+      ),
+    );
     if (!mounted) {
       await scan.cancel();
       return;
@@ -113,7 +127,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
       final groups = await scan.result;
       if (!mounted) return;
       setState(() {
-        _results = ResultsController(groups, autoSelect: settings.autoSelectDuplicates);
+        _results = ResultsController(
+          groups,
+          autoSelect: settings.autoSelectDuplicates,
+        );
         _scan = null;
       });
     } catch (e) {
@@ -125,13 +142,18 @@ class _ScannerScreenState extends State<ScannerScreen> {
     final scope = AppScope.of(context);
     final results = _results!;
     if (results.selectedCount == 0) return;
-    final blocked = results.freeTierBlockReason(isPremium: scope.premium.isPremium);
+    final blocked = results.freeTierBlockReason(
+      isPremium: scope.premium.isPremium,
+    );
     if (blocked != null) return showUpgradeDialog(context, reason: blocked);
     if (scope.settings.promptBeforeDeletion) {
-      final ok = await confirm(context,
-          title: 'Warning: Deletion Confirmation!',
-          message: 'Are you sure to delete ${results.selectedCount} selected files? '
-              'Files are permanently deleted, please re-check file paths.');
+      final ok = await confirm(
+        context,
+        title: 'Warning: Deletion Confirmation!',
+        message:
+            'Are you sure to delete ${results.selectedCount} selected files? '
+            'Files are permanently deleted, please re-check file paths.',
+      );
       if (!ok) return;
     }
     setState(() => _deleting = true);
@@ -139,37 +161,55 @@ class _ScannerScreenState extends State<ScannerScreen> {
     if (!mounted) return;
     setState(() => _deleting = false);
     scope.settings.deletionSuccessCount += outcome.deleted;
-    final failed = outcome.failed.isEmpty ? '' : ' (${outcome.failed.length} could not be deleted)';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Files deleted successfully: ${outcome.deleted}, '
-          '${formatBytes(outcome.freedBytes)} freed$failed'),
-    ));
+    final failed = outcome.failed.isEmpty
+        ? ''
+        : ' (${outcome.failed.length} could not be deleted)';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Files deleted successfully: ${outcome.deleted}, '
+          '${formatBytes(outcome.freedBytes)} freed$failed',
+        ),
+      ),
+    );
   }
 
   Future<void> _select() async {
     final scope = AppScope.of(context);
     if (!scope.premium.allowsSortAndSelectFilters) {
-      return showUpgradeDialog(context, reason: 'Selection filters are a premium feature.');
+      return showUpgradeDialog(
+        context,
+        reason: 'Selection filters are a premium feature.',
+      );
     }
-    final f = await chooseOne(context,
-        title: 'Select an option', options: SelectFilter.values, label: (f) => f.label);
+    final f = await chooseOne(
+      context,
+      title: 'Select an option',
+      options: SelectFilter.values,
+      label: (f) => f.label,
+    );
     if (f != null) _results!.applySelection(f);
   }
 
   Future<void> _sort() async {
     final scope = AppScope.of(context);
     if (!scope.premium.allowsSortAndSelectFilters) {
-      return showUpgradeDialog(context, reason: 'Sort filters are a premium feature.');
+      return showUpgradeDialog(
+        context,
+        reason: 'Sort filters are a premium feature.',
+      );
     }
     final options = [
       for (final f in SortField.values) ...[(f, true), (f, false)],
     ];
     final r = _results!;
-    final picked = await chooseOne<(SortField, bool)>(context,
-        title: 'Sort',
-        options: options,
-        selected: r.sortField == null ? null : (r.sortField!, r.ascending),
-        label: (o) => '${o.$1.label} - ${o.$2 ? 'Ascending' : 'Descending'}');
+    final picked = await chooseOne<(SortField, bool)>(
+      context,
+      title: 'Sort',
+      options: options,
+      selected: r.sortField == null ? null : (r.sortField!, r.ascending),
+      label: (o) => '${o.$1.label} - ${o.$2 ? 'Ascending' : 'Descending'}',
+    );
     if (picked != null) r.sort(picked.$1, ascending: picked.$2);
   }
 
@@ -177,12 +217,19 @@ class _ScannerScreenState extends State<ScannerScreen> {
   Widget build(BuildContext context) {
     final results = _results;
     return PanelScaffold(
-      title: results == null ? 'Summary' : '${results.duplicateCount} duplicates',
+      title: results == null
+          ? 'Summary'
+          : '${results.duplicateCount} duplicates',
       body: _error != null
-          ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)))
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(_error!),
+              ),
+            )
           : results == null
-              ? _ProgressView(progress: _progress)
-              : _ResultsView(results: results, onSelect: _select, onSort: _sort),
+          ? _ProgressView(progress: _progress)
+          : _ResultsView(results: results, onSelect: _select, onSort: _sort),
       bottom: results == null
           ? null
           : ListenableBuilder(
@@ -193,14 +240,20 @@ class _ScannerScreenState extends State<ScannerScreen> {
                   width: double.infinity,
                   height: 54,
                   child: FilledButton.icon(
-                    onPressed: _deleting || results.selectedCount == 0 ? null : _delete,
+                    onPressed: _deleting || results.selectedCount == 0
+                        ? null
+                        : _delete,
                     icon: _deleting
                         ? const SizedBox.square(
-                            dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         : const Icon(Icons.delete_outline),
-                    label: Text(_deleting
-                        ? 'Deleting files...'
-                        : 'CAN BE DELETED (${formatBytes(results.selectedBytes)})'),
+                    label: Text(
+                      _deleting
+                          ? 'Deleting files...'
+                          : 'CAN BE DELETED (${formatBytes(results.selectedBytes)})',
+                    ),
                   ),
                 ),
               ),
@@ -231,25 +284,35 @@ class _ProgressView extends StatelessWidget {
           children: [
             SizedBox.square(
               dimension: 125,
-              child: Stack(fit: StackFit.expand, children: [
-                CircularProgressIndicator(
-                  value: determinate ? p.percent / 100 : null,
-                  strokeWidth: 10,
-                  backgroundColor: Colors.black12,
-                  color: AppColors.accent,
-                ),
-                if (determinate)
-                  Center(child: Text('${p.percent}%', style: const TextStyle(fontSize: 22))),
-              ]),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CircularProgressIndicator(
+                    value: determinate ? p.percent / 100 : null,
+                    strokeWidth: 10,
+                    backgroundColor: Colors.black12,
+                    color: AppColors.accent,
+                  ),
+                  if (determinate)
+                    Center(
+                      child: Text(
+                        '${p.percent}%',
+                        style: const TextStyle(fontSize: 22),
+                      ),
+                    ),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
             Text(label, style: const TextStyle(fontSize: 18)),
             const SizedBox(height: 8),
-            Text(p?.path ?? '',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: AppColors.lightBlack)),
+            Text(
+              p?.path ?? '',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: AppColors.lightBlack),
+            ),
           ],
         ),
       ),
@@ -258,7 +321,11 @@ class _ProgressView extends StatelessWidget {
 }
 
 class _ResultsView extends StatelessWidget {
-  const _ResultsView({required this.results, required this.onSelect, required this.onSort});
+  const _ResultsView({
+    required this.results,
+    required this.onSelect,
+    required this.onSort,
+  });
 
   final ResultsController results;
   final VoidCallback onSelect;
@@ -273,8 +340,11 @@ class _ResultsView extends StatelessWidget {
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(24),
-              child: Text('No duplicates found. Brilliant job done by you!',
-                  textAlign: TextAlign.center, style: TextStyle(fontSize: 16)),
+              child: Text(
+                'No duplicates found. Brilliant job done by you!',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16),
+              ),
             ),
           );
         }
@@ -284,41 +354,52 @@ class _ResultsView extends StatelessWidget {
             ..add(('header', i + 1, g))
             ..addAll(g.items);
         }
-        return Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-            child: Row(children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                    onPressed: onSelect,
-                    icon: const Icon(Icons.checklist),
-                    label: const Text('Select')),
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onSelect,
+                      icon: const Icon(Icons.checklist),
+                      label: const Text('Select'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onSort,
+                      icon: const Icon(Icons.sort),
+                      label: const Text('Sort'),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                    onPressed: onSort, icon: const Icon(Icons.sort), label: const Text('Sort')),
-              ),
-            ]),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(8),
-              itemCount: rows.length,
-              itemBuilder: (_, i) => switch (rows[i]) {
-                (String _, int n, DuplicateGroup g) => Padding(
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(8),
+                itemCount: rows.length,
+                itemBuilder: (_, i) => switch (rows[i]) {
+                  (String _, int n, DuplicateGroup g) => Padding(
                     padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
                     child: Text(
-                        'Set $n: ${g.items.length} files (${formatBytes(g.items.first.size)} each)',
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                      'Set $n: ${g.items.length} files (${formatBytes(g.items.first.size)} each)',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                   ),
-                DuplicateItem item => _DuplicateTile(
-                    item: item, onToggle: () => results.toggle(item)),
-                _ => const SizedBox.shrink(),
-              },
+                  DuplicateItem item => _DuplicateTile(
+                    item: item,
+                    onToggle: () => results.toggle(item),
+                  ),
+                  _ => const SizedBox.shrink(),
+                },
+              ),
             ),
-          ),
-        ]);
+          ],
+        );
       },
     );
   }
@@ -330,8 +411,9 @@ class _DuplicateTile extends StatelessWidget {
   final DuplicateItem item;
   final VoidCallback onToggle;
 
-  bool get _isImage => AppConstants.decodableImageExtensions
-      .contains(p.extension(item.name).replaceFirst('.', '').toLowerCase());
+  bool get _isImage => AppConstants.decodableImageExtensions.contains(
+    p.extension(item.name).replaceFirst('.', '').toLowerCase(),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -340,12 +422,17 @@ class _DuplicateTile extends StatelessWidget {
       child: SizedBox.square(
         dimension: AppConstants.thumbnailSize,
         child: _isImage
-            ? Image.file(File(item.path),
+            ? Image.file(
+                File(item.path),
                 fit: BoxFit.cover,
                 cacheWidth: 120,
-                errorBuilder: (_, _, _) => const Icon(Icons.broken_image_outlined))
+                errorBuilder: (_, _, _) =>
+                    const Icon(Icons.broken_image_outlined),
+              )
             : const ColoredBox(
-                color: AppColors.primary, child: Icon(Icons.insert_drive_file_outlined)),
+                color: AppColors.primary,
+                child: Icon(Icons.insert_drive_file_outlined),
+              ),
       ),
     );
     return Card(
@@ -355,37 +442,57 @@ class _DuplicateTile extends StatelessWidget {
         onTap: onToggle,
         child: Padding(
           padding: const EdgeInsets.all(8),
-          child: Row(children: [
-            Checkbox(value: item.checked, onChanged: (_) => onToggle()),
-            InkWell(onTap: () => OpenFilex.open(item.path), child: thumb),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Expanded(
-                      child: Text(item.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 15)),
+          child: Row(
+            children: [
+              Checkbox(value: item.checked, onChanged: (_) => onToggle()),
+              InkWell(onTap: () => OpenFilex.open(item.path), child: thumb),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 15),
+                          ),
+                        ),
+                        if (item.isMainFile)
+                          const Chip(
+                            label: Text(
+                              'Original',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                      ],
                     ),
-                    if (item.isMainFile)
-                      const Chip(
-                          label: Text('Original', style: TextStyle(fontSize: 11)),
-                          visualDensity: VisualDensity.compact),
-                  ]),
-                  Text('Size: ${formatBytes(item.size)}', style: const TextStyle(fontSize: 12)),
-                  Text('Modified: ${formatDate(item.modified)}',
-                      style: const TextStyle(fontSize: 12)),
-                  Text(item.path,
+                    Text(
+                      'Size: ${formatBytes(item.size)}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      'Modified: ${formatDate(item.modified)}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      item.path,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: AppColors.lightBlack)),
-                ],
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.lightBlack,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
         ),
       ),
     );

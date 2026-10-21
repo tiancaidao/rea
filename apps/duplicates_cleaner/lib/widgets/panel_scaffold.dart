@@ -25,7 +25,10 @@ class PanelScaffold extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: showBack,
-        title: Text(title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600)),
+        title: Text(
+          title,
+          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
+        ),
         actions: actions,
       ),
       body: SafeArea(

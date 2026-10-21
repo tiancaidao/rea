@@ -27,21 +27,29 @@ class SettingsStore extends ChangeNotifier {
       _enum('ScanAlgorithm', ScanAlgorithm.values, ScanAlgorithm.sameContent);
   set algorithm(ScanAlgorithm v) => _setEnum('ScanAlgorithm', v);
 
-  StorageSelection get storage =>
-      _enum('StorageSelection', StorageSelection.values, StorageSelection.internal);
+  StorageSelection get storage => _enum(
+    'StorageSelection',
+    StorageSelection.values,
+    StorageSelection.internal,
+  );
   set storage(StorageSelection v) => _setEnum('StorageSelection', v);
 
-  FileSizeExclusion get sizeExclusion =>
-      _enum('ExcludedFileSizes', FileSizeExclusion.values, FileSizeExclusion.none);
+  FileSizeExclusion get sizeExclusion => _enum(
+    'ExcludedFileSizes',
+    FileSizeExclusion.values,
+    FileSizeExclusion.none,
+  );
   set sizeExclusion(FileSizeExclusion v) => _setEnum('ExcludedFileSizes', v);
 
-  bool get autoSelectDuplicates => _prefs.getBool('DuplicatesAutoSelection') ?? true;
+  bool get autoSelectDuplicates =>
+      _prefs.getBool('DuplicatesAutoSelection') ?? true;
   set autoSelectDuplicates(bool v) {
     _prefs.setBool('DuplicatesAutoSelection', v);
     notifyListeners();
   }
 
-  bool get promptBeforeDeletion => _prefs.getBool('FilesDeletionPrompt') ?? true;
+  bool get promptBeforeDeletion =>
+      _prefs.getBool('FilesDeletionPrompt') ?? true;
   set promptBeforeDeletion(bool v) {
     _prefs.setBool('FilesDeletionPrompt', v);
     notifyListeners();
@@ -65,16 +73,19 @@ class SettingsStore extends ChangeNotifier {
 
   String? get customFolder => _prefs.getString('CustomFolder');
   set customFolder(String? v) {
-    v == null ? _prefs.remove('CustomFolder') : _prefs.setString('CustomFolder', v);
+    v == null
+        ? _prefs.remove('CustomFolder')
+        : _prefs.setString('CustomFolder', v);
     notifyListeners();
   }
 
   /// Stored comma separated, like the original `CustomExtensions` key.
-  Set<String> get customExtensions => (_prefs.getString('CustomExtensions') ?? '')
-      .split(',')
-      .map((e) => e.trim().toLowerCase())
-      .where((e) => e.isNotEmpty)
-      .toSet();
+  Set<String> get customExtensions =>
+      (_prefs.getString('CustomExtensions') ?? '')
+          .split(',')
+          .map((e) => e.trim().toLowerCase())
+          .where((e) => e.isNotEmpty)
+          .toSet();
   set customExtensions(Set<String> v) {
     _prefs.setString('CustomExtensions', v.join(','));
     notifyListeners();

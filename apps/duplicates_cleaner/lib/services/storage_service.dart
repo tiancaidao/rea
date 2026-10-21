@@ -32,14 +32,19 @@ class StorageService {
 
   Future<void> openAccessSettings() => openAppSettings();
 
-  Future<String?> pickFolder() => FilePicker.getDirectoryPath(
-        dialogTitle: 'Select a folder to scan',
-      );
+  Future<String?> pickFolder() =>
+      FilePicker.getDirectoryPath(dialogTitle: 'Select a folder to scan');
 
-  Future<List<String>> rootsFor(StorageSelection s, {String? customFolder}) async {
+  Future<List<String>> rootsFor(
+    StorageSelection s, {
+    String? customFolder,
+  }) async {
     if (s == StorageSelection.customFolder) {
       if (customFolder == null || !Directory(customFolder).existsSync()) {
-        throw StorageUnavailable('Select a folder', 'Choose a folder to scan first.');
+        throw StorageUnavailable(
+          'Select a folder',
+          'Choose a folder to scan first.',
+        );
       }
       return [customFolder];
     }
@@ -53,17 +58,23 @@ class StorageService {
       case StorageSelection.parallel:
         if (!Directory(parallelRoot).existsSync()) {
           throw StorageUnavailable(
-              'Parallel storage not found', 'No dual-app / parallel space was found.');
+            'Parallel storage not found',
+            'No dual-app / parallel space was found.',
+          );
         }
         return [parallelRoot];
       case StorageSelection.sdCard:
       case StorageSelection.usb:
         if (removable.isEmpty) {
           throw s == StorageSelection.sdCard
-              ? StorageUnavailable('SD Card Not Found!',
-                  'Please re-check the device memory card slot.')
-              : StorageUnavailable('USB Error!',
-                  'USB device not mounted correctly. Please eject and reattach it.');
+              ? StorageUnavailable(
+                  'SD Card Not Found!',
+                  'Please re-check the device memory card slot.',
+                )
+              : StorageUnavailable(
+                  'USB Error!',
+                  'USB device not mounted correctly. Please eject and reattach it.',
+                );
         }
         return removable;
       case StorageSelection.internalPlusSdCard:

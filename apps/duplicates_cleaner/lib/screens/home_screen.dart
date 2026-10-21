@@ -43,7 +43,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final upgrade = await confirm(
       context,
       title: 'Free Version Limits',
-      message: "You're using the free version.\n\n"
+      message:
+          "You're using the free version.\n\n"
           'Delete up to ${AppConstants.freeDeleteMaxFilesPerOperation} files per operation '
           'and up to ${formatBytes(AppConstants.freeFileSizeLimit)} at a time.\n\n'
           'Continue free or upgrade now for unlimited cleanup.',
@@ -56,17 +57,24 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _open(ScanType type) async {
     final scope = AppScope.of(context);
     if (type == ScanType.apk && !scope.premium.allowsApkScan) {
-      return showUpgradeDialog(context,
-          reason: 'This feature is available in our prime version.');
+      return showUpgradeDialog(
+        context,
+        reason: 'This feature is available in our prime version.',
+      );
     }
     if (type == ScanType.custom) {
       if (!scope.premium.allowsCustomExtensions) {
-        return showUpgradeDialog(context,
-            reason: 'This feature is available in our prime version.');
+        return showUpgradeDialog(
+          context,
+          reason: 'This feature is available in our prime version.',
+        );
       }
       if (scope.settings.customExtensions.isEmpty) {
-        return showMessage(context, 'Custom Extensions',
-            'Add custom extensions in Settings before running this scan.');
+        return showMessage(
+          context,
+          'Custom Extensions',
+          'Add custom extensions in Settings before running this scan.',
+        );
       }
     }
     await Navigator.of(context)
@@ -80,7 +88,9 @@ class _HomeScreenState extends State<HomeScreen> {
       listenable: premium,
       builder: (context, _) => PanelScaffold(
         showBack: false,
-        title: premium.isPremium ? AppConstants.premiumAppName : AppConstants.freeAppName,
+        title: premium.isPremium
+            ? AppConstants.premiumAppName
+            : AppConstants.freeAppName,
         body: GridView.count(
           padding: const EdgeInsets.all(16),
           crossAxisCount: 2,
@@ -88,12 +98,17 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisSpacing: 12,
           children: [
             for (final t in ScanType.values)
-              _HomeTile(icon: _icons[t]!, label: t.label, onTap: () => _open(t)),
+              _HomeTile(
+                icon: _icons[t]!,
+                label: t.label,
+                onTap: () => _open(t),
+              ),
             _HomeTile(
               icon: Icons.settings_outlined,
               label: 'Settings',
-              onTap: () => Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
+              onTap: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
             ),
             _HomeTile(
               icon: Icons.info_outline,
@@ -109,7 +124,11 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _HomeTile extends StatelessWidget {
-  const _HomeTile({required this.icon, required this.label, required this.onTap});
+  const _HomeTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String label;
@@ -117,21 +136,25 @@ class _HomeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(15),
-          onTap: onTap,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: AppColors.primary,
-                child: Icon(icon, size: 30, color: Colors.black87),
-              ),
-              const SizedBox(height: 12),
-              Text(label, style: const TextStyle(fontSize: 15), textAlign: TextAlign.center),
-            ],
+    child: InkWell(
+      borderRadius: BorderRadius.circular(15),
+      onTap: onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: AppColors.primary,
+            child: Icon(icon, size: 30, color: Colors.black87),
           ),
-        ),
-      );
+          const SizedBox(height: 12),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 15),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ),
+  );
 }

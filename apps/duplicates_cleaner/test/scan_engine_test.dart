@@ -20,24 +20,28 @@ void main() {
   setUp(() => root = Directory.systemTemp.createTempSync('dc_test'));
   tearDown(() => root.deleteSync(recursive: true));
 
-  File write(String rel, List<int> bytes) =>
-      File(p.join(root.path, rel))
-        ..createSync(recursive: true)
-        ..writeAsBytesSync(bytes);
+  File write(String rel, List<int> bytes) => File(p.join(root.path, rel))
+    ..createSync(recursive: true)
+    ..writeAsBytesSync(bytes);
 
-  Future<List<List<String>>> scan(ScanAlgorithm a,
-      {Set<String> ext = const {'bin', 'jpg', 'png'},
-      FileSizeExclusion ex = FileSizeExclusion.none,
-      bool verify = true}) async {
-    final groups = await ScanEngine(ScanRequest(
-      roots: [root.path],
-      extensions: ext,
-      algorithm: a,
-      sizeExclusion: ex,
-      verifyContent: verify,
-    )).run();
+  Future<List<List<String>>> scan(
+    ScanAlgorithm a, {
+    Set<String> ext = const {'bin', 'jpg', 'png'},
+    FileSizeExclusion ex = FileSizeExclusion.none,
+    bool verify = true,
+  }) async {
+    final groups = await ScanEngine(
+      ScanRequest(
+        roots: [root.path],
+        extensions: ext,
+        algorithm: a,
+        sizeExclusion: ex,
+        verifyContent: verify,
+      ),
+    ).run();
     return [
-      for (final g in groups) [for (final i in g.items) p.relative(i.path, from: root.path)]..sort(),
+      for (final g in groups)
+        [for (final i in g.items) p.relative(i.path, from: root.path)]..sort(),
     ];
   }
 
@@ -51,19 +55,26 @@ void main() {
     ]);
   });
 
-  test('same content rejects files that only share the fingerprinted edges', () async {
-    final a = randomBytes(30000, 3);
-    final b = Uint8List.fromList(a)..[15000] ^= 0xFF; // outside both sampled windows
-    write('x.bin', a);
-    write('y.bin', b);
-    expect(await scan(ScanAlgorithm.sameContent), isEmpty);
-  });
+  test(
+    'same content rejects files that only share the fingerprinted edges',
+    () async {
+      final a = randomBytes(30000, 3);
+      final b = Uint8List.fromList(a)
+        ..[15000] ^= 0xFF; // outside both sampled windows
+      write('x.bin', a);
+      write('y.bin', b);
+      expect(await scan(ScanAlgorithm.sameContent), isEmpty);
+    },
+  );
 
   test('files under 8 KB are skipped only when nothing is excluded', () async {
     write('small1.bin', List.filled(4000, 7));
     write('small2.bin', List.filled(4000, 7));
     expect(await scan(ScanAlgorithm.sameContent), isEmpty);
-    expect(await scan(ScanAlgorithm.sameSize, ex: FileSizeExclusion.small), hasLength(1));
+    expect(
+      await scan(ScanAlgorithm.sameSize, ex: FileSizeExclusion.small),
+      hasLength(1),
+    );
   });
 
   test('extension filter and hidden folders are respected', () async {
@@ -77,14 +88,17 @@ void main() {
     ]);
   });
 
-  test('same name matches the exact name, as the original groups rows', () async {
-    write('a/photo.bin', randomBytes(9000, 5));
-    write('b/photo.bin', randomBytes(12000, 6));
-    write('c/Photo.bin', randomBytes(12000, 8));
-    expect(await scan(ScanAlgorithm.sameName), [
-      ['a/photo.bin', 'b/photo.bin'],
-    ]);
-  });
+  test(
+    'same name matches the exact name, as the original groups rows',
+    () async {
+      write('a/photo.bin', randomBytes(9000, 5));
+      write('b/photo.bin', randomBytes(12000, 6));
+      write('c/Photo.bin', randomBytes(12000, 8));
+      expect(await scan(ScanAlgorithm.sameName), [
+        ['a/photo.bin', 'b/photo.bin'],
+      ]);
+    },
+  );
 
   test('same name and size ignores case but needs equal sizes', () async {
     write('a/Photo.bin', randomBytes(12000, 5));
@@ -110,17 +124,25 @@ void main() {
     write('a.bin', data);
     write('b.bin', data);
     write('c.bin', data);
-    final groups = await ScanEngine(ScanRequest(
-      roots: [root.path],
-      extensions: const {'bin'},
-      algorithm: ScanAlgorithm.sameContent,
-      sizeExclusion: FileSizeExclusion.none,
-    )).run();
+    final groups = await ScanEngine(
+      ScanRequest(
+        roots: [root.path],
+        extensions: const {'bin'},
+        algorithm: ScanAlgorithm.sameContent,
+        sizeExclusion: FileSizeExclusion.none,
+      ),
+    ).run();
     final restored = [
       for (final g in groups)
-        DuplicateGroup([for (final i in g.items) DuplicateItem.fromJson(i.toJson())]),
+        DuplicateGroup([
+          for (final i in g.items) DuplicateItem.fromJson(i.toJson()),
+        ]),
     ];
-    expect(restored.single.items.map((i) => i.isMainFile), [true, false, false]);
+    expect(restored.single.items.map((i) => i.isMainFile), [
+      true,
+      false,
+      false,
+    ]);
     expect(restored.single.wastedBytes, 40000);
   });
 
@@ -128,7 +150,10 @@ void main() {
     final data = randomBytes(20000, 7);
     write('a.bin', data);
     write('b.bin', data);
-    expect(await scan(ScanAlgorithm.sameSize, ex: FileSizeExclusion.tiny), isEmpty);
+    expect(
+      await scan(ScanAlgorithm.sameSize, ex: FileSizeExclusion.tiny),
+      isEmpty,
+    );
     expect(await scan(ScanAlgorithm.sameSize), hasLength(1));
   });
 
@@ -138,13 +163,30 @@ void main() {
       for (var x = 0; x < 256; x++) {
         final d = (x - 90) * (x - 90) + (y - 140) * (y - 140) < 3600;
         final t = (x * 7 + y * 13) % 9;
-        base.setPixelRgb(x, y, (d ? 240 : x) - t, (d ? 40 : y) + t, d ? 30 : 128);
+        base.setPixelRgb(
+          x,
+          y,
+          (d ? 240 : x) - t,
+          (d ? 40 : y) + t,
+          d ? 30 : 128,
+        );
       }
     }
     final orig = write('orig.png', img.encodePng(base, level: 0));
-    expect(orig.lengthSync(), greaterThan(8192), reason: 'must pass the 8 KB floor');
-    final copy = write('copy.jpg', img.encodeJpg(img.copyResize(base, width: 200), quality: 95));
-    expect(copy.lengthSync(), greaterThan(8192), reason: 'must pass the 8 KB floor');
+    expect(
+      orig.lengthSync(),
+      greaterThan(8192),
+      reason: 'must pass the 8 KB floor',
+    );
+    final copy = write(
+      'copy.jpg',
+      img.encodeJpg(img.copyResize(base, width: 200), quality: 95),
+    );
+    expect(
+      copy.lengthSync(),
+      greaterThan(8192),
+      reason: 'must pass the 8 KB floor',
+    );
     final other = img.Image(width: 256, height: 256);
     for (var y = 0; y < 256; y++) {
       for (var x = 0; x < 256; x++) {

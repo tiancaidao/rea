@@ -20,22 +20,22 @@ class DuplicateItem {
   bool checked;
 
   Map<String, Object?> toJson() => {
-        'path': path,
-        'name': name,
-        'size': size,
-        'modified': modified.millisecondsSinceEpoch,
-        'isMainFile': isMainFile,
-        'checked': checked,
-      };
+    'path': path,
+    'name': name,
+    'size': size,
+    'modified': modified.millisecondsSinceEpoch,
+    'isMainFile': isMainFile,
+    'checked': checked,
+  };
 
   factory DuplicateItem.fromJson(Map<String, Object?> j) => DuplicateItem(
-        path: j['path']! as String,
-        name: j['name']! as String,
-        size: j['size']! as int,
-        modified: DateTime.fromMillisecondsSinceEpoch(j['modified']! as int),
-        isMainFile: j['isMainFile'] as bool? ?? false,
-        checked: j['checked'] as bool? ?? false,
-      );
+    path: j['path']! as String,
+    name: j['name']! as String,
+    size: j['size']! as int,
+    modified: DateTime.fromMillisecondsSinceEpoch(j['modified']! as int),
+    isMainFile: j['isMainFile'] as bool? ?? false,
+    checked: j['checked'] as bool? ?? false,
+  );
 }
 
 class DuplicateGroup {

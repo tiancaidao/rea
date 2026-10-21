@@ -38,7 +38,11 @@ class AppScope extends InheritedWidget {
 }
 
 class DuplicatesCleanerApp extends StatelessWidget {
-  const DuplicatesCleanerApp({super.key, required this.settings, required this.premium});
+  const DuplicatesCleanerApp({
+    super.key,
+    required this.settings,
+    required this.premium,
+  });
 
   final SettingsStore settings;
   final PremiumService premium;
@@ -70,17 +74,23 @@ class DuplicatesCleanerApp extends StatelessWidget {
           cardTheme: CardThemeData(
             color: Colors.white,
             elevation: 1.5,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
           ),
           filledButtonTheme: FilledButtonThemeData(
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
             ),
           ),
         ),
-        home: settings.firstLaunch ? const TutorialScreen() : const HomeScreen(),
+        home: settings.firstLaunch
+            ? const TutorialScreen()
+            : const HomeScreen(),
       ),
     );
   }

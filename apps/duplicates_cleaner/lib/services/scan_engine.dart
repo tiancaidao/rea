@@ -60,8 +60,10 @@ class ScanEngine {
       ScanAlgorithm.sameContent => await _bySameContent(files),
       ScanAlgorithm.sameName => _bySameName(files),
       // `NSHash`: lower-cased name followed by the size, with no separator.
-      ScanAlgorithm.sameNameAndSize =>
-        _groupBy(files, (f) => '${f.name.toLowerCase()}${f.size}'),
+      ScanAlgorithm.sameNameAndSize => _groupBy(
+        files,
+        (f) => '${f.name.toLowerCase()}${f.size}',
+      ),
       ScanAlgorithm.sameSize => _groupBy(files, (f) => '${f.size}'),
       ScanAlgorithm.sameAppearance => await _bySameAppearance(files),
     };
@@ -102,12 +104,14 @@ class ScanEngine {
           }
           if (!request.sizeExclusion.allows(stat.size)) continue;
           if (!seen.add(e.absolute.path)) continue;
-          result.add(DuplicateItem(
-            path: e.path,
-            name: name,
-            size: stat.size,
-            modified: stat.modified,
-          ));
+          result.add(
+            DuplicateItem(
+              path: e.path,
+              name: name,
+              size: stat.size,
+              modified: stat.modified,
+            ),
+          );
         }
       }
       if (++visited % 25 == 0) {
@@ -135,15 +139,20 @@ class ScanEngine {
   /// stored rows are grouped by the name as written, so "IMG.jpg" and
   /// "img.jpg" end up in separate groups.
   List<DuplicateGroup> _bySameName(List<DuplicateItem> files) {
-    final candidates =
-        _groupBy(files, (f) => f.name.toLowerCase()).expand((g) => g.items).toList();
+    final candidates = _groupBy(
+      files,
+      (f) => f.name.toLowerCase(),
+    ).expand((g) => g.items).toList();
     return _groupBy(candidates, (f) => f.name);
   }
 
   /// `ProcessFileSizeAndContent`: files sharing a size are hashed with
   /// `FileCheck.GetXhash`, and the stored rows are grouped by that hash alone.
   Future<List<DuplicateGroup>> _bySameContent(List<DuplicateItem> files) async {
-    final candidates = _groupBy(files, (f) => '${f.size}').expand((g) => g.items).toList();
+    final candidates = _groupBy(
+      files,
+      (f) => '${f.size}',
+    ).expand((g) => g.items).toList();
     final byHash = <int, List<DuplicateItem>>{};
     for (var i = 0; i < candidates.length && !_cancelled; i++) {
       final f = candidates[i];
@@ -156,7 +165,8 @@ class ScanEngine {
       }
     }
     final buckets = byHash.values.where((b) => b.length > 1).toList();
-    if (!request.verifyContent) return [for (final b in buckets) DuplicateGroup(b)];
+    if (!request.verifyContent)
+      return [for (final b in buckets) DuplicateGroup(b)];
 
     // Optional extra step: split each bucket by real byte equality, so a hash
     // collision (including every file under 2 KB, which all hash to 0) never
@@ -170,9 +180,12 @@ class ScanEngine {
         final rest = <DuplicateItem>[];
         for (final other in remaining.skip(1)) {
           _report(ScanPhase.comparing, done, buckets.length, other.path);
-          final equal = head.size == other.size &&
-              await filesHaveSameBytes(File(head.path), File(other.path))
-                  .catchError((_) => false);
+          final equal =
+              head.size == other.size &&
+              await filesHaveSameBytes(
+                File(head.path),
+                File(other.path),
+              ).catchError((_) => false);
           (equal ? same : rest).add(other);
         }
         if (same.length > 1) groups.add(DuplicateGroup(same));
@@ -184,10 +197,15 @@ class ScanEngine {
 
   /// `ProcessSimilarImageFiles` + `GroupFinal`: nine features per image, then
   /// the two matching passes in [groupSimilarImages].
-  Future<List<DuplicateGroup>> _bySameAppearance(List<DuplicateItem> files) async {
+  Future<List<DuplicateGroup>> _bySameAppearance(
+    List<DuplicateItem> files,
+  ) async {
     final images = files
-        .where((f) => AppConstants.decodableImageExtensions
-            .contains(p.extension(f.name).replaceFirst('.', '').toLowerCase()))
+        .where(
+          (f) => AppConstants.decodableImageExtensions.contains(
+            p.extension(f.name).replaceFirst('.', '').toLowerCase(),
+          ),
+        )
         .toList();
     final analysed = <DuplicateItem>[];
     final features = <ImageFeatures>[];

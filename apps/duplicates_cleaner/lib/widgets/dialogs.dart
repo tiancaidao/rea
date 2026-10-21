@@ -9,7 +9,12 @@ Future<void> showMessage(BuildContext context, String title, String message) =>
       builder: (c) => AlertDialog(
         title: Text(title),
         content: Text(message),
-        actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('Ok'))],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Ok'),
+          ),
+        ],
       ),
     );
 
@@ -28,7 +33,10 @@ Future<bool> confirm(
         content: Text(message),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: Text(no)),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(yes)),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: Text(yes),
+          ),
         ],
       ),
     ) ??
@@ -42,32 +50,36 @@ Future<T?> chooseOne<T>(
   required String Function(T) label,
   T? selected,
   bool Function(T)? locked,
-}) =>
-    showModalBottomSheet<T>(
-      context: context,
-      showDragHandle: true,
-      builder: (c) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(title, style: Theme.of(c).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            for (final o in options)
-              ListTile(
-                title: Text(label(o)),
-                leading: Icon(
-                  o == selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                  color: AppColors.accent,
-                ),
-                trailing: (locked?.call(o) ?? false)
-                    ? const Icon(Icons.workspace_premium, color: AppColors.primaryDark)
-                    : null,
-                onTap: () => Navigator.pop(c, o),
-              ),
-          ],
-        ),
-      ),
-    );
+}) => showModalBottomSheet<T>(
+  context: context,
+  showDragHandle: true,
+  builder: (c) => SafeArea(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(title, style: Theme.of(c).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        for (final o in options)
+          ListTile(
+            title: Text(label(o)),
+            leading: Icon(
+              o == selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_off,
+              color: AppColors.accent,
+            ),
+            trailing: (locked?.call(o) ?? false)
+                ? const Icon(
+                    Icons.workspace_premium,
+                    color: AppColors.primaryDark,
+                  )
+                : null,
+            onTap: () => Navigator.pop(c, o),
+          ),
+      ],
+    ),
+  ),
+);
 
 /// The upgrade dialog with the benefits list (`UpgradeDialogFragment`).
 Future<void> showUpgradeDialog(BuildContext context, {String? reason}) {
@@ -85,17 +97,26 @@ Future<void> showUpgradeDialog(BuildContext context, {String? reason}) {
             for (final b in AppConstants.premiumBenefits)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(children: [
-                  const Icon(Icons.check_circle, color: AppColors.accent, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(b)),
-                ]),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      color: AppColors.accent,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(b)),
+                  ],
+                ),
               ),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(c), child: const Text('later')),
+        TextButton(
+          onPressed: () => Navigator.pop(c),
+          child: const Text('later'),
+        ),
         FilledButton(
           onPressed: () async {
             Navigator.pop(c);
@@ -103,8 +124,11 @@ Future<void> showUpgradeDialog(BuildContext context, {String? reason}) {
               await premium.unlockForTesting();
             } else {
               if (context.mounted) {
-                await showMessage(context, 'Not available',
-                    'In-app purchases are not configured in this build yet.');
+                await showMessage(
+                  context,
+                  'Not available',
+                  'In-app purchases are not configured in this build yet.',
+                );
               }
             }
           },
