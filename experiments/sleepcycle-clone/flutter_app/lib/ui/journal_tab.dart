@@ -342,7 +342,7 @@ class _WeekStrip extends StatelessWidget {
               'Weekly report',
               n == 0
                   ? (r['highlights'] as List).join('\n')
-                  : '$n nights tracked\nAverage quality: ${r['avgQuality']}%\n'
+                  : '$n ${n == 1 ? 'night' : 'nights'} tracked\nAverage quality: ${r['avgQuality']}%\n'
                       'Average asleep: ${fmtDuration(r['avgAsleepMin'] as int)}\n'
                       'Regularity: ${r['regularity']}%\n\n${(r['highlights'] as List).join('\n')}');
           return;
@@ -363,7 +363,7 @@ class _WeekStrip extends StatelessWidget {
     final q = week.map((n) => n.quality).reduce((a, b) => a + b) ~/ week.length;
     final a = week.map((n) => n.asleepMinutes).reduce((a, b) => a + b) ~/ week.length;
     showInfoSheet(context, 'Weekly report',
-        '${week.length} nights tracked\nAverage quality: $q%\nAverage asleep: ${fmtDuration(a)}\n\n'
+        '${week.length} ${week.length == 1 ? 'night' : 'nights'} tracked\nAverage quality: $q%\nAverage asleep: ${fmtDuration(a)}\n\n'
         'Your most consistent bedtime keeps your quality steady — keep it up.');
   }
 }

@@ -71,7 +71,8 @@ curl -sf -X PATCH -H "Authorization: Bearer $TOKEN" -H "x-goog-user-project: $PR
   >/dev/null || echo "  ! enable Email/Password in the console: Authentication › Sign-in method"
 
 echo "▸ Android app $PKG"
-firebase apps:list android --project "$PROJECT" | grep -q "$PKG" 2>/dev/null || \
+# (the app list shows display names, not package names)
+firebase apps:list android --project "$PROJECT" 2>/dev/null | grep -q "Sleep Tracker (prototype)" || \
   firebase apps:create android "Sleep Tracker (prototype)" --package-name "$PKG" --project "$PROJECT"
 
 echo "▸ Firestore rules → $DATABASE only"
@@ -106,5 +107,5 @@ ACCESS_TOKEN="$(gcloud "${ACCT[@]}" auth print-access-token)" node "$HERE/script
 
 echo
 echo "✔ deployed. API: $URL"
-echo "  Health: curl $URL/healthz"
+echo "  Health: curl $URL/health"
 echo "  App flags: scripts/app_defines.sh $PROJECT $URL"

@@ -34,13 +34,23 @@ flutter run --dart-define=BACKEND=emulator   # Android emulator reaches the host
 
 ```bash
 firebase login                      # once
-scripts/deploy.sh <project-id> --create --billing <BILLING_ACCOUNT_ID> \
+scripts/deploy.sh <project-id> [--account you@example.com] \
   --audio-dir ../flutter_app/assets/audio          # optional: your local media
-flutter run $(scripts/app_defines.sh <project-id> <api-url>)
+scripts/app_defines.sh <project-id> <api-url> --json > ../flutter_app/config/backend.cloud.json
+cd ../flutter_app && flutter run --dart-define-from-file=config/backend.cloud.json
 ```
 
-`deploy.sh` enables the APIs, adds Firebase, creates Firestore + the Storage
-bucket, enables email sign-in, registers the Android app, deploys rules, creates
+`config/backend.cloud.json` is gitignored: this repo is public, and the
+project config would let anyone create accounts in your Firebase project.
+See `config/backend.example.json` for the shape.
+
+Shared projects are fine: the backend uses its own Firestore database
+(`sleep-tracker`), its own private bucket (`<project>-sleep-aid`) and its own
+Android app registration; it doesn't change other apps' rules or data.
+Cloud Run reserves `/healthz`, so use `GET /health`.
+
+`deploy.sh` checks billing, enables the APIs, creates the named Firestore
+database and the private media bucket, enables email sign-in, registers the Android app, deploys rules, creates
 a least-privilege service account, deploys the API to Cloud Run (scale-to-zero,
 max 3 instances) and seeds the catalog. Re-run it to update.
 

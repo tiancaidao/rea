@@ -31,3 +31,7 @@ flutter_app/assets/icon/*
 flutter_app/assets/data/*.csv
 flutter_app/assets/data/sleep_aid_index.json
 flutter_app/assets/data/strings.en.json
+
+# project config for --dart-define-from-file (keep out of the public repo)
+flutter_app/config/*.json
+!flutter_app/config/backend.example.json

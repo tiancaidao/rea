@@ -38,7 +38,7 @@ function createApp({ db, auth, bucket, publisher = null, packageName = null, fet
   app.use((req, res, next) => {
     const t0 = Date.now();
     res.on('finish', () => {
-      if (req.path === '/healthz') return;
+      if (req.path.startsWith('/health')) return;
       console.log(JSON.stringify({ severity: 'INFO', method: req.method, path: req.path,
         status: res.statusCode, ms: Date.now() - t0 }));
     });
@@ -58,7 +58,8 @@ function createApp({ db, auth, bucket, publisher = null, packageName = null, fet
     next();
   });
 
-  app.get('/healthz', (_req, res) => res.json({ ok: true }));
+  // /healthz is reserved by Cloud Run's front end; /health works there
+  app.get(['/health', '/healthz'], (_req, res) => res.json({ ok: true }));
 
   // Remote config + paywall definition (public: needed before sign-in).
   app.get('/v1/config', asyncRoute(async (_req, res) => {
