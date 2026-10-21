@@ -17,6 +17,9 @@ flutter_app/.flutter-plugins*
 # These are Northcube's copyrighted material — kept local, never redistributed.
 # Run tools/extract_placeholders.sh against the APK to repopulate for a demo.
 flutter_app/assets/audio/
+flutter_app/assets/video/
+flutter_app/assets/images/
+flutter_app/assets/fonts/
 flutter_app/assets/lottie/
 flutter_app/assets/icon/
 flutter_app/assets/data/*.csv

@@ -32,3 +32,5 @@ flutter:
     - assets/lottie/
     - assets/audio/
     - assets/icon/
+    - assets/images/
+    - assets/video/
