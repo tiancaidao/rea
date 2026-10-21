@@ -2,7 +2,9 @@
 
 ## Snore / sound-event classifier (Part A)
 
-**Contract:** [1,1,86,64] log-mel patch — 44.1 kHz → 2048-pt FFT (hop 1024) → 64 mel → 86 frames (~2.02 s), the front-end recovered from the app. Mel energy above 8 kHz is dropped so 16 kHz public data and a 44.1 kHz phone mic match. **Model:** our own 3-block 2D-CNN (≈24k params) → snore / cough / speech / other. Our weights, open data only (see `DATASETS.md`); no Sleep Cycle weights or outputs used.
+**Contract:** [1,1,86,64] log-mel patch — 44.1 kHz → 2048-pt FFT (hop 1024) → 64 mel → 86 frames (~2.02 s), the front-end recovered from the app. Mel energy above 8 kHz is dropped so 16 kHz public data and a 44.1 kHz phone mic match. **Model:** our own 3-block 2D-CNN (≈24k params) → snore / cough / speech / other. Our weights, open/approved data only (see `DATASETS.md`); no Sleep Cycle weights or outputs used.
+
+**Licence of these weights: research / non-commercial only.** They are trained on ESC-50 (CC BY-NC) and, when present, APSAA (academic / non-commercial, no redistribution). Neither the weights nor the data may be shipped commercially or redistributed.
 
 **Splits** (patches; no clip / speaker / subject crosses splits — ESC-50 folds 1-3/4/5, LibriSpeech speakers hashed, EPFL subjects train vs test). Training: fit on train, pick the epoch count (34) and snore threshold on val, then refit from scratch on train+val and evaluate once on test:
 
@@ -38,9 +40,15 @@ Threshold on P(snore) chosen on the **validation** split for F0.5 (precision-wei
 |---|---|---|---|---|---|---|
 | P(snore) ≥ 0.57 (shipped) | 0.66 | 0.34 | 14.4 | 19 | 10 | 37 |
 | P(snore) ≥ 0.50 | 0.57 | 0.36 | 21.5 | 20 | 15 | 36 |
-| clip-level, ≥2 patches ≥ 0.57 (5 s ESC-50 clips) | 1.00 | 0.50 | 0.0 | 4 | 0 | 4 |
+| per 5 s clip, ≥ half its windows ≥ 0.57 (ESC-50 clips, APSAA 5-s blocks) | 0.50 | 0.38 | 5.6 | 3 | 3 | 5 |
 
 False alarms per hour treat each test patch as ~1 s of audio, one decision per second, before the app's event smoothing (`detectSnoreEvents`: 3-window majority vote + minimum event length), which removes isolated single-patch false alarms.
+
+Snore per ~1 s window by test source, each scored on that source's own windows: esc50 = full-band open-data snores and clips, apsaa = 4 kHz overnight hospital audio from held-out patients:
+
+| test source | precision | recall | false alarms / hour | TP | FP | FN |
+|---|---|---|---|---|---|---|
+| esc50 | 0.79 | 0.34 | 17.9 | 19 | 5 | 37 |
 
 Patch-level test false alarms by true class / source: animals / fsd50k: 1, animals / sheep: 1, breathing_nonspeech / breathing: 2, breathing_nonspeech / fsd50k: 1, clock / clock_tick: 1, clock / fsd50k: 3, traffic / engine: 1
 
@@ -67,11 +75,12 @@ Share of each "other" group's patches scored P(snore) ≥ 0.57. Groups leaning t
 
 - The rebalancing rule was revised once after a test run: the first rule (val false alarms only) boosted only `clock`, and test then showed animals 3.5%, breathing 3.0% and clock 4.9% leaking into snore. The rule now also counts val near-misses. That is one look at test, so treat the test numbers as slightly optimistic.
 
-- Only 56 snore test patches (8 ESC-50 clips): the snore numbers have wide confidence intervals. Open, permissively-licensed snore audio is scarce; the Kaggle snore set and AudioSet snoring clips were rejected on licence grounds (see DATASETS.md).
+- 56 snore test windows in total; the ESC-50 part is only 8 clips, so its row has wide confidence intervals. APSAA adds whole held-out patients.
 
 - ESC-50 is CC BY-NC: fine for this research build, not for a commercial model. The path to a shippable model is opt-in, user-confirmed clips (`consent_sounds`).
 
 - Published smartphone snore CNNs reach ~95% accuracy with PPV as the weak point (MODELS_findings.md); this is the same model family on a much smaller public set.
+
 <!-- below this line is maintained by hand; train_snore.py keeps it -->
 
 ## On-device verification (Android emulator `sc_test`, 2026-10-22)

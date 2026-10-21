@@ -24,6 +24,7 @@ hashed 60/20/20; EPFL's two subjects train vs test.
 
   python3 training/prepare_data.py --download
   python3 training/prepare_data.py            # writes data/features.npz
+  python3 training/prepare_data.py --apsaa    # data/apsaa/APSAA.zip -> data/features_apsaa.npz
   python3 training/prepare_data.py --selftest # held-out clips for the on-device test
   python3 training/prepare_data.py --prune    # delete raw audio after caching
 """
@@ -64,6 +65,9 @@ LIBRI_DIR = os.path.join(DATA, "librispeech")
 COUGH_PARQUET = os.path.join(DATA, "coughcount", "val.parquet")
 FSD_DIR = os.path.join(DATA, "fsd50k")
 OUT = os.path.join(DATA, "features.npz")
+APSAA_ZIP = os.path.join(DATA, "apsaa", "APSAA.zip")
+APSAA_URL = "https://zenodo.org/records/14096541/files/APSAA.zip?download=1"
+APSAA_OUT = os.path.join(DATA, "features_apsaa.npz")
 
 ESC_GROUPS = {
     "rain_water": ["rain", "water_drops", "pouring_water", "sea_waves", "toilet_flush"],
@@ -261,6 +265,93 @@ def tv_items(rng, X, y, split, group, n_per_split={"train": 300, "val": 100, "te
             yield np.log(np.maximum(mix, 0) + LOG_FLOOR), "other", sp, "synthetic", f"tv_{sp}_{k}", "tv"
 
 
+# --------------------------------------------------------------------------- APSAA
+
+def _apsaa_split(subjects):
+    """Patient-level split, deterministic: 20 train / 6 val / 6 test of 32."""
+    order = np.random.default_rng(7).permutation(sorted(subjects))
+    n_test = n_val = max(1, round(len(order) * 0.19))
+    return {sid: ("test" if k < n_test else "val" if k < n_test + n_val else "train")
+            for k, sid in enumerate(order)}
+
+
+def apsaa_items(rng, max_snore=250, neg_blocks=50):
+    """APSAA overnight hospital recordings (4 kHz mono, synchronised with a
+    polygraph). Snore: 1-s-stride windows inside the technicians' manual
+    "Snore" annotations. Other: blocks of 5 consecutive windows >= 15 s from
+    any snore annotation where the polygraph snore channel (Snore_EG, 10 Hz)
+    has no snore-like spike (peak under its 90th percentile away from
+    annotated snores), so unannotated snoring isn't used as a negative. Windows are resampled 4 kHz -> 44.1 kHz with a polyphase filter
+    (nothing above 2 kHz, unlike the other sources; training band-limits a share
+    of the other sources to match). Research / non-commercial use only."""
+    import zipfile
+    from scipy.signal import resample_poly
+    z = zipfile.ZipFile(APSAA_ZIP)
+    subjects = sorted({n.split("/")[0] for n in z.namelist() if n.endswith(".wav")})
+    split = _apsaa_split(subjects)
+    src_sr, win_s = 4000, WINDOW_SAMPLES / SAMPLE_RATE
+    for sid in subjects:
+        import soundfile as sf
+        with z.open(f"{sid}/{sid}.wav") as f:
+            pcm, sr = sf.read(io.BytesIO(f.read()), dtype="float32")
+        assert sr == src_sr, (sid, sr)
+        dur = len(pcm) / sr
+        ann = list(csv.DictReader(io.TextIOWrapper(z.open(f"{sid}/{sid}_Annotations.csv"))))
+        def secs(t):
+            h, m, s_ = (float(x) for x in t.split(":"))
+            return h * 3600 + m * 60 + s_
+        snores = [(secs(a["Start_Time"]), secs(a["Start_Time"]) + float(a["Duration"]))
+                  for a in ann if a["Event_Name"].strip().lower() == "snore"]
+        eg = np.array([float(l) for l in io.TextIOWrapper(z.open(f"{sid}/{sid}_Snore_EG.csv")).read().split()[1:]])
+        # the snore channel's level away from annotated snores (>= 15 s): a window
+        # whose peak stays under its 90th percentile has no snore-like pressure spike
+        far = np.ones(len(eg), bool)
+        for s0, e0 in snores:
+            far[max(0, int((s0 - 15) * 10)):int((e0 + 15) * 10)] = False
+        eg_quiet = np.percentile(eg[far], 90) if far.any() else np.percentile(eg, 50)
+
+        def window(t0):
+            a = int(t0 * sr)
+            seg = pcm[a:a + int(np.ceil(win_s * sr)) + 8]
+            up = resample_poly(seg, 441, 40).astype(np.float32)
+            return logmel_frames(_pad(up))[:N_FRAMES]
+
+        starts = [t for s0, e0 in snores for t in
+                  (np.arange(s0, e0 - win_s + 1e-6, 1.0) if e0 - s0 >= win_s else [max(0.0, (s0 + e0 - win_s) / 2)])]
+        if len(starts) > max_snore:
+            starts = sorted(rng.choice(starts, max_snore, replace=False))
+        for t in starts:
+            if t + win_s < dur:
+                yield window(t), "snore", split[sid], "apsaa", f"{sid}_{int(t) // 5}", ""
+
+        def clear(t0, t1):
+            if any(t0 - 15 < e0 and t1 + 15 > s0 for s0, e0 in snores):
+                return False
+            seg = eg[int(t0 * 10):int(t1 * 10) + 1]
+            return len(seg) > 0 and seg.max() <= eg_quiet
+        cands = [t for t in np.arange(30.0, dur - 10, 5.0) if clear(t, t + 4 + win_s)]
+        for t in sorted(rng.choice(cands, min(neg_blocks, len(cands)), replace=False)):
+            for k in range(5):
+                yield window(t + k), "other", split[sid], "apsaa", f"{sid}_neg{int(t)}", "apsaa_overnight"
+        print(f"  APSAA {sid} ({split[sid]}): {len(snores)} snore events, {len(starts)} snore windows, "
+              f"{min(neg_blocks, len(cands))} quiet blocks", flush=True)
+
+
+def build_apsaa():
+    rng = np.random.default_rng(3)
+    X, y, split, source, clip, group = [], [], [], [], [], []
+    for p, lab, sp, src, cid, grp in apsaa_items(rng):
+        X.append(p.astype(np.float16)); y.append(LABELS.index(lab)); split.append(sp)
+        source.append(src); clip.append(cid); group.append(grp)
+    X, y, split = np.stack(X)[:, None], np.array(y), np.array(split)
+    np.savez_compressed(APSAA_OUT, X=X, y=y, split=split, source=np.array(source), group=np.array(clip),
+                        neg_group=np.array(group), labels=np.array(LABELS))
+    print(f"wrote {APSAA_OUT}: {X.shape}")
+    for sp in ("train", "val", "test"):
+        m = split == sp
+        print(f"  {sp:5s}", {LABELS[c]: int(((y == c) & m).sum()) for c in range(len(LABELS))})
+
+
 # --------------------------------------------------------------------------- download
 
 def _fsd_select(rng):
@@ -443,6 +534,8 @@ def prune():
 if __name__ == "__main__":
     if "--download" in sys.argv:
         download()
+    elif "--apsaa" in sys.argv:
+        build_apsaa()
     elif "--selftest" in sys.argv:
         selftest_clips()
     elif "--prune" in sys.argv:

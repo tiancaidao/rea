@@ -33,6 +33,7 @@ from audio_pipeline import LOG_FLOOR, FMAX_HZ, SAMPLE_RATE, FFT_SIZE, HOP, N_MEL
 from snore_classifier import build_model  # noqa: E402
 
 FEATURES = os.path.join(ML, "data", "features.npz")
+FEATURES_APSAA = os.path.join(ML, "data", "features_apsaa.npz")  # optional, research-only data
 FLUTTER_MODEL = os.path.join(ML, "..", "flutter_app", "assets", "models", "snore_cnn.json")
 SNORE = 0
 MANUAL_MARKER = "<!-- below this line is maintained by hand; train_snore.py keeps it -->"
@@ -73,6 +74,18 @@ def binary_at(scores, positive, t):
     return pr, rc, fa_per_hour, tp, fp, fn
 
 
+def pick_threshold_multi(groups, beta=0.5):
+    best = (0.5, -1.0)
+    for t in np.linspace(0.05, 0.99, 95):
+        fs = []
+        for scores, positive in groups:
+            pr, rc, *_ = binary_at(scores, positive, t)
+            fs.append((1 + beta ** 2) * pr * rc / (beta ** 2 * pr + rc) if pr + rc else 0.0)
+        if np.mean(fs) > best[1]:
+            best = (float(t), float(np.mean(fs)))
+    return best[0]
+
+
 def pick_threshold(scores, positive, beta=0.5):
     best = (0.5, -1.0)
     for t in np.linspace(0.05, 0.99, 95):
@@ -88,16 +101,40 @@ def main():
     import torch.nn as nn
     import torch.nn.functional as F
 
-    d = np.load(FEATURES)
+    d = dict(np.load(FEATURES))
+    if os.path.isfile(FEATURES_APSAA) and "--open-only" not in sys.argv:  # merge the APSAA cache when present
+        a = np.load(FEATURES_APSAA)
+        for k in ("X", "y", "split", "source", "group", "neg_group"):
+            d[k] = np.concatenate([d[k], a[k]])
+    if "--no-apsaa" in sys.argv:  # ablation: open data only for training, APSAA test kept for scoring
+        d["split"] = np.where((d["source"] == "apsaa") & (d["split"] != "test"), "unused", d["split"])
     labels = [str(x) for x in d["labels"]]
     X, y, split = d["X"].astype(np.float32), d["y"], d["split"]
     neg = d["neg_group"]
     tr, va, te = split == "train", split == "val", split == "test"
     mean, std = float(X[tr].mean()), float(X[tr].std() + 1e-6)
+    narrowband = d["source"] == "apsaa"  # 4 kHz recordings: nothing above 2 kHz
+    band_all = "--bandlimit-all" in sys.argv
+    # mel bands centred above 2 kHz, silenced when band-limiting a wideband patch
+    from audio_pipeline import _mel_filterbank, FFT_SIZE as NFFT
+    fb = _mel_filterbank()
+    centre_hz = (fb * np.arange(fb.shape[1])).sum(1) / np.maximum(fb.sum(1), 1e-9) * SAMPLE_RATE / NFFT
+    above_2k = torch.tensor(centre_hz > 2000)
+    if band_all:  # every patch band-limited to 2 kHz, as if the front-end stopped there
+        X[:, :, :, centre_hz > 2000] = np.log(LOG_FLOOR)
+        narrowband = np.ones(len(X), bool)
 
-    def augment(xb_raw, bg):
-        """xb_raw: un-normalized log-mel. Gain, background mix, SpecAugment, roll."""
+    def augment(xb_raw, bg, nb):
+        """xb_raw: un-normalized log-mel. Gain, background mix, band-limit, SpecAugment, roll.
+        nb marks narrowband (4 kHz) patches; 50% of the wideband ones are band-limited
+        to 2 kHz too, so "no energy above 2 kHz" can't stand in for a label."""
         b = xb_raw.shape[0]
+        if narrowband.any():
+            lim = (~nb) & (torch.rand(b) < 0.5)
+            if lim.any():
+                xb_raw = xb_raw.clone()
+                xb_raw[lim.nonzero(as_tuple=True)[0][:, None], :, :, above_2k.nonzero(as_tuple=True)[0]] = \
+                    float(np.log(LOG_FLOOR))
         lin = torch.exp(xb_raw) - LOG_FLOOR
         lin = lin * torch.exp(torch.empty(b, 1, 1, 1).uniform_(-1.5, 1.5))      # about +-13 dB
         mix = torch.rand(b) < 0.5
@@ -128,16 +165,24 @@ def main():
         (model at best epoch, best epoch)."""
         torch.manual_seed(0)
         Xr, yt = torch.tensor(X[mask]), torch.tensor(y[mask])
+        nb_m = torch.tensor(narrowband[mask])
         bg = Xr[yt == labels.index("other")]
         counts = np.bincount(y[mask], minlength=len(labels)).astype(np.float64)
         w_class = 1.0 / np.sqrt(counts)          # each class drawn ~ sqrt of its share
-        w_class[SNORE] *= 3.0                    # and the scarce snore class oversampled
+        if counts[SNORE] < 1000:
+            w_class[SNORE] *= 3.0                # and a scarce snore class oversampled
         w = w_class[y[mask]]
         g = neg[mask]
         groups = sorted(set(g[g != ""]))
         for gr in groups:
             m = g == gr
             w[m] *= (g != "").sum() / (len(groups) * m.sum()) * (boost or {}).get(gr, 1.0)
+        # within the narrowband (APSAA) domain, draw non-snore exactly as often as
+        # snore, so "band-limited" can't predict the label
+        nbm = narrowband[mask]
+        nb_sn, nb_ot = nbm & (y[mask] == SNORE), nbm & (y[mask] != SNORE)
+        if nb_sn.any() and nb_ot.any():
+            w[nb_ot] *= w[nb_sn].sum() / w[nb_ot].sum()
         sampler_w = torch.tensor(w, dtype=torch.double)
         model = build_model(len(labels))
         opt = torch.optim.AdamW(model.parameters(), lr=2e-3, weight_decay=1e-3)
@@ -150,7 +195,7 @@ def main():
             for s in range(steps):
                 idx = idx_all[s * 64:(s + 1) * 64]
                 opt.zero_grad()
-                loss = lossf(model(augment(Xr[idx], bg)), yt[idx])
+                loss = lossf(model(augment(Xr[idx], bg, nb_m[idx])), yt[idx])
                 loss.backward()
                 opt.step()
                 sched.step()
@@ -171,7 +216,11 @@ def main():
     # 1) train on train, pick the epoch count and the snore threshold on val
     model, best_ep = fit(tr, epochs=40, val_mask=va)
     pv = probs(model, X[va])
-    thr = pick_threshold(pv[:, SNORE], y[va] == SNORE)
+    # pick the threshold for the mean F0.5 over val sources with snores (full-band open
+    # data vs 4 kHz APSAA), so neither domain alone sets it
+    src_va = d["source"][va]
+    doms = [m for m in ((src_va == "apsaa"), (src_va != "apsaa")) if (m & (y[va] == SNORE)).any()]
+    thr = pick_threshold_multi([(pv[m, SNORE], y[va][m] == SNORE) for m in doms])
     print(f"best epoch {best_ep}, val-chosen snore threshold {thr:.2f}")
     # a negative group that leaks toward snore on val — >2% of its patches at
     # P(snore) >= thr/2, i.e. false alarms plus near-misses — is drawn 3x as often
@@ -195,10 +244,15 @@ def main():
         print(f"  {c:7s} P={m['precision']:.2f} R={m['recall']:.2f} F1={m['f1']:.2f} n={m['support']}")
 
     export(model, labels, mean, std, thr, torch.tensor((X[te][:4] - mean) / std))
+    src_te = d["source"][te]
+    per_src = {sname: binary_at(pt[src_te == sname, SNORE], y[te][src_te == sname] == SNORE, thr)
+               for sname in ("esc50", "apsaa") if ((src_te == sname) & (y[te] == SNORE)).any()}
+    for sname, b in per_src.items():
+        print(f"  snore on {sname} test: P={b[0]:.2f} R={b[1]:.2f} FA/h={b[2]:.1f}")
     test_leak = group_fp(pt[:, SNORE], neg[te], thr)
     print("test leaks into snore:", {g: f"{fp}/{n}" for g, (fp, n) in test_leak.items() if fp})
     write_results(acc, per, cm, labels, snore_ap, thr, bin_thr, bin_argmax, clip, best_ep, d, y, split, pt,
-                  val_leak, test_leak, boost)
+                  val_leak, test_leak, boost, per_src)
 
 
 def group_fp(p_snore, neg_group, thr):
@@ -207,25 +261,28 @@ def group_fp(p_snore, neg_group, thr):
             for g in sorted(set(neg_group[neg_group != ""]))}
 
 
-def clip_level(p_snore, y, group, source, thr, min_hits=2):
-    """ESC-50 test clips (5 s): call a clip snoring when >= min_hits of its
-    patches pass the threshold — the same idea as the app's event smoothing
-    (majority vote + minimum event length) applied to a 5 s clip."""
+def clip_level(p_snore, y, group, source, thr):
+    """5 s clips (ESC-50 clips, APSAA 5-s blocks): call a clip snoring when at
+    least half of its windows pass the threshold — the app's majority-vote
+    smoothing applied to a 5 s clip."""
     clips = {}
     for p, t, g, s in zip(p_snore, y, group, source):
-        if s != "esc50":
+        if s not in ("esc50", "apsaa"):
             continue
-        hits, pos = clips.get(g, (0, False))
-        clips[g] = (hits + (p >= thr), pos or t == SNORE)
-    tp = sum(1 for h, pos in clips.values() if h >= min_hits and pos)
-    fp = sum(1 for h, pos in clips.values() if h >= min_hits and not pos)
-    fn = sum(1 for h, pos in clips.values() if h < min_hits and pos)
-    fp_clips = sorted(g for g, (h, pos) in clips.items() if h >= min_hits and not pos)
+        hits, n, pos = clips.get(g, (0, 0, False))
+        clips[g] = (hits + (p >= thr), n + 1, pos or t == SNORE)
+    on = {g: h * 2 >= n for g, (h, n, _) in clips.items()}
+    tp = sum(1 for g, (_, _, pos) in clips.items() if on[g] and pos)
+    fp = sum(1 for g, (_, _, pos) in clips.items() if on[g] and not pos)
+    fn = sum(1 for g, (_, _, pos) in clips.items() if not on[g] and pos)
+    fp_clips = sorted(g for g, (_, _, pos) in clips.items() if on[g] and not pos)
     return (tp / (tp + fp) if tp + fp else 1.0, tp / (tp + fn) if tp + fn else 0.0, tp, fp, fn, fp_clips,
-            sum(1 for _, pos in clips.values() if not pos))
+            sum(1 for _, _, pos in clips.values() if not pos))
 
 
 def export(model, labels, mean, std, thr, sample):
+    if "--no-export" in sys.argv:  # ablation runs leave the shipped model alone
+        return
     import torch
     model.eval()
     onnx_path = os.path.join(HERE, "snore_classifier.onnx")
@@ -273,7 +330,7 @@ def _esc_categories():
 
 
 def write_results(acc, per, cm, labels, snore_ap, thr, bin_thr, bin_argmax, clip, best_ep, d, y, split, pt,
-                  val_leak, test_leak, boost):
+                  val_leak, test_leak, boost, per_src=None):
     src, grp, cat = d["source"], d["group"], _esc_categories()
     counts = {sp: {labels[c]: int(((y == c) & (split == sp)).sum()) for c in range(len(labels))}
               for sp in ("train", "val", "test")}
@@ -293,7 +350,10 @@ def write_results(acc, per, cm, labels, snore_ap, thr, bin_thr, bin_argmax, clip
         "86 frames (~2.02 s), the front-end recovered from the app. Mel energy above 8 kHz is "
         "dropped so 16 kHz public data and a 44.1 kHz phone mic match. "
         "**Model:** our own 3-block 2D-CNN (≈24k params) → snore / cough / speech / other. "
-        "Our weights, open data only (see `DATASETS.md`); no Sleep Cycle weights or outputs used.\n",
+        "Our weights, open/approved data only (see `DATASETS.md`); no Sleep Cycle weights or outputs used.\n",
+        "**Licence of these weights: research / non-commercial only.** They are trained on ESC-50 "
+        "(CC BY-NC) and, when present, APSAA (academic / non-commercial, no redistribution). Neither "
+        "the weights nor the data may be shipped commercially or redistributed.\n",
         "**Splits** (patches; no clip / speaker / subject crosses splits — ESC-50 folds 1-3/4/5, "
         "LibriSpeech speakers hashed, EPFL subjects train vs test). Training: fit on train, pick "
         f"the epoch count ({best_ep}) and snore threshold on val, then refit from scratch on "
@@ -320,11 +380,19 @@ def write_results(acc, per, cm, labels, snore_ap, thr, bin_thr, bin_argmax, clip
           f"{bin_thr[3]} | {bin_thr[4]} | {bin_thr[5]} |",
           f"| P(snore) ≥ 0.50 | {bin_argmax[0]:.2f} | {bin_argmax[1]:.2f} | {bin_argmax[2]:.1f} | "
           f"{bin_argmax[3]} | {bin_argmax[4]} | {bin_argmax[5]} |",
-          f"| clip-level, ≥2 patches ≥ {thr:.2f} (5 s ESC-50 clips) | {clip[0]:.2f} | {clip[1]:.2f} | "
+          f"| per 5 s clip, ≥ half its windows ≥ {thr:.2f} (ESC-50 clips, APSAA 5-s blocks) | {clip[0]:.2f} | {clip[1]:.2f} | "
           f"{clip[3] / max(1, clip[6]) * 720:.1f} | {clip[2]} | {clip[3]} | {clip[4]} |",
           "\nFalse alarms per hour treat each test patch as ~1 s of audio, one decision per second, "
           "before the app's event smoothing (`detectSnoreEvents`: 3-window majority vote + minimum "
           "event length), which removes isolated single-patch false alarms.\n",
+          *([] if not per_src else [
+              "Snore per ~1 s window by test source, each scored on that source's own windows: "
+              "esc50 = full-band open-data snores and clips, apsaa = 4 kHz overnight hospital audio "
+              "from held-out patients:\n",
+              "| test source | precision | recall | false alarms / hour | TP | FP | FN |",
+              "|---|---|---|---|---|---|---|",
+              *[f"| {k} | {b[0]:.2f} | {b[1]:.2f} | {b[2]:.1f} | {b[3]} | {b[4]} | {b[5]} |"
+                for k, b in per_src.items()], ""]),
           "Patch-level test false alarms by true class / source: " + (", ".join(f"{k}: {v}" for k, v in sorted(fa_src.items()))
                                             or "none") + "\n",
           "### False positives into \"snore\" by negative group\n",
@@ -343,15 +411,13 @@ def write_results(acc, per, cm, labels, snore_ap, thr, bin_thr, bin_argmax, clip
           "alarms only) boosted only `clock`, and test then showed animals 3.5%, breathing 3.0% and "
           "clock 4.9% leaking into snore. The rule now also counts val near-misses. That is one "
           "look at test, so treat the test numbers as slightly optimistic.\n",
-          f"- Only {counts['test']['snore']} snore test patches (8 ESC-50 clips): the snore numbers "
-          "have wide confidence intervals. Open, permissively-licensed snore audio is scarce; "
-          "the Kaggle snore set and AudioSet snoring clips were rejected on licence grounds "
-          "(see DATASETS.md).\n",
+          f"- {counts['test']['snore']} snore test windows in total; the ESC-50 part is only 8 clips, so "
+          "its row has wide confidence intervals. APSAA adds whole held-out patients.\n",
           "- ESC-50 is CC BY-NC: fine for this research build, not for a commercial model. "
           "The path to a shippable model is opt-in, user-confirmed clips (`consent_sounds`).\n",
           "- Published smartphone snore CNNs reach ~95% accuracy with PPV as the weak point "
           "(MODELS_findings.md); this is the same model family on a much smaller public set.\n"]
-    p = os.path.join(HERE, "RESULTS.md")
+    p = os.path.join(HERE, "RESULTS.md" if "--no-apsaa" not in sys.argv else "RESULTS_no_apsaa.md")
     # keep hand-written sections (on-device verification, ...) below the marker
     manual = ""
     if os.path.isfile(p) and MANUAL_MARKER in open(p).read():

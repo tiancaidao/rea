@@ -38,6 +38,16 @@ Licences and the rejected sources are in `DATASETS.md`, metrics in
 `RESULTS.md`. The app picks the model up from `assets/models/snore_cnn.json`
 when built with `--dart-define=SNORE_MODEL=true`.
 
+## Sleep-staging model on open data (Part C)
+
+```bash
+.venv/bin/python -I training/staging_data.py   # Walch (PhysioNet) + Newcastle (Zenodo) -> data/staging_features.npz
+.venv/bin/python -I training/train_stage.py    # train, compare with the heuristic, export, STAGING_RESULTS.md
+```
+
+The app picks it up from `assets/models/stage_tcn.json` when built with
+`--dart-define=STAGE_MODEL=true`.
+
 ## Getting real data
 
 - **Snore / sound classes:** ESC-50 (has a `snoring` class), AudioSet, or your

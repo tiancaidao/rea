@@ -9,10 +9,16 @@ import '../core/sleep_algorithms.dart';
 import '../data/models.dart';
 import '../sensing/sleep_tracker.dart';
 import 'snore_model.dart';
+import 'stage_model.dart';
 
 /// Feature flag for the trained snore model (`--dart-define=SNORE_MODEL=true`).
 /// Off, or with no model asset bundled, snore minutes use the loudness proxy.
 const snoreModelFlag = bool.fromEnvironment('SNORE_MODEL');
+
+/// Feature flag for the trained sleep stager (`--dart-define=STAGE_MODEL=true`).
+/// Off, with no model asset bundled, or for nights under 10 minutes, stages
+/// come from the heuristic [estimateStages].
+const stageModelFlag = bool.fromEnvironment('STAGE_MODEL');
 
 /// Front-end + CNN for one window, off the UI isolate. Top-level so the
 /// closure sent to the isolate captures only the model and the samples.
@@ -41,7 +47,9 @@ Future<List<double>> _classify(SnoreModel m, Float32List window) =>
 class LiveTracker {
   final bool useMicrophone;
   final bool useSnoreModel;
-  LiveTracker({required this.useMicrophone, this.useSnoreModel = snoreModelFlag});
+  final bool useStageModel;
+  LiveTracker({required this.useMicrophone, this.useSnoreModel = snoreModelFlag, this.useStageModel = stageModelFlag});
+  StageModel? stageModel;
 
   static const epochSeconds = 30;
 
@@ -76,6 +84,7 @@ class LiveTracker {
 
   Future<void> start() async {
     await WakelockPlus.enable();
+    if (useStageModel) stageModel = await StageModel.load();
     _accelSub = accelerometerEventStream(samplingPeriod: const Duration(milliseconds: 20)).listen((e) {
       final mag = math.sqrt(e.x * e.x + e.y * e.y + e.z * e.z) / gravity;
       if (_prevMag != null) {
@@ -190,6 +199,10 @@ class LiveTracker {
   /// Wait for queued inferences (tests, and before [analyze] at stop).
   Future<void> flush() => _queue;
 
+  /// Append one finished epoch's accelerometer movement number (tests replay
+  /// recorded nights through this; the live path is [_closeEpoch]).
+  void addAccelEpoch(double raw) => _accelEpochs.add(raw);
+
   void _closeEpoch() {
     _accelEpochs.add(_spikes + _energy);
     _energy = 0;
@@ -247,7 +260,11 @@ class LiveTracker {
       if (i < _soundEpochs.length && _soundEpochs[i] > 15) loudEpochs++;
       movement.add(math.max(a, s * 0.8));
     }
-    final labels = estimateStages([for (final m in movement) EpochFeatures(m)]);
+    // the trained stager reads the accelerometer epochs directly (motion only,
+    // as trained); the heuristic reads the combined movement/sound number
+    final labels = stageModel != null && n >= 20
+        ? stageModel!.stages(_accelEpochs)
+        : estimateStages([for (final m in movement) EpochFeatures(m)]);
     final asleep = labels.where((l) => l != 'awake').length;
     final events = snoreEvents;
     final session = SleepSession(
