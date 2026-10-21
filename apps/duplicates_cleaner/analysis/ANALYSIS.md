@@ -82,11 +82,28 @@ same name and size, same size, same appearance (images).
 2048 bytes. Candidates are first grouped by size. This is a sampled hash, not a
 full-content comparison, despite the "100% content match" copy.
 
-**Same appearance** (`FilesScanner.GroupByPhaseOne`): per-image pHash (DCT,
-64-bit) plus region features (centre average, four corner deltas, spiral and
-centre deltas). Two images match when the pHash Hamming distance is at most 12
-and at least 5 of the 8 checks agree; matches are joined by breadth-first
-grouping.
+**Same appearance** (`FilesScanner.ProcessImageSimilarity`, `GroupByPhaseOne`,
+`GroupFinal`, `GroupByHeight`). Per image, the original computes:
+
+- `CropDelta`: average colour of the centre cell of a 3x3 grid.
+- A grayscale copy scaled to 100 px wide (aspect ratio kept). Its height is
+  stored as `Height`, so it acts as an aspect-ratio key.
+- From the grayscale copy: average brightness of five regions (`TL`, `TR`,
+  `BL`, `BR`, `CentreAVG`); a grid-of-points RMS value (`CentreDelta`); a DCT
+  of brightness sampled along an Archimedean spiral (`ArchSpiroDelta`); and a
+  64-bit pHash (32x32 DCT, top-left 8x8).
+
+Matching runs in two passes, and only images with the same `Height` (same
+aspect ratio) are ever compared:
+
+1. Two images are linked when **all 8 checks pass**: pHash Hamming distance
+   at most 12, each of the five region averages within 10, `CentreDelta`
+   within 10, and `ArchSpiroDelta` within 5. They are also linked when the
+   pHash distance alone is **at most 5**. Linked images are joined into groups
+   by breadth-first search.
+2. Images left on their own after pass 1 get a second chance. They are linked
+   when the normalised chromaticity distance between their centre colours is
+   at most 2.0 **and** the pHash distance is at most 13.
 
 **Size exclusion** (`FilesScanner.FileCanBeProcessed`): files under 8 KB are
 always skipped. Tiny excludes up to 1 MB, Small 1 to 50 MB, Medium 50 to
@@ -133,8 +150,8 @@ select filters.
 - **Byte-for-byte confirmation.** Partial fingerprint matches are confirmed by
   comparing whole files before they are offered for deletion, so two files that
   only share their sampled regions are never grouped.
-- **Similar images** use the pHash with the same Hamming threshold of 12, but
-  not the extra region checks. The pure-Dart decoder covers JPEG, PNG, GIF,
+- **Similar images** use only the pHash with a Hamming threshold of 12,
+  without the region checks, the aspect-ratio bucketing or the second pass. The pure-Dart decoder covers JPEG, PNG, GIF,
   TIFF and BMP; HEIF, EPS and RAW are skipped in this mode.
 - **Billing and licensing** are not wired. `PremiumService` keeps the same
   gates and can be unlocked from the upgrade dialog in debug builds.
