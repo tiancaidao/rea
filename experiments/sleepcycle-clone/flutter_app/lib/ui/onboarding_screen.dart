@@ -141,6 +141,53 @@ class _StepView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The intro page is full-bleed: the animation fills the page area with the
+    // headline overlaid at the bottom over a scrim (like the real app's intro).
+    if (step.lottie != null) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: Lottie.asset(step.lottie!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    const DecoratedBox(decoration: BoxDecoration(gradient: AppTheme.nightGradient))),
+          ),
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.center,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x00000000), Color(0xCC080B18)],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 28,
+            right: 28,
+            bottom: 36,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(step.title,
+                    style: Theme.of(context)
+                        .textTheme
+                        .displaySmall
+                        ?.copyWith(fontWeight: FontWeight.w800, height: 1.05)),
+                if (step.body.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(step.body,
+                      style: const TextStyle(color: Colors.white70, fontSize: 16, height: 1.4)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(

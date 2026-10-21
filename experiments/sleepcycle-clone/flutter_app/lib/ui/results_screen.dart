@@ -244,10 +244,11 @@ class _HypnogramPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (phases.isEmpty) return;
     final n = phases.length;
-    // raw depth then a light moving-average smoothing
+    // raw depth then a wide moving-average so stage changes read as curved
+    // waves rather than vertical steps (radius scales with the night length)
     final raw = [for (final p in phases) _depth[p.phase] ?? 0.0];
     final sm = <double>[];
-    const r = 4;
+    final r = (n / 30).round().clamp(8, 60);
     for (var i = 0; i < n; i++) {
       var acc = 0.0, cnt = 0;
       for (var j = i - r; j <= i + r; j++) {
