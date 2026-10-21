@@ -55,6 +55,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _open(ScanType type) async {
     final scope = AppScope.of(context);
+    if (type == ScanType.apk && !scope.premium.allowsApkScan) {
+      return showUpgradeDialog(context,
+          reason: 'This feature is available in our prime version.');
+    }
     if (type == ScanType.custom) {
       if (!scope.premium.allowsCustomExtensions) {
         return showUpgradeDialog(context,

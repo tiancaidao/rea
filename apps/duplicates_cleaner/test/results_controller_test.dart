@@ -27,9 +27,12 @@ void main() {
     expect(c.freeTierBlockReason(isPremium: true), isNull);
   });
 
-  test('free tier blocks files of 500 MB and above', () {
-    final c = ResultsController([group('big', 524288000, 2)], autoSelect: true);
+  test('free tier blocks a selection totalling 500 MB or more', () {
+    final c = ResultsController([group('big', 200 * 1048576, 4)], autoSelect: true);
+    expect(c.selectedBytes, 600 * 1048576);
     expect(c.freeTierBlockReason(isPremium: false), contains('500 MB'));
+    final small = ResultsController([group('ok', 100 * 1048576, 4)], autoSelect: true);
+    expect(small.freeTierBlockReason(isPremium: false), isNull);
   });
 
   test('sorting orders groups by their original file', () {

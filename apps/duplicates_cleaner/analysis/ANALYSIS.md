@@ -105,8 +105,8 @@ aspect ratio) are ever compared:
    when the normalised chromaticity distance between their centre colours is
    at most 2.0 **and** the pHash distance is at most 13.
 
-**Size exclusion** (`FilesScanner.FileCanBeProcessed`): files under 8 KB are
-always skipped. Tiny excludes up to 1 MB, Small 1 to 50 MB, Medium 50 to
+**Size exclusion** (`FilesScanner.FileCanBeProcessed`): with Exclude None,
+files under 8 KB are skipped; other settings use their range alone. Tiny excludes up to 1 MB, Small 1 to 50 MB, Medium 50 to
 250 MB, Large 250 MB and above.
 
 **Storage options** (`StorageSelection`): internal, SD card, custom folder,
@@ -121,10 +121,11 @@ filters: Select all, Unselect all, Select duplicates.
 **Sort** (`IDuplicatesGroupingService`): size, name length, name alphabetical,
 path, date created; ascending or descending.
 
-**Free tier limits** (`Constants`): at most 100 files per delete operation,
-and files of 500 MB (524,288,000 bytes) and above need premium. Premium
+**Free tier limits** (`DeleteSelectedDuplicates`): at most 100 files per
+delete operation, and a selection totalling 500 MB (524,288,000 bytes) or more
+needs premium. Premium
 products: `dc_prime_benefits` (subscription) and `dc_prime_one_time_purchase`.
-Premium also unlocks SD card, similar images, USB, parallel and custom folder
+Premium also unlocks the APK and Custom Files scans, SD card, similar images, USB, parallel and custom folder
 scans, size exclusion, non-content algorithms, custom extensions, and sort and
 select filters.
 

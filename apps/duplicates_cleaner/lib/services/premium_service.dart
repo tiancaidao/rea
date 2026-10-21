@@ -37,5 +37,6 @@ class PremiumService extends ChangeNotifier {
   bool allowsSizeExclusion(FileSizeExclusion e) =>
       isPremium || e == FileSizeExclusion.none;
   bool get allowsCustomExtensions => isPremium;
+  bool get allowsApkScan => isPremium;
   bool get allowsSortAndSelectFilters => isPremium;
 }

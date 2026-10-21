@@ -4,13 +4,13 @@ class AppConstants {
   static const freeAppName = 'Duplicates Cleaner';
   static const premiumAppName = 'Duplicates Cleaner Prime';
 
-  /// Free users cannot delete duplicates at or above this size (500 MB).
+  /// Free users cannot delete a selection totalling this size or more (500 MB).
   static const freeFileSizeLimit = 524288000;
 
   /// Free users can delete at most this many files per delete operation.
   static const freeDeleteMaxFilesPerOperation = 100;
 
-  /// Files below this size are never scanned, whatever the exclusion filter.
+  /// Files below this size are skipped when no size exclusion is chosen.
   static const minScannableFileSize = 8192;
 
   /// Hamming distance threshold used for perceptual-hash image grouping.

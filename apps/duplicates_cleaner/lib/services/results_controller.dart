@@ -79,9 +79,8 @@ class ResultsController extends ChangeNotifier {
           '${AppConstants.freeDeleteMaxFilesPerOperation} files per operation. '
           'Upgrade to remove this limit.';
     }
-    if (selected.any((i) => i.size >= AppConstants.freeFileSizeLimit)) {
-      return 'To delete duplicates of size 500 MB and above you need the '
-          'premium version.';
+    if (selectedBytes >= AppConstants.freeFileSizeLimit) {
+      return 'To delete 500 MB or more at a time you need the premium version.';
     }
     return null;
   }

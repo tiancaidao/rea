@@ -61,14 +61,14 @@ enum FileSizeExclusion {
 
   static const _mb = 1048576;
 
+  /// The 8 KB floor applies only to [none], exactly as in the original.
   bool allows(int size) => switch (this) {
         FileSizeExclusion.none => size >= AppConstants.minScannableFileSize,
         FileSizeExclusion.tiny => size > _mb,
         FileSizeExclusion.small => size < _mb || size > 50 * _mb,
         FileSizeExclusion.medium => size < 50 * _mb || size > 250 * _mb,
         FileSizeExclusion.large => size < 250 * _mb,
-      } &&
-      size >= AppConstants.minScannableFileSize;
+      };
 }
 
 /// `SortFieldType`.

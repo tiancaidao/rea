@@ -56,10 +56,11 @@ void main() {
     expect(await scan(ScanAlgorithm.sameContent), isEmpty);
   });
 
-  test('files under 8 KB are never scanned', () async {
+  test('files under 8 KB are skipped only when nothing is excluded', () async {
     write('small1.bin', List.filled(4000, 7));
     write('small2.bin', List.filled(4000, 7));
     expect(await scan(ScanAlgorithm.sameContent), isEmpty);
+    expect(await scan(ScanAlgorithm.sameSize, ex: FileSizeExclusion.small), hasLength(1));
   });
 
   test('extension filter and hidden folders are respected', () async {
