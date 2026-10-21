@@ -24,6 +24,10 @@ class BackendConfig {
   static const apiBaseUrl = String.fromEnvironment('API_BASE_URL',
       defaultValue: mode == 'emulator' ? 'http://$emulatorHost:8080' : '');
 
+  // the app's own named database (projects may be shared with other apps)
+  static const database = String.fromEnvironment('FIRESTORE_DATABASE',
+      defaultValue: mode == 'cloud' ? 'sleep-tracker' : '(default)');
+
   static bool get enabled => mode == 'emulator' || mode == 'cloud';
 
   static FirebaseOptions get options => mode == 'emulator'
@@ -62,7 +66,8 @@ class Backend {
   String? lastError;
 
   FirebaseAuth get _auth => FirebaseAuth.instance;
-  FirebaseFirestore get _db => FirebaseFirestore.instance;
+  FirebaseFirestore get _db =>
+      FirebaseFirestore.instanceFor(app: Firebase.app(), databaseId: BackendConfig.database);
   User? get user => enabled ? _auth.currentUser : null;
 
   Future<void> init() async {

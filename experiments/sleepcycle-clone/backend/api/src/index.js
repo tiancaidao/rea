@@ -23,7 +23,8 @@ if (packageName) {
 }
 
 const app = createApp({
-  db: getFirestore(),
+  // a named database keeps this app's data apart when the project is shared
+  db: getFirestore(process.env.FIRESTORE_DATABASE || '(default)'),
   auth: getAuth(),
   bucket: getStorage().bucket(),
   publisher,
