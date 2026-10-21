@@ -440,7 +440,7 @@ class _ResultsView extends StatelessWidget {
                   (String _, int n, DuplicateGroup g) => Padding(
                     padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
                     child: Text(
-                      'Set $n: ${g.items.length} files (${formatBytes(g.items.first.size)} each)',
+                      'Set $n: ${g.items.length} files (${_setSize(g)})',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -551,4 +551,14 @@ class _DuplicateTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "45 KB each" when every file has the same size (content and size scans),
+/// otherwise the total, since name and appearance sets can mix sizes.
+String _setSize(DuplicateGroup g) {
+  final first = g.items.first.size;
+  if (g.items.every((i) => i.size == first)) {
+    return '${formatBytes(first)} each';
+  }
+  return '${formatBytes(g.items.fold(0, (sum, i) => sum + i.size))} total';
 }
