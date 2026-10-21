@@ -78,8 +78,44 @@ class ResultsScreen extends StatelessWidget {
                   '${s.timeInBed.inMinutes.remainder(60)}m'),
             ),
           ),
+          const SizedBox(height: 16),
+          Text('Sleep notes', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          const Text('Tag what might have affected your night',
+              style: TextStyle(color: Colors.white54, fontSize: 12)),
+          const SizedBox(height: 8),
+          const _SleepNotes(),
         ],
       ),
+    );
+  }
+}
+
+/// Selectable sleep-note tags, correlated with sleep quality over time in a real
+/// build. Local state only here.
+class _SleepNotes extends StatefulWidget {
+  const _SleepNotes();
+  @override
+  State<_SleepNotes> createState() => _SleepNotesState();
+}
+
+class _SleepNotesState extends State<_SleepNotes> {
+  static const _tags = ['Coffee', 'Stress', 'Exercise', 'Late meal', 'Alcohol', 'Screen time'];
+  final Set<String> _selected = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        for (final t in _tags)
+          FilterChip(
+            label: Text(t),
+            selected: _selected.contains(t),
+            onSelected: (v) => setState(() => v ? _selected.add(t) : _selected.remove(t)),
+          ),
+      ],
     );
   }
 }

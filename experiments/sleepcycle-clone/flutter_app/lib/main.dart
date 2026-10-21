@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'theme.dart';
 import 'data/models.dart';
 import 'data/api_client.dart';
 import 'ui/sleep_session_screen.dart';
@@ -7,6 +8,8 @@ import 'ui/alarm_settings_screen.dart';
 import 'ui/login_screen.dart';
 import 'ui/sleep_aid_screen.dart';
 import 'ui/paywall_screen.dart';
+import 'ui/onboarding_screen.dart';
+import 'ui/stats_screen.dart';
 
 void main() => runApp(const SleepApp());
 
@@ -18,15 +21,7 @@ class SleepApp extends StatelessWidget {
     return MaterialApp(
       title: 'Sleep Tracker',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6C7BFF),
-          brightness: Brightness.dark,
-        ),
-        scaffoldBackgroundColor: const Color(0xFF0E1026),
-      ),
+      theme: AppTheme.dark(),
       home: const HomeScreen(),
     );
   }
@@ -41,6 +36,17 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   AlarmSettings settings = AlarmSettings(alarmTime: const TimeOfDayLike(7, 30));
   final SleepApi api = SleepApi();
+
+  @override
+  void initState() {
+    super.initState();
+    // First run: show the onboarding flow once. (Persist a flag with
+    // shared_preferences in a real build; shown every launch here for demo.)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()));
+    });
+  }
 
   void _open(Widget screen) =>
       Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
@@ -112,12 +118,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: const Text('Alarm settings'),
               ),
               const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ResultsDemoLoader()),
-                ),
-                child: const Text('See a sample night'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextButton(
+                    onPressed: () => _open(const ResultsDemoLoader()),
+                    child: const Text('Sample night'),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: () => _open(const StatsScreen()),
+                    icon: const Icon(Icons.show_chart, size: 18),
+                    label: const Text('Trends'),
+                  ),
+                ],
               ),
             ],
           ),

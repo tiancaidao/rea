@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../data/models.dart';
 import '../sensing/sleep_tracker.dart';
 import 'results_screen.dart';
+import 'night_view.dart';
 
 /// "Tracking" screen. In a real build this runs overnight off the native
 /// sensing service; here it runs a SimulatedNight so you can see the full
@@ -31,13 +32,14 @@ class _SleepSessionScreenState extends State<SleepSessionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tracking')),
-      body: Center(
-        child: Column(
+      body: Stack(
+        children: [
+          const Positioned.fill(child: NightView(caption: 'Phone on the mattress, screen down')),
+          SafeArea(
+            child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.bedtime, size: 80, color: Color(0xFF6C7BFF)),
-            const SizedBox(height: 16),
+            const Spacer(),
             Text('Alarm ${widget.settings.alarmTime}',
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 32),
@@ -66,8 +68,11 @@ class _SleepSessionScreenState extends State<SleepSessionScreen> {
                 style: TextStyle(color: Colors.white54, fontSize: 12),
               ),
             ),
-          ],
-        ),
+            const Spacer(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

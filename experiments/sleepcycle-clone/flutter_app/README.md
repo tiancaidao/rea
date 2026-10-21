@@ -47,8 +47,11 @@ Honest, feature-by-feature. "Design parity" = same approach, our own code/params
 | Smart alarm | per-night learned thresholds, eased window, multi-trigger | per-night percentile thresholds, eased window | **Design parity** |
 | Snore detection | 30-class sound-event model + event rules | event rules ready; **you plug in the model** | Rules parity; **gap**: your sound model |
 | "Who is snoring" | 16-D embedding + kNN vote | kNN vote ready; **you plug in the embedder** | Rules parity; **gap**: your embedding model |
-| Hypnogram + score | polished native charts | Flutter hypnogram + simple score | Functional; **gap**: visual polish |
-| Audio playback / sleep aid | ExoPlayer library + content | — | **gap** |
+| Hypnogram + score | polished native charts | Flutter hypnogram + score + **trends screen** (score line, stage bars) | Functional |
+| Onboarding | guided animated flow | **animated multi-step flow** (PageView, dots, scale-in) | Functional |
+| Tracking visuals | live animated night view | **animated night view** (breathing moon, twinkling stars) | Functional |
+| Sleep notes / tags | correlated with quality | **selectable tag chips** on results | Functional (needs correlation) |
+| Audio playback / sleep aid | ExoPlayer library + content | catalog + mock player (wire just_audio) | Partial; **gap**: real playback + content |
 | Accounts / cloud sync | Ory + GCP backend | mock API only | **gap**: real backend |
 | Wear OS / HealthKit | yes | — | **gap** |
 | Paywall / billing | dynamic server-driven | — | **gap** |
