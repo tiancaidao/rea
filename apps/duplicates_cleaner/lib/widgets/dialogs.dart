@@ -71,12 +71,12 @@ Future<T?> chooseOne<T>(
                 o == selected
                     ? Icons.radio_button_checked
                     : Icons.radio_button_off,
-                color: AppColors.accent,
+                color: AppColors.primary,
               ),
               trailing: (locked?.call(o) ?? false)
                   ? const Icon(
                       Icons.workspace_premium,
-                      color: AppColors.primaryDark,
+                      color: AppColors.premium,
                     )
                   : null,
               onTap: () => Navigator.pop(c, o),
@@ -107,7 +107,7 @@ Future<void> showUpgradeDialog(BuildContext context, {String? reason}) {
                   children: [
                     const Icon(
                       Icons.check_circle,
-                      color: AppColors.accent,
+                      color: AppColors.primary,
                       size: 18,
                     ),
                     const SizedBox(width: 8),

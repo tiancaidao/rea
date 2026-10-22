@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../widgets/themed.dart';
 import 'home_screen.dart';
 
 /// First-launch walkthrough (`TutorialActivity`), using the original copy.
@@ -68,79 +69,100 @@ class _TutorialScreenState extends State<TutorialScreen> {
   @override
   Widget build(BuildContext context) {
     final last = _page == _slides.length - 1;
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: _finish,
-                child: const Text('Skip tutorial'),
-              ),
-            ),
-            Expanded(
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: _slides.length,
-                onPageChanged: (p) => setState(() => _page = p),
-                itemBuilder: (_, i) {
-                  final (icon, title, desc) = _slides[i];
-                  return Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircleAvatar(
-                          radius: 64,
-                          backgroundColor: AppColors.primary,
-                          child: Icon(icon, size: 64, color: Colors.black87),
-                        ),
-                        const SizedBox(height: 32),
-                        Text(
-                          title,
-                          style: Theme.of(context).textTheme.headlineSmall,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(desc, textAlign: TextAlign.center),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (var i = 0; i < _slides.length; i++)
-                  Container(
-                    margin: const EdgeInsets.all(4),
-                    width: i == _page ? 18 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: i == _page ? AppColors.accent : Colors.black26,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: last
-                      ? _finish
-                      : () => _controller.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOut,
-                        ),
-                  child: Text(last ? 'Finish tutorial' : 'Next'),
+    return GradientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: PageView.builder(
+                  controller: _controller,
+                  itemCount: _slides.length,
+                  onPageChanged: (p) => setState(() => _page = p),
+                  itemBuilder: (_, i) {
+                    final (icon, title, desc) = _slides[i];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AppMark(size: 210, icon: i == 0 ? null : icon),
+                          const SizedBox(height: 40),
+                          if (i == 0)
+                            const Text(
+                              'Welcome to the',
+                              style: TextStyle(fontSize: 15),
+                            ),
+                          Text(
+                            i == 0 ? 'Duplicates Cleaner' : title,
+                            style: const TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                              height: 1.25,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            desc,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColors.textMuted,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
-            ),
-          ],
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < _slides.length; i++)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      margin: const EdgeInsets.all(4),
+                      width: i == _page ? 22 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: i == _page
+                            ? AppColors.primary
+                            : AppColors.primary.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: PrimaryButton(
+                    label: last ? 'Finish tutorial' : 'Next',
+                    onPressed: last
+                        ? _finish
+                        : () => _controller.nextPage(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOut,
+                          ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: _finish,
+                    child: const Text('Skip tutorial'),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
