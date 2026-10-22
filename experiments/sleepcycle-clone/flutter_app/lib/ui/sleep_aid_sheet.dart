@@ -18,11 +18,12 @@ class SleepAidPill extends StatelessWidget {
         height: 56,
         margin: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          color: const Color(0xFF0A1B26),
+          color: context.palette.surface,
+          border: Border.all(color: context.palette.stroke),
           borderRadius: BorderRadius.circular(28),
           gradient: item == null
               ? null
-              : LinearGradient(colors: [const Color(0xFF0A1B26), item.art.first.withOpacity(0.7)]),
+              : LinearGradient(colors: [context.palette.surface, item.art.first.withOpacity(0.7)]),
         ),
         child: Row(children: [
           Expanded(
@@ -36,16 +37,16 @@ class SleepAidPill extends StatelessWidget {
                   child: Text(item?.title ?? 'Sleep aid',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: AppTheme.accent, fontSize: 17, fontWeight: FontWeight.w600)),
+                      style: TextStyle(
+                          color: context.palette.accent, fontSize: 17, fontWeight: FontWeight.w600)),
                 ),
               ),
             ),
           ),
-          Container(width: 1, height: 28, color: Colors.white24),
+          Container(width: 1, height: 28, color: context.palette.textFaint),
           IconButton(
             iconSize: 30,
-            color: AppTheme.accent,
+            color: context.palette.accent,
             icon: Icon(s.sleepAidPlaying ? Icons.pause : Icons.play_arrow),
             onPressed: () => item == null ? showSleepAidCatalog(context) : s.toggleSleepAid(),
           ),
@@ -60,7 +61,6 @@ Future<void> showSleepAidCatalog(BuildContext context) => showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: const Color(0xFF0C1E2B),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => const FractionallySizedBox(heightFactor: 0.97, child: _CatalogSheet()),
     );
@@ -89,7 +89,7 @@ class _CatalogSheetState extends State<_CatalogSheet> {
         ? SleepAidCatalog.current
         : [SleepAidCatalog.current[_chip - 1]];
     return Column(children: [
-      _SheetHeader(title: 'Sleep aid'),
+      const _SheetHeader(title: 'Sleep aid'),
       SizedBox(
         height: 56,
         child: ListView(
@@ -103,9 +103,9 @@ class _CatalogSheetState extends State<_CatalogSheet> {
                   label: Text(i == 0 ? 'All' : SleepAidCatalog.current[i - 1].title),
                   selected: _chip == i,
                   showCheckmark: false,
-                  selectedColor: AppTheme.accent,
-                  backgroundColor: const Color(0xFF15303F),
-                  labelStyle: TextStyle(color: _chip == i ? Colors.black : AppTheme.accent),
+                  selectedColor: context.palette.segThumb,
+                  backgroundColor: context.palette.surfaceHi,
+                  labelStyle: TextStyle(color: _chip == i ? context.palette.segThumbText : context.palette.accent),
                   shape: const StadiumBorder(side: BorderSide.none),
                   onSelected: (_) => setState(() => _chip = i),
                 ),
@@ -130,14 +130,14 @@ class _SheetHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Watch((context, s) => Row(children: [
           IconButton(
-            icon: const Icon(Icons.keyboard_arrow_down, color: AppTheme.accent, size: 32),
+            icon: Icon(Icons.keyboard_arrow_down, color: context.palette.accent, size: 32),
             onPressed: () => Navigator.pop(context),
           ),
           Expanded(
               child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600))),
           IconButton(
             icon: Icon(s.sleepAidPlaying ? Icons.pause : Icons.play_arrow,
-                color: AppTheme.accent, size: 30),
+                color: context.palette.accent, size: 30),
             onPressed: s.sleepAid == null ? null : s.toggleSleepAid,
           ),
         ]));
@@ -156,7 +156,7 @@ class _Featured extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-                color: const Color(0xFF4C7D93), borderRadius: BorderRadius.circular(4)),
+                color: context.palette.surfaceHi, borderRadius: BorderRadius.circular(4)),
             child: const Text('FEATURED',
                 style: TextStyle(fontSize: 12, letterSpacing: 1.2, fontWeight: FontWeight.w600)),
           ),
@@ -171,7 +171,7 @@ class _Featured extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
               child: Text(item.description,
-                  style: const TextStyle(color: Colors.white70, height: 1.35))),
+                  style: TextStyle(color: context.palette.textMuted, height: 1.35))),
         ]),
       ]),
     );
@@ -197,13 +197,13 @@ class _Section extends StatelessWidget {
       const SizedBox(height: 8),
       ActionChip(
         label: Text('Show all (${section.items.length})'),
-        labelStyle: const TextStyle(color: AppTheme.accent),
-        backgroundColor: const Color(0xFF15303F),
+        labelStyle: TextStyle(color: context.palette.accent),
+        backgroundColor: context.palette.surfaceHi,
         shape: const StadiumBorder(side: BorderSide.none),
         onPressed: () => push(context, _SectionPage(section: section)),
       ),
       const SizedBox(height: 8),
-      const Divider(color: Colors.white12),
+      const Divider(),
     ]);
   }
 }
@@ -255,7 +255,7 @@ class HeroCard extends StatelessWidget {
           Text(item.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
           const SizedBox(height: 2),
           Text('${item.description} (${item.minutes} min)',
-              style: const TextStyle(color: Colors.white60, height: 1.35)),
+              style: TextStyle(color: context.palette.textMuted, height: 1.35)),
         ]),
       ),
     );
@@ -282,7 +282,6 @@ Future<void> showTrackSheet(BuildContext context, SleepAidItem item) => showModa
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: const Color(0xFF0C1E2B),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => FractionallySizedBox(heightFactor: 0.97, child: _TrackSheet(item: item)),
     );
@@ -338,7 +337,7 @@ class _TrackSheetState extends State<_TrackSheet> {
             left: 4,
             top: 4,
             child: IconButton(
-              icon: const Icon(Icons.keyboard_arrow_down, color: AppTheme.accent, size: 32),
+              icon: Icon(Icons.keyboard_arrow_down, color: context.palette.accent, size: 32),
               onPressed: () => Navigator.pop(context),
             ),
           ),
@@ -360,19 +359,19 @@ class _TrackSheetState extends State<_TrackSheet> {
                     width: 52,
                     height: 52,
                     child: CircularProgressIndicator(
-                        value: _progress, strokeWidth: 4, color: AppTheme.accent),
+                        value: _progress, strokeWidth: 4, color: context.palette.accent),
                   ),
                   const SizedBox(width: 16),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel download',
-                        style: TextStyle(color: AppTheme.accent, fontSize: 16)),
+                    child: Text('Cancel download',
+                        style: TextStyle(color: context.palette.accent, fontSize: 16)),
                   ),
                 ])
               else
                 Watch((c, s) => IconButton.filledTonal(
                       iconSize: 44,
-                      style: IconButton.styleFrom(backgroundColor: Colors.white24),
+                      style: IconButton.styleFrom(backgroundColor: context.palette.textFaint),
                       icon: Icon(s.sleepAidPlaying ? Icons.pause : Icons.play_arrow),
                       onPressed: s.toggleSleepAid,
                     )),
@@ -401,7 +400,7 @@ class _TrackSheetState extends State<_TrackSheet> {
   }
 
   Widget _credit(String k, String v) => Column(children: [
-        Text(k, style: const TextStyle(color: Colors.white70)),
+        Text(k, style: TextStyle(color: context.palette.textMuted)),
         const SizedBox(height: 2),
         Text(v, style: const TextStyle(fontSize: 16)),
       ]);

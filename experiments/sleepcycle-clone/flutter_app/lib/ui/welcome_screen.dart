@@ -29,7 +29,7 @@ class WelcomeScreen extends StatelessWidget {
               width: 130,
               height: 130,
               decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-              child: const Icon(Icons.nightlight_round, size: 64, color: Color(0xFF0F2B3A)),
+              child: Icon(Icons.nightlight_round, size: 64, color: context.palette.deep),
             ),
             const SizedBox(height: 28),
             const Padding(
@@ -39,7 +39,7 @@ class WelcomeScreen extends StatelessWidget {
             ),
             const Spacer(flex: 2),
             Container(
-              color: const Color(0xFF071620),
+              color: context.palette.sheet,
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
               child: Column(children: [
                 const Text('Create an account to keep your nights safe and synced.',
@@ -67,8 +67,8 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-                  TextButton(onPressed: () => _email(context, signUp: true), child: const Text('Sign up with email', style: TextStyle(color: AppTheme.accent, fontSize: 16))),
-                  TextButton(onPressed: () => _email(context), child: const Text('Log in', style: TextStyle(color: AppTheme.accent, fontSize: 16))),
+                  TextButton(onPressed: () => _email(context, signUp: true), child: Text('Sign up with email', style: TextStyle(color: context.palette.accent, fontSize: 16))),
+                  TextButton(onPressed: () => _email(context), child: Text('Log in', style: TextStyle(color: context.palette.accent, fontSize: 16))),
                 ]),
               ]),
             ),
@@ -100,8 +100,8 @@ class TrialScreen extends StatelessWidget {
     Widget step(IconData icon, String title, String body, {bool last = false}) => IntrinsicHeight(
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Column(children: [
-              CircleAvatar(radius: 20, backgroundColor: const Color(0xFF2C8FB0), child: Icon(icon, color: Colors.white)),
-              if (!last) Expanded(child: Container(width: 10, color: const Color(0xFF2C8FB0))),
+              CircleAvatar(radius: 20, backgroundColor: context.palette.light, child: Icon(icon, color: Colors.white)),
+              if (!last) Expanded(child: Container(width: 10, color: context.palette.light)),
             ]),
             const SizedBox(width: 16),
             Expanded(
@@ -110,7 +110,7 @@ class TrialScreen extends StatelessWidget {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 2),
-                  Text(body, style: const TextStyle(color: Colors.white70)),
+                  Text(body, style: TextStyle(color: context.palette.textMuted)),
                 ]),
               ),
             ),
@@ -135,15 +135,15 @@ class TrialScreen extends StatelessWidget {
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppTheme.accent),
-                color: const Color(0x2215A0C0),
+                border: Border.all(color: context.palette.accent),
+                color: context.palette.surface,
               ),
-              child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('PREMIUM · YEARLY', style: TextStyle(letterSpacing: 1.1, fontSize: 13)),
-                SizedBox(height: 8),
-                Text('7-day free trial', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
-                SizedBox(height: 8),
-                Text('then billed yearly · price set by the store', style: TextStyle(color: Colors.white70)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('PREMIUM · YEARLY', style: const TextStyle(letterSpacing: 1.1, fontSize: 13)),
+                const SizedBox(height: 8),
+                const Text('7-day free trial', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Text('then billed yearly · price set by the store', style: TextStyle(color: context.palette.textMuted)),
               ]),
             ),
             const SizedBox(height: 40),
@@ -162,8 +162,8 @@ class TrialScreen extends StatelessWidget {
               if (context.mounted) _enter(context);
             }),
             const SizedBox(height: 12),
-            const Text('Cancel anytime in your app store subscriptions.',
-                textAlign: TextAlign.center, style: TextStyle(color: Colors.white60)),
+            Text('Cancel anytime in your app store subscriptions.',
+                textAlign: TextAlign.center, style: TextStyle(color: context.palette.textMuted)),
           ]),
         ),
       ),

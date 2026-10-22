@@ -5,7 +5,7 @@ import 'package:sleep_tracker/app_state.dart';
 import 'package:sleep_tracker/theme.dart';
 import 'package:sleep_tracker/ui/main_shell.dart';
 
-Widget _app() => MaterialApp(theme: AppTheme.dark(), home: const MainShell());
+Widget _app() => MaterialApp(theme: buildTheme(AppThemeId.midnight.palette), home: const MainShell());
 
 void main() {
   testWidgets('five tabs in the original order', (tester) async {

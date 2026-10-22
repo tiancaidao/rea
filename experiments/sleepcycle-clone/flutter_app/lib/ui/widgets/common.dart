@@ -28,26 +28,39 @@ class Watch extends StatelessWidget {
       ListenableBuilder(listenable: AppState.I, builder: (c, _) => builder(c, AppState.I));
 }
 
-/// Deep teal night sky with twinkle-free stars and, when the local comparison
-/// placeholders are present, a soft cloud layer.
+/// The theme's backdrop: its sky gradient, a soft bloom behind the hero,
+/// stars on dark themes and, when the local comparison placeholders are
+/// present, a soft cloud layer.
 class StarryBackground extends StatelessWidget {
   final Widget child;
   const StarryBackground({super.key, required this.child});
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF0F2B3A), Color(0xFF071620)],
+          colors: p.backdrop,
         ),
       ),
       child: Stack(children: [
-        const Positioned.fill(child: CustomPaint(painter: _StarsPainter())),
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(0, -0.25),
+                radius: 0.9,
+                colors: [p.glow, p.glow.withOpacity(0)],
+              ),
+            ),
+          ),
+        ),
+        if (p.stars != null) Positioned.fill(child: CustomPaint(painter: _StarsPainter(p.stars!))),
         Positioned.fill(
           child: Opacity(
-            opacity: 0.35,
+            opacity: p.isDark ? 0.35 : 0.2,
             child: Image.asset('assets/images/night_clouds_bg.webp',
                 fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox()),
           ),
@@ -59,20 +72,21 @@ class StarryBackground extends StatelessWidget {
 }
 
 class _StarsPainter extends CustomPainter {
-  const _StarsPainter();
+  final Color color;
+  const _StarsPainter(this.color);
   @override
   void paint(Canvas canvas, Size size) {
     final rng = math.Random(11);
     final p = Paint();
     for (var i = 0; i < 70; i++) {
-      p.color = const Color(0xFF6FD6FF).withOpacity(0.15 + rng.nextDouble() * 0.5);
+      p.color = color.withOpacity(0.1 + rng.nextDouble() * 0.45);
       canvas.drawCircle(Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height * 0.8),
-          0.6 + rng.nextDouble() * 1.2, p);
+          0.5 + rng.nextDouble() * 1.1, p);
     }
   }
 
   @override
-  bool shouldRepaint(_StarsPainter old) => false;
+  bool shouldRepaint(_StarsPainter old) => old.color != color;
 }
 
 /// Back-arrow page with a centered title — the template every settings and
@@ -87,14 +101,13 @@ class SettingsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.accent),
+          icon: Icon(Icons.arrow_back, color: context.palette.accent),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
         title: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
         actions: actions,
-        bottom: const PreferredSize(
-            preferredSize: Size.fromHeight(1), child: Divider(height: 1, color: Colors.white12)),
+        bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1)),
       ),
       body: ListView(padding: const EdgeInsets.only(bottom: 32), children: children),
     );
@@ -121,19 +134,19 @@ class NavRow extends StatelessWidget {
   const NavRow({super.key, this.icon, required this.title, this.value, this.onTap, this.titleColor});
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return Column(children: [
       ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-        leading: icon == null ? null : Icon(icon, color: AppTheme.accent),
+        leading: icon == null ? null : Icon(icon, color: p.accent),
         title: Text(title, style: TextStyle(color: titleColor)),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (value != null)
-            Text(value!, style: const TextStyle(color: Colors.white60, fontSize: 14)),
-          if (onTap != null) const Icon(Icons.chevron_right, color: Colors.white60),
+          if (value != null) Text(value!, style: TextStyle(color: p.textMuted, fontSize: 14)),
+          if (onTap != null) Icon(Icons.chevron_right, color: p.textMuted),
         ]),
         onTap: onTap,
       ),
-      const Divider(height: 1, indent: 20, endIndent: 20, color: Colors.white12),
+      const Divider(height: 1, indent: 20, endIndent: 20),
     ]);
   }
 }
@@ -155,7 +168,7 @@ class PrefRadioList extends StatelessWidget {
           if (header != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-              child: Text(header!, style: const TextStyle(color: Colors.white70, fontSize: 15)),
+              child: Text(header!, style: TextStyle(color: context.palette.textMuted, fontSize: 15)),
             ),
           for (final o in options)
             InkWell(
@@ -167,7 +180,7 @@ class PrefRadioList extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 child: Row(children: [
                   Icon(s.pref(prefKey) == o ? Icons.radio_button_checked : Icons.radio_button_off,
-                      color: AppTheme.accent, size: 22),
+                      color: context.palette.accent, size: 22),
                   const SizedBox(width: 16),
                   Expanded(child: Text(o, style: const TextStyle(fontSize: 16))),
                 ]),
@@ -188,11 +201,11 @@ class AboutBlock extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Divider(color: Colors.white12),
+        const Divider(),
         const SizedBox(height: 12),
         const Text('About', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
-        Text(text, style: const TextStyle(color: Colors.white60, height: 1.45)),
+        Text(text, style: TextStyle(color: context.palette.textMuted, height: 1.45)),
         if (art != null) ...[const SizedBox(height: 24), Center(child: art!)],
       ]),
     );
@@ -205,18 +218,15 @@ class CircleArt extends StatelessWidget {
   final String? asset;
   final IconData icon;
   final double size;
-  final List<Color> colors;
-  const CircleArt(
-      {super.key,
-      this.asset,
-      required this.icon,
-      this.size = 220,
-      this.colors = const [Color(0xFF2B6E86), Color(0xFF173246)]});
+  final List<Color>? colors; // defaults to the theme's light → deep stage blend
+  const CircleArt({super.key, this.asset, required this.icon, this.size = 220, this.colors});
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final fallback = DecoratedBox(
       decoration: BoxDecoration(
-          shape: BoxShape.circle, gradient: LinearGradient(colors: colors, begin: Alignment.topLeft)),
+          shape: BoxShape.circle,
+          gradient: LinearGradient(colors: colors ?? [p.light, p.deep], begin: Alignment.topLeft)),
       child: Center(child: Icon(icon, size: size * 0.4, color: Colors.white)),
     );
     return SizedBox(
@@ -255,27 +265,36 @@ class ArtBox extends StatelessWidget {
   }
 }
 
-/// Full-width rounded primary button (orange by default).
+/// Full-width rounded primary button in the theme's call-to-action fill
+/// (a gradient on Midnight), or a solid [color] when given.
 class PillButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
-  final Color color;
+  final Color? color;
   final double width;
-  const PillButton(this.label,
-      {super.key, this.onPressed, this.color = AppTheme.cta, this.width = double.infinity});
+  const PillButton(this.label, {super.key, this.onPressed, this.color, this.width = double.infinity});
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return SizedBox(
       width: width,
       height: 52,
-      child: FilledButton(
-        style: FilledButton.styleFrom(
-            backgroundColor: color,
-            foregroundColor: Colors.white,
-            shape: const StadiumBorder(),
-            textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-        onPressed: onPressed,
-        child: Text(label),
+      child: DecoratedBox(
+        decoration: ShapeDecoration(
+          shape: const StadiumBorder(),
+          gradient: color == null ? p.ctaGradient : null,
+          color: color,
+        ),
+        child: FilledButton(
+          style: FilledButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              foregroundColor: p.onCta,
+              shape: const StadiumBorder(),
+              textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, fontFamily: p.fontFamily)),
+          onPressed: onPressed,
+          child: Text(label),
+        ),
       ),
     );
   }

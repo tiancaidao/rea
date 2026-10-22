@@ -66,22 +66,21 @@ class _TrackingScreenState extends State<TrackingScreen> {
     var h = s.alarmHour, m = s.alarmMinute;
     final ok = await showModalBottomSheet<bool>(
       context: context,
-      backgroundColor: const Color(0xFF0B1C27),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (c) => Column(mainAxisSize: MainAxisSize.min, children: [
         Row(children: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: const Text('Cancel', style: TextStyle(color: AppTheme.accent, fontSize: 16))),
+              child: Text('Cancel', style: TextStyle(color: context.palette.accent, fontSize: 16))),
           const Expanded(
               child: Text('Change alarm',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600))),
           TextButton(
               onPressed: () => Navigator.pop(c, true),
-              child: const Text('Done', style: TextStyle(color: AppTheme.accent, fontSize: 16))),
+              child: Text('Done', style: TextStyle(color: context.palette.accent, fontSize: 16))),
         ]),
-        const Divider(height: 1, color: Colors.white12),
+        const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: TimeWheel(hour: h, minute: m, onChanged: (hh, mm) {
@@ -184,7 +183,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
             ),
             const SizedBox(height: 40),
             Text(fmtDt(_now),
-                style: const TextStyle(fontSize: 64, fontWeight: FontWeight.w300, color: Color(0xFF8FB8C8))),
+                style: TextStyle(fontSize: 64, fontWeight: FontWeight.w300, color: context.palette.textMuted)),
             GestureDetector(
               onTap: AppState.I.alarmMode == 2 ? null : _changeAlarm,
               child: Text.rich(TextSpan(children: [
@@ -192,14 +191,14 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 TextSpan(
                     text: _alarmLabel,
                     style: const TextStyle(decoration: TextDecoration.underline)),
-              ]), style: const TextStyle(fontSize: 18, color: Color(0xFF8FB8C8))),
+              ]), style: TextStyle(fontSize: 18, color: context.palette.textMuted)),
             ),
             const Spacer(),
             if (_stopping)
-              const Column(children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 12),
-                Text('Analyzing your night…', style: TextStyle(color: Colors.white70)),
+              Column(children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 12),
+                Text('Analyzing your night…', style: TextStyle(color: context.palette.textMuted)),
               ])
             else
               GestureDetector(
@@ -214,12 +213,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 onTap: () => toast(context, 'Swipe up to stop'),
                 child: Transform.translate(
                   offset: Offset(0, -_drag),
-                  child: const SizedBox(
+                  child: SizedBox(
                     width: 160,
                     height: 90,
                     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Icon(Icons.keyboard_arrow_up, color: Color(0xFF8FB8C8), size: 32),
-                      Text('Stop', style: TextStyle(fontSize: 20, color: Color(0xFF8FB8C8))),
+                      Icon(Icons.keyboard_arrow_up, color: context.palette.textMuted, size: 32),
+                      Text('Stop', style: TextStyle(fontSize: 20, color: context.palette.textMuted)),
                     ]),
                   ),
                 ),
@@ -235,11 +234,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
 class _Moon extends StatelessWidget {
   const _Moon();
   @override
-  Widget build(BuildContext context) => const DecoratedBox(
+  Widget build(BuildContext context) => DecoratedBox(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: RadialGradient(colors: [Color(0xFFB9D9E6), Color(0xFF3B6F86)]),
-          boxShadow: [BoxShadow(color: Color(0x553FC1E0), blurRadius: 30)],
+          gradient: RadialGradient(colors: [context.palette.rem, context.palette.deep]),
+          boxShadow: [BoxShadow(color: context.palette.glow, blurRadius: 30)],
         ),
       );
 }

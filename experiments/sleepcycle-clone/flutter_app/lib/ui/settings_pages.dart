@@ -15,6 +15,99 @@ import 'widgets/common.dart';
 
 // ── Profile › Settings ──────────────────────────────────────────────────────
 
+// ── Theme ───────────────────────────────────────────────────────────────────
+
+/// Picks the app theme. Each option previews its own palette (backdrop, card
+/// and the four stage colors) so the choice is visible before it is applied.
+class ThemePage extends StatelessWidget {
+  const ThemePage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Watch((context, s) => SettingsPage(title: 'Theme', children: [
+          const SizedBox(height: 8),
+          for (final t in AppThemeId.values)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              child: _ThemeOption(
+                theme: t,
+                selected: AppThemeId.byLabel(s.pref('theme')) == t,
+                onTap: () => s.setPref('theme', t.label),
+              ),
+            ),
+          const AboutBlock('Midnight and Mist share the same layouts and differ only in palette: '
+              'dark glass with a blue stage gradient for the bedroom, and a misty light theme for daytime. '
+              'Classic keeps the original teal look.'),
+        ]));
+  }
+}
+
+class _ThemeOption extends StatelessWidget {
+  final AppThemeId theme;
+  final bool selected;
+  final VoidCallback onTap;
+  const _ThemeOption({required this.theme, required this.selected, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final cur = context.palette;
+    final t = theme.palette;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: cur.surface,
+          borderRadius: BorderRadius.circular(cur.radius),
+          border: Border.all(color: selected ? cur.accent : cur.stroke, width: selected ? 2 : 1),
+        ),
+        child: Row(children: [
+          // miniature of the theme: its sky, a card and the stage colors
+          Container(
+            width: 84,
+            height: 84,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                  begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: t.backdrop),
+              border: Border.all(color: cur.stroke),
+            ),
+            padding: const EdgeInsets.all(10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: t.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: t.stroke),
+              ),
+              padding: const EdgeInsets.all(6),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                for (final (c, h) in [(t.deep, 0.9), (t.light, 0.6), (t.rem, 0.75), (t.awake, 0.3)])
+                  Expanded(
+                    child: FractionallySizedBox(
+                      heightFactor: h,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                        decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(3)),
+                      ),
+                    ),
+                  ),
+              ]),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(theme.label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text(theme.blurb, style: TextStyle(color: cur.textMuted, height: 1.3)),
+            ]),
+          ),
+          Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off, color: cur.accent),
+        ]),
+      ),
+    );
+  }
+}
+
 class SleepGoalPage extends StatelessWidget {
   const SleepGoalPage({super.key});
   @override
@@ -32,7 +125,6 @@ class SleepGoalPage extends StatelessWidget {
               onPressed: () async {
                 final h = await showModalBottomSheet<String>(
                   context: context,
-                  backgroundColor: const Color(0xFF0E2230),
                   builder: (c) => ListView(shrinkWrap: true, children: [
                     for (final g in ['6h 30m', '7h', '7h 30m', '8h', '8h 30m', '9h'])
                       ListTile(title: Text(g), onTap: () => Navigator.pop(c, g)),
@@ -83,12 +175,12 @@ class AlarmSoundPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SettingsPage(title: 'Sound', children: [
-      PrefRadioList(prefKey: 'alarm_sound', options: free, onPicked: _preview),
-      const Padding(
-        padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
-        child: Text('Premium sounds', style: TextStyle(color: Colors.white60)),
+      const PrefRadioList(prefKey: 'alarm_sound', options: free, onPicked: _preview),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+        child: Text('Premium sounds', style: TextStyle(color: context.palette.textMuted)),
       ),
-      PrefRadioList(prefKey: 'alarm_sound', options: premium, onPicked: _preview),
+      const PrefRadioList(prefKey: 'alarm_sound', options: premium, onPicked: _preview),
     ]);
   }
 }
@@ -171,9 +263,9 @@ class MorePage extends StatelessWidget {
         NavRow(icon: Icons.storage, title: 'Database', onTap: () => open(const DatabasePage())),
         NavRow(icon: Icons.extension, title: 'Third-party software',
             onTap: () => showLicensePage(context: context, applicationName: 'Sleep Tracker')),
-        const Padding(
-          padding: EdgeInsets.all(24),
-          child: Center(child: Text('Sleep Tracker v0.1.0 (prototype)', style: TextStyle(color: Colors.white38))),
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Center(child: Text('Sleep Tracker v0.1.0 (prototype)', style: TextStyle(color: context.palette.textFaint))),
         ),
       ]);
     });
@@ -185,11 +277,11 @@ class AccountPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppState.I;
-    Widget link(String t, VoidCallback onTap, {Color color = AppTheme.accent}) => InkWell(
+    Widget link(String t, VoidCallback onTap, {Color? color}) => InkWell(
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(t, style: TextStyle(color: color, fontSize: 16)),
+            child: Text(t, style: TextStyle(color: color ?? context.palette.accent, fontSize: 16)),
           ),
         );
     return SettingsPage(title: 'Account', children: [
@@ -214,7 +306,7 @@ class AccountPage extends StatelessWidget {
           }),
           link('Erase your data', () async {
             if (await confirm(context, 'Erase your data?', 'All nights will be deleted.', 'Erase')) s.eraseAll();
-          }, color: Colors.redAccent),
+          }, color: context.palette.awake),
           link('Erase your data and account', () async {
             if (await confirm(context, 'Erase data and account?', 'This cannot be undone.', 'Erase')) {
               try {
@@ -229,7 +321,7 @@ class AccountPage extends StatelessWidget {
               Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const WelcomeScreen()), (_) => false);
             }
-          }, color: Colors.redAccent),
+          }, color: context.palette.awake),
         ]),
       ),
       const AboutBlock('Manage your sign-in details and your data.'),
@@ -269,16 +361,16 @@ class ConsentPage extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
-                Text(body, style: const TextStyle(color: Colors.white60, height: 1.4)),
+                Text(body, style: TextStyle(color: context.palette.textMuted, height: 1.4)),
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   controlAffinity: ListTileControlAffinity.leading,
                   value: s.pref(key) == 'true',
-                  activeColor: AppTheme.accent,
+                  activeColor: context.palette.accent,
                   title: const Text('I agree'),
                   onChanged: (v) => s.setPref(key, '${v ?? false}'),
                 ),
-                const Divider(color: Colors.white12),
+                const Divider(),
               ]),
             );
         return SettingsPage(title: 'Consent and privacy', children: [
@@ -333,7 +425,7 @@ class DatabasePage extends StatelessWidget {
             onPressed: () async {
               if (await confirm(context, 'Erase database?', 'All nights will be deleted.', 'Erase')) s.eraseAll();
             },
-            child: const Text('Erase database', style: TextStyle(color: Colors.white60, fontSize: 12)),
+            child: Text('Erase database', style: TextStyle(color: context.palette.textMuted, fontSize: 12)),
           ),
         ),
       ),
@@ -391,7 +483,7 @@ class SleepNotesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SettingsPage(title: 'Sleep notes', children: [
         const _Radio('sleep_notes', ['Show', 'Hide']),
-        const Divider(indent: 20, endIndent: 20, color: Colors.white12),
+        const Divider(indent: 20, endIndent: 20),
         NavRow(title: 'Edit sleep notes', onTap: () => push(context, const EditSleepNotesPage())),
         NavRow(title: 'Home location', onTap: () => toast(context, 'Used to tag nights away from home')),
         const AboutBlock('Tag each night with things that might affect your sleep — then see which ones matter.'),
@@ -406,7 +498,7 @@ class EditSleepNotesPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: AppTheme.accent), onPressed: () => Navigator.pop(context)),
+            icon: Icon(Icons.arrow_back, color: context.palette.accent), onPressed: () => Navigator.pop(context)),
         centerTitle: true,
         title: const Text('Sleep notes', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
       ),
@@ -417,7 +509,7 @@ class EditSleepNotesPage extends StatelessWidget {
               s.notesChanged();
             },
             footer: ListTile(
-              leading: const Icon(Icons.add_circle, color: Colors.greenAccent),
+              leading: Icon(Icons.add_circle, color: context.palette.positive),
               title: const Text('Add new…'),
               onTap: () async {
                 final c = TextEditingController();
@@ -440,14 +532,14 @@ class EditSleepNotesPage extends StatelessWidget {
                 ListTile(
                   key: ValueKey(n),
                   leading: IconButton(
-                    icon: const Icon(Icons.remove_circle, color: Colors.redAccent),
+                    icon: Icon(Icons.remove_circle, color: context.palette.awake),
                     onPressed: () {
                       s.sleepNotes.remove(n);
                       s.notesChanged();
                     },
                   ),
                   title: Text(n),
-                  trailing: const Icon(Icons.drag_handle, color: AppTheme.accent),
+                  trailing: Icon(Icons.drag_handle, color: context.palette.accent),
                 ),
             ],
           )),
@@ -494,7 +586,7 @@ class BenefitsPage extends StatelessWidget {
               textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
         ),
         Center(child: CircleArt(icon: Icons.card_giftcard, size: 220,
-            colors: [Color(0xFFFF8A4C), Color(0xFF7A2E10)])),
+            colors: null)),
       ]);
 }
 
@@ -520,7 +612,7 @@ class HelpPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return SettingsPage(title: 'Help', children: [
       Container(
-        color: const Color(0xFF2A6C80),
+        color: context.palette.surfaceHi,
         padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
         child: const Column(children: [
           Text('Help center', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700)),
@@ -544,7 +636,7 @@ class HelpPage extends StatelessWidget {
           child: OutlinedButton(
             style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(64),
-                side: const BorderSide(color: AppTheme.accent),
+                side: BorderSide(color: context.palette.accent),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
             onPressed: () => push(
                 context,
@@ -554,7 +646,7 @@ class HelpPage extends StatelessWidget {
                       Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), child: Text(qa.$2)),
                     ]),
                 ])),
-            child: Text(t.key, style: const TextStyle(color: AppTheme.accent, fontSize: 16)),
+            child: Text(t.key, style: TextStyle(color: context.palette.accent, fontSize: 16)),
           ),
         ),
     ]);
@@ -599,7 +691,7 @@ class _Radio extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 child: Row(children: [
                   Icon(s.pref(prefKey) == o ? Icons.radio_button_checked : Icons.radio_button_off,
-                      color: AppTheme.accent, size: 22),
+                      color: context.palette.accent, size: 22),
                   const SizedBox(width: 16),
                   Text('$o$suffix', style: const TextStyle(fontSize: 16)),
                 ]),

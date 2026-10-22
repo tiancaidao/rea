@@ -25,12 +25,12 @@ class ProfileTab extends StatelessWidget {
                 const Text('Profile', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700)),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.card_giftcard, color: AppTheme.accent),
+                  icon: Icon(Icons.card_giftcard, color: context.palette.accent),
                   onPressed: () => open(const BenefitsPage()),
                 ),
               ]),
             ),
-            const Divider(indent: 20, endIndent: 20, color: Colors.white12),
+            const Divider(indent: 20, endIndent: 20),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: GridView.count(
@@ -40,15 +40,17 @@ class ProfileTab extends StatelessWidget {
                 childAspectRatio: 2.5,
                 children: [
                   _Tile(Icons.nightlight_round, n.isEmpty ? '—' : '${n.length}', 'Nights'),
-                  _Tile(Icons.donut_large, avgQ, 'Avg. quality', color: const Color(0xFFD08A2E)),
+                  _Tile(Icons.donut_large, avgQ, 'Avg. quality', color: context.palette.quality),
                   _Tile(Icons.schedule, avgT, 'Avg. time'),
                   _Tile(Icons.cloud_done, s.pref('online_backup') == 'On' ? 'OK' : 'Off', 'Backup',
-                      color: Colors.greenAccent),
+                      color: context.palette.positive),
                 ],
               ),
             ),
-            const Divider(indent: 20, endIndent: 20, color: Colors.white12),
+            const Divider(indent: 20, endIndent: 20),
             const SectionTitle('Settings'),
+            NavRow(icon: Icons.palette_outlined, title: 'Theme', value: s.pref('theme'),
+                onTap: () => open(const ThemePage())),
             NavRow(icon: Icons.track_changes, title: 'Sleep Goal', value: s.pref('sleep_goal'),
                 onTap: () => open(const SleepGoalPage())),
             NavRow(icon: Icons.music_note, title: 'Sound', value: s.pref('alarm_sound'),
@@ -86,18 +88,18 @@ class _Tile extends StatelessWidget {
   final IconData icon;
   final String value;
   final String label;
-  final Color color;
-  const _Tile(this.icon, this.value, this.label, {this.color = AppTheme.accent});
+  final Color? color;
+  const _Tile(this.icon, this.value, this.label, {this.color});
   @override
   Widget build(BuildContext context) {
     return Row(children: [
-      Icon(icon, color: color, size: 30),
+      Icon(icon, color: color ?? context.palette.accent, size: 30),
       const SizedBox(width: 12),
       Expanded(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          Text(label, style: const TextStyle(color: Colors.white60, fontSize: 13)),
+          Text(label, style: TextStyle(color: context.palette.textMuted, fontSize: 13)),
         ]),
       ),
     ]);

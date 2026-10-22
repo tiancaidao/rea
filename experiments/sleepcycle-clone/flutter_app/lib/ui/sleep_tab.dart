@@ -19,7 +19,6 @@ class SleepTab extends StatefulWidget {
 class _SleepTabState extends State<SleepTab> {
   late final _pager = PageController(initialPage: AppState.I.alarmMode);
 
-  static const _startColors = [AppTheme.cta, Color(0xFF29B6E6), Color(0xFF1E4D63)];
 
   String _describe(AppState s, int mode) {
     final end = fmtTime(s.alarmHour, s.alarmMinute);
@@ -69,7 +68,7 @@ class _SleepTabState extends State<SleepTab> {
                     const SizedBox(height: 22),
                     PillButton('Start',
                         width: 150,
-                        color: _startColors[i],
+                        color: [null, context.palette.light, context.palette.deep][i],
                         onPressed: () => startSleep(context)),
                   ]),
                 ),
@@ -82,7 +81,7 @@ class _SleepTabState extends State<SleepTab> {
                     height: 7,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: i == s.alarmMode ? AppTheme.cta : const Color(0xFF1F4558),
+                      color: i == s.alarmMode ? context.palette.accent : context.palette.surfaceHi,
                     ),
                   ),
               ]),
@@ -101,7 +100,6 @@ Future<void> startSleep(BuildContext context) async {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: const Color(0xFF0B1C27),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => const FractionallySizedBox(heightFactor: 0.85, child: _RememberSheet()),
     );
@@ -143,7 +141,7 @@ class _RememberSheetState extends State<_RememberSheet> {
       Row(children: [
         IconButton(
           icon: Icon(_step == 0 ? Icons.keyboard_arrow_down : Icons.chevron_left,
-              color: AppTheme.accent, size: 30),
+              color: context.palette.accent, size: 30),
           onPressed: () =>
               _step == 0 ? Navigator.pop(context, false) : setState(() => _step = 0),
         ),
@@ -153,7 +151,7 @@ class _RememberSheetState extends State<_RememberSheet> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600))),
         const SizedBox(width: 48),
       ]),
-      const Divider(height: 1, color: Colors.white12),
+      const Divider(height: 1),
       const Spacer(),
       if (_step == 1 && mic)
         SizedBox(

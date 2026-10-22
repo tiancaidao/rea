@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme.dart';
 
 /// Hour : minute AM/PM picker drawn as three scroll wheels with a framed
 /// selection band — the alarm input used on the Sleep tab and in the
@@ -57,11 +58,12 @@ class _TimeWheelState extends State<TimeWheel> {
 
   Widget _text(String s) => Center(
         child: Text(s,
-            style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w400, color: Colors.white)),
+            style: TextStyle(fontSize: 34, fontWeight: FontWeight.w400, color: context.palette.text)),
       );
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return SizedBox(
       height: _item * 3,
       child: Stack(alignment: Alignment.center, children: [
@@ -69,12 +71,14 @@ class _TimeWheelState extends State<TimeWheel> {
           height: _item,
           width: 250,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: Colors.white24),
-            color: Colors.black12,
+            borderRadius: BorderRadius.circular(p.radius * 0.6),
+            border: Border.all(color: p.stroke),
+            color: p.surface,
           ),
         ),
         ShaderMask(
+          // fades the wheel's ends by alpha so it works on light and dark themes
+          blendMode: BlendMode.dstIn,
           shaderCallback: (r) => const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
