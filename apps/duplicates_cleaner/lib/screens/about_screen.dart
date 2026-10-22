@@ -53,9 +53,7 @@ class AboutScreen extends StatelessWidget {
                       ? 'Premium version is already purchased'
                       : 'Upgrade - Premium Version',
                 ),
-                onTap: premium.isPremium
-                    ? null
-                    : () => showUpgradeDialog(context),
+                onTap: premium.isPremium ? null : () => showPaywall(context),
                 trailing: premium.isPremium && premium.canPurchase
                     ? TextButton(
                         onPressed: premium.reset,

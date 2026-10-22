@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/home_screen.dart';
-import 'screens/tutorial_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'services/premium_service.dart';
 import 'services/settings_store.dart';
 import 'services/storage_service.dart';
@@ -51,7 +51,7 @@ class DuplicatesCleanerApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: buildAppTheme(),
         home: settings.firstLaunch
-            ? const TutorialScreen()
+            ? const OnboardingScreen()
             : const HomeScreen(),
       ),
     );
