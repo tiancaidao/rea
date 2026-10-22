@@ -10,6 +10,7 @@
 const express = require('express');
 const { weeklyReport, DAY } = require('./insights');
 const { currentWeather } = require('./weather');
+const { recommendations } = require('./recommendations');
 
 const DEFAULT_CONFIG = {
   minAppVersion: '0.1.0',
@@ -124,6 +125,98 @@ function createApp({ db, auth, bucket, publisher = null, packageName = null, fet
     await db.doc(`users/${req.user.uid}`).set({ premium }, { merge: true });
     await auth.setCustomUserClaims(req.user.uid, { ...(req.user.claims || {}), premium: active });
     res.json(premium);
+  }));
+
+  // Personal recommendations from the last two weeks of nights.
+  app.get('/v1/insights/recommendations', requireUser, asyncRoute(async (req, res) => {
+    const tz = Number(req.query.tzOffsetMin || 0);
+    const goal = req.query.goalMin ? Number(req.query.goalMin) : null;
+    const now = Date.now();
+    const snap = await db.collection(`users/${req.user.uid}/nights`)
+      .where('wokeUp', '>=', now - 14 * DAY)
+      .get();
+    res.json(recommendations(snap.docs.map((d) => d.data()), now, tz, goal));
+  }));
+
+  // Consent and privacy choices, stored with a timestamp (GDPR record).
+  const CONSENT_KEYS = ['storage', 'sounds', 'product'];
+  app.post('/v1/consent', requireUser, asyncRoute(async (req, res) => {
+    const consent = { updatedAt: Date.now() };
+    for (const k of CONSENT_KEYS) {
+      if (typeof (req.body || {})[k] !== 'boolean') return res.status(400).json({ error: `${k} must be a boolean` });
+      consent[k] = req.body[k];
+    }
+    await db.doc(`users/${req.user.uid}`).set({ consent }, { merge: true });
+    res.json(consent);
+  }));
+
+  // Push / device registration (FCM token or APNs token), one doc per device.
+  app.post('/v1/devices/register', requireUser, asyncRoute(async (req, res) => {
+    const { token, platform } = req.body || {};
+    if (typeof token !== 'string' || token.length < 8 || token.length > 4096) {
+      return res.status(400).json({ error: 'token required' });
+    }
+    if (!['android', 'ios'].includes(platform)) return res.status(400).json({ error: 'platform must be android or ios' });
+    const id = require('crypto').createHash('sha256').update(token).digest('hex').slice(0, 32);
+    await db.doc(`users/${req.user.uid}/devices/${id}`).set({ token, platform, updatedAt: Date.now() });
+    res.json({ id });
+  }));
+
+  // "About you" and the onboarding survey: a whitelisted set of properties.
+  const PROPERTY_KEYS = ['units', 'weight', 'height', 'gender', 'birth', 'survey', 'goal'];
+  app.post('/v1/user/properties', requireUser, asyncRoute(async (req, res) => {
+    const properties = {};
+    for (const [k, v] of Object.entries(req.body || {})) {
+      if (!PROPERTY_KEYS.includes(k)) return res.status(400).json({ error: `unknown property ${k}` });
+      if (typeof v !== 'string' || v.length > 100) return res.status(400).json({ error: `${k} must be a short string` });
+      properties[k] = v;
+    }
+    await db.doc(`users/${req.user.uid}`).set({ properties }, { merge: true });
+    res.json({ properties });
+  }));
+
+  // Start the free trial once per account; the trial reminder is scheduled on
+  // the device. Store purchases still go through /v1/billing/verify.
+  app.post('/v1/trial/start', requireUser, asyncRoute(async (req, res) => {
+    const ref = db.doc(`users/${req.user.uid}`);
+    const result = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const existing = snap.exists ? snap.data().trial : null;
+      if (existing) return { status: 409, body: { error: 'trial already used', trial: existing } };
+      const cfg = await tx.get(db.doc('config/app'));
+      const days = (cfg.exists && cfg.data().paywall && cfg.data().paywall.trialDays) || DEFAULT_CONFIG.paywall.trialDays;
+      const now = Date.now();
+      const trial = { startedAt: now, endsAt: now + days * DAY, productId: (req.body || {}).productId || null };
+      tx.set(ref, { trial }, { merge: true });
+      return { status: 200, body: trial };
+    });
+    res.status(result.status).json(result.body);
+  }));
+
+  // Redeem a gift card: codes live in giftcards/{code} (created by the
+  // seed script or a purchase flow) and can be used once.
+  app.post('/v1/giftcards/redeem', requireUser, asyncRoute(async (req, res) => {
+    const code = String((req.body || {}).code || '').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    if (code.length < 6) return res.status(400).json({ error: 'invalid code' });
+    const cardRef = db.doc(`giftcards/${code}`);
+    const userRef = db.doc(`users/${req.user.uid}`);
+    const result = await db.runTransaction(async (tx) => {
+      const card = await tx.get(cardRef);
+      if (!card.exists) return { status: 404, body: { error: 'unknown code' } };
+      if (card.data().redeemedBy) return { status: 409, body: { error: 'code already used' } };
+      const user = await tx.get(userRef);
+      const now = Date.now();
+      const current = user.exists && user.data().premium && user.data().premium.expiry;
+      const from = current && current > now ? current : now;
+      const expiry = from + (card.data().months || 12) * 30 * DAY;
+      tx.update(cardRef, { redeemedBy: req.user.uid, redeemedAt: now });
+      tx.set(userRef, { premium: { active: true, source: 'giftcard', expiry, verifiedAt: now } }, { merge: true });
+      return { status: 200, body: { premiumUntil: new Date(expiry).toISOString().slice(0, 10), expiry } };
+    });
+    if (result.status === 200) {
+      await auth.setCustomUserClaims(req.user.uid, { ...(req.user.claims || {}), premium: true });
+    }
+    res.status(result.status).json(result.body);
   }));
 
   // "Erase your data and account": nights, reports, profile, then the login.

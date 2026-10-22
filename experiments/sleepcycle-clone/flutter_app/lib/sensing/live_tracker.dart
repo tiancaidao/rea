@@ -7,6 +7,8 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../core/sleep_algorithms.dart';
 import '../data/models.dart';
+import '../data/sound_clips.dart';
+import '../device/device_sensors.dart';
 import '../sensing/sleep_tracker.dart';
 import 'snore_model.dart';
 import 'stage_model.dart';
@@ -30,9 +32,13 @@ Future<List<double>> _classify(SnoreModel m, Float32List window) =>
 /// * Accelerometer (sensors_plus, ~50 Hz): per 30-s epoch, the summed change
 ///   in acceleration magnitude plus a count of spikes — movement through the
 ///   mattress.
-/// * Microphone (record, PCM, nothing is kept): per epoch, the loudest 0.5-s
-///   window relative to the room's noise floor. Rustling and turning over
-///   register as sound when the phone is on the nightstand.
+/// * Microphone (record, PCM): per epoch, the loudest 0.5-s window relative
+///   to the room's noise floor. Rustling and turning over register as sound
+///   when the phone is on the nightstand. With a [clipDir], loud moments are
+///   also kept as short clips (2 s before + 4 s after, at most one every
+///   [clipCooldown]) for the Journal's Sounds card; without one no audio is
+///   kept.
+/// * Ambient light sensor, where the phone has one: mean lux per epoch.
 /// * Snore model (behind [snoreModelFlag]): the mic runs at 44.1 kHz and every
 ///   second the last ~2 s go through [SnoreFrontEnd] + [SnoreModel] in a
 ///   background isolate, giving P(snore) / P(cough) per second. Quiet seconds
@@ -48,8 +54,38 @@ class LiveTracker {
   final bool useMicrophone;
   final bool useSnoreModel;
   final bool useStageModel;
-  LiveTracker({required this.useMicrophone, this.useSnoreModel = snoreModelFlag, this.useStageModel = stageModelFlag});
+
+  /// Folder for this night's sound clips; null records no clips.
+  final String? clipDir;
+
+  /// Called after every finished epoch (the tracking screen drives the
+  /// smart alarm and the sleep-aid fade from it).
+  void Function(int epoch)? onEpoch;
+
+  LiveTracker(
+      {required this.useMicrophone,
+      this.useSnoreModel = snoreModelFlag,
+      this.useStageModel = stageModelFlag,
+      this.clipDir});
   StageModel? stageModel;
+
+  // sound clips
+  static const clipCooldown = Duration(minutes: 3);
+  static const maxClips = 40;
+  static const clipTriggerDb = 18.0; // above the noise floor
+  final List<SoundClip> clips = [];
+  Int16List? _pre; // circular pre-roll of the last 2 s
+  int _prePos = 0;
+  List<int>? _clip; // samples of the clip being recorded
+  int _clipAt = 0;
+  double _clipPeak = 0;
+  DateTime? _lastClip;
+
+  // ambient light
+  StreamSubscription<double>? _lightSub;
+  final List<double> _luxEpochs = [];
+  double _luxSum = 0;
+  int _luxN = 0;
 
   static const epochSeconds = 30;
 
@@ -105,9 +141,14 @@ class LiveTracker {
           numChannels: 1,
         ));
         micActive = true;
+        if (clipDir != null) _pre = Int16List(_sampleRate * 2);
         _micSub = stream.listen(ingestPcm);
       }
     }
+    _lightSub = DeviceSensors.light().listen((lux) {
+      _luxSum += lux;
+      _luxN++;
+    }, onError: (_) {});
     _epochTimer = Timer.periodic(const Duration(seconds: epochSeconds), (_) => _closeEpoch());
   }
 
@@ -135,6 +176,7 @@ class LiveTracker {
       final s = data.getInt16(i, Endian.little);
       _buf.add(s);
       if (_ring != null) _push(s / 32768.0);
+      if (_pre != null) _recordSample(s);
       if (_buf.length >= half) {
         var sum = 0.0;
         for (final v in _buf) {
@@ -146,8 +188,51 @@ class LiveTracker {
         _windowDb.add(db);
         if (_windowDb.length > 1200) _windowDb.removeAt(0); // ~10 min
         _buf.clear();
+        if (_pre != null) _maybeStartClip(db);
       }
     }
+  }
+
+  void _recordSample(int s) {
+    final clip = _clip;
+    if (clip != null) {
+      clip.add(s);
+      if (clip.length >= _sampleRate * 6) _finishClip();
+      return;
+    }
+    final pre = _pre!;
+    pre[_prePos] = s;
+    _prePos = (_prePos + 1) % pre.length;
+  }
+
+  void _maybeStartClip(double db) {
+    if (_clip != null || clips.length >= maxClips || _windowDb.length < 20) return;
+    final above = db - _noiseFloor();
+    if (above < clipTriggerDb) return;
+    final now = DateTime.now();
+    if (_lastClip != null && now.difference(_lastClip!) < clipCooldown) return;
+    _lastClip = now;
+    final pre = _pre!;
+    _clip = [...pre.sublist(_prePos), ...pre.sublist(0, _prePos)];
+    _clipAt = math.max(0, now.difference(startedAt).inSeconds - 2);
+    _clipPeak = above;
+  }
+
+  void _finishClip() {
+    final samples = Int16List.fromList(_clip!);
+    _clip = null;
+    final at = _clipAt, peak = _clipPeak;
+    // a clip whose seconds the snore model called snoring is a snore clip
+    final probs = snoreProbs.length > at ? snoreProbs.sublist(at, math.min(snoreProbs.length, at + 6)) : <double>[];
+    final snore = model != null && probs.where((p) => !p.isNaN && p >= model!.snoreThreshold).length >= 2;
+    final path = '$clipDir/${startedAt.millisecondsSinceEpoch}_$at.wav';
+    clips.add(SoundClip(
+        offsetSec: at,
+        path: path,
+        kind: snore ? 'snore' : 'sound',
+        peakDb: peak,
+        durationMs: samples.length * 1000 ~/ _sampleRate));
+    unawaited(writeWav(path, samples, _sampleRate).catchError((_) {}));
   }
 
   void _push(double v) {
@@ -212,6 +297,45 @@ class LiveTracker {
       _soundEpochs.add(math.max(0, _loudestDb - floor));
       _loudestDb = -120;
     }
+    if (_luxN > 0) _luxEpochs.add(_luxSum / _luxN);
+    _luxSum = 0;
+    _luxN = 0;
+    onEpoch?.call(_accelEpochs.length);
+  }
+
+  /// Median overnight illuminance (lux), or null without a light sensor.
+  double? get medianLux {
+    if (_luxEpochs.isEmpty) return null;
+    final s = [..._luxEpochs]..sort();
+    return s[s.length ~/ 2];
+  }
+
+  /// Snore spans in seconds from the start, for the Journal's snore track.
+  List<(int, int)> get snoreSpans => modelActive
+      ? [for (final e in snoreEvents) (e.startFrame, e.endFrame)]
+      : [
+          for (var i = 0; i < _soundEpochs.length; i++)
+            if (_soundEpochs[i] > 15) (i * epochSeconds, (i + 1) * epochSeconds)
+        ];
+
+  /// The night's movement so far, one 0..1 number per epoch (the same mix of
+  /// accelerometer and sound [analyze] stages from). The smart alarm reads it.
+  List<double> movementSoFar() {
+    final n = _accelEpochs.length;
+    final maxA = _accelEpochs.fold(0.0, math.max);
+    return [
+      for (var i = 0; i < n; i++)
+        math.max(maxA == 0 ? 0.0 : _accelEpochs[i] / maxA,
+            i < _soundEpochs.length ? (_soundEpochs[i] / 25).clamp(0.0, 1.0) * 0.8 : 0.0)
+    ];
+  }
+
+  /// Whether the last few epochs look like sleep (for the "Smart" sleep-aid fade).
+  bool get seemsAsleep {
+    final m = movementSoFar();
+    if (m.length < 20) return false;
+    final recent = m.sublist(m.length - 10);
+    return recent.every((v) => v < 0.15);
   }
 
   double _noiseFloor([double percentile = 0.2]) {
@@ -228,6 +352,8 @@ class LiveTracker {
     _closeEpoch();
     await _accelSub?.cancel();
     await _micSub?.cancel();
+    await _lightSub?.cancel();
+    if (_clip != null && _clip!.length > _sampleRate * 3) _finishClip();
     try {
       await _recorder?.stop();
       await _recorder?.dispose();
@@ -284,8 +410,7 @@ class LiveTracker {
     return TrackingResult(session, movement);
   }
 
-  static int _snoreSeconds(List<SnoreEvent> events) =>
-      events.fold(0, (a, e) => a + (e.endFrame - e.startFrame));
+  static int _snoreSeconds(List<SnoreEvent> events) => events.fold(0, (a, e) => a + (e.endFrame - e.startFrame));
 
   /// Minutes of snoring: model events when the model runs, otherwise minutes of
   /// loud, sustained sound as a proxy.
@@ -294,7 +419,6 @@ class LiveTracker {
       : (_soundEpochs.where((d) => d > 15).length * epochSeconds / 60).round();
 
   /// Cough events (model only; null when the model isn't running).
-  int? get coughs => modelActive
-      ? detectSnoreEvents(coughProbs, onThreshold: 0.5, majorityWindow: 1, minEventFrames: 1).length
-      : null;
+  int? get coughs =>
+      modelActive ? detectSnoreEvents(coughProbs, onThreshold: 0.5, majorityWindow: 1, minEventFrames: 1).length : null;
 }

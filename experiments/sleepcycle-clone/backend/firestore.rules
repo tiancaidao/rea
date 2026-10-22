@@ -1,6 +1,6 @@
 rules_version = '2';
-// Owner-only user data. Privileged fields (premium) are written by the API
-// with admin credentials and can't be changed from the app.
+// Owner-only user data. Privileged fields (premium, trial) are written by the
+// API with admin credentials and can't be changed from the app.
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
@@ -15,12 +15,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /giftcards/{code} {
+      allow read, write: if false; // redeemed through the API only
+    }
+
+    function unchanged(field) {
+      return !(field in request.resource.data)
+        || (field in resource.data && request.resource.data[field] == resource.data[field]);
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid);
-      allow create: if isOwner(uid) && !('premium' in request.resource.data);
-      allow update: if isOwner(uid)
-        && (!('premium' in request.resource.data)
-            || request.resource.data.premium == resource.data.premium);
+      allow create: if isOwner(uid)
+        && !('premium' in request.resource.data) && !('trial' in request.resource.data);
+      allow update: if isOwner(uid) && unchanged('premium') && unchanged('trial');
       allow delete: if false; // via the API's account deletion
 
       match /nights/{nightId} {
@@ -29,6 +37,10 @@ service cloud.firestore {
           && request.resource.data.wokeUp is int
           && request.resource.data.session is map
           && request.resource.data.session.phases.size() <= 2880; // ≤ 24 h of 30 s epochs
+      }
+      match /devices/{id} {
+        allow read, delete: if isOwner(uid);
+        allow write: if false; // registered through the API
       }
       match /reports/{week} {
         allow read: if isOwner(uid);

@@ -1,10 +1,20 @@
+import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../app_state.dart';
 import '../data/night.dart';
+import '../data/sound_clips.dart';
+import '../device/notifications.dart';
 import '../backend/backend.dart';
 import '../data/recorded_night.dart';
 import '../theme.dart';
+import 'alertness_game.dart';
+import 'morning_flow.dart' show MoodFacePainter, moodLabels;
 import 'settings_pages.dart';
 import 'widgets/common.dart';
 import 'widgets/hypnogram.dart';
@@ -92,8 +102,7 @@ class _NightView extends StatelessWidget {
     return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 40), children: [
       // ── header ───────────────────────────────────────────────────────────
       Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-        Text(_weekdays[end.weekday - 1],
-            style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700)),
+        Text(_weekdays[end.weekday - 1], style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700)),
         const SizedBox(width: 8),
         Padding(
           padding: const EdgeInsets.only(bottom: 5),
@@ -102,7 +111,7 @@ class _NightView extends StatelessWidget {
         const Spacer(),
         IconButton(
           icon: Icon(Icons.ios_share, color: p.accent),
-          onPressed: () => toast(context, 'Share card (not wired in the prototype)'),
+          onPressed: demo ? null : () => shareNight(context, night),
         ),
         IconButton(
           icon: Icon(Icons.calendar_month, color: p.accent),
@@ -113,8 +122,8 @@ class _NightView extends StatelessWidget {
       _WeekStrip(night: night),
       const SizedBox(height: 28),
       // ── report hero ──────────────────────────────────────────────────────
-      Text(_greeting(end), textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
+      Text(_greeting(end),
+          textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
       const SizedBox(height: 6),
       Text(_verdict(night.quality),
           textAlign: TextAlign.center, style: TextStyle(color: p.textMuted, fontSize: 15, height: 1.4)),
@@ -143,16 +152,28 @@ class _NightView extends StatelessWidget {
       const SizedBox(height: 24),
       // ── stage tiles ──────────────────────────────────────────────────────
       _TileGrid(children: [
-        StatTile(color: p.deep, label: 'Deep sleep', minutes: mins['deep'] ?? 0,
+        StatTile(
+            color: p.deep,
+            label: 'Deep sleep',
+            minutes: mins['deep'] ?? 0,
             status: share('deep') >= 0.13 ? 'In range' : 'Below avg',
             statusIcon: share('deep') >= 0.13 ? Icons.check_circle : Icons.arrow_circle_down),
-        StatTile(color: p.light, label: 'Light sleep', minutes: mins['light'] ?? 0,
+        StatTile(
+            color: p.light,
+            label: 'Light sleep',
+            minutes: mins['light'] ?? 0,
             status: share('light') <= 0.6 ? 'In range' : 'Above avg',
             statusIcon: share('light') <= 0.6 ? Icons.check_circle : Icons.arrow_circle_up),
-        StatTile(color: p.rem, label: 'REM', minutes: mins['rem'] ?? 0,
+        StatTile(
+            color: p.rem,
+            label: 'REM',
+            minutes: mins['rem'] ?? 0,
             status: share('rem') >= 0.18 ? 'In range' : 'Below avg',
             statusIcon: share('rem') >= 0.18 ? Icons.check_circle : Icons.arrow_circle_down),
-        StatTile(color: p.awake, label: 'Awake', minutes: mins['awake'] ?? 0,
+        StatTile(
+            color: p.awake,
+            label: 'Awake',
+            minutes: mins['awake'] ?? 0,
             status: (mins['awake'] ?? 0) <= 30 ? 'Low' : 'High',
             statusIcon: (mins['awake'] ?? 0) <= 30 ? Icons.check_circle : Icons.arrow_circle_up),
       ]),
@@ -196,19 +217,11 @@ class _NightView extends StatelessWidget {
           onPressed: () => _notesSheet(context),
         ),
       ),
-      if (night.notes.isNotEmpty)
-        Wrap(spacing: 8, children: [for (final n in night.notes) Chip(label: Text(n))]),
+      if (night.notes.isNotEmpty) Wrap(spacing: 8, children: [for (final n in night.notes) Chip(label: Text(n))]),
       const SizedBox(height: 16),
-      GlassCard(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Sounds', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Text('Snoring and other sounds from the night will appear here.',
-              style: TextStyle(color: p.textMuted)),
-        ]),
-      ),
+      _SoundsCard(night: night),
       const SizedBox(height: 16),
-      const _AlertnessCard(),
+      _AlertnessCard(night: night, demo: demo),
       const SizedBox(height: 16),
       _Card(
         child: InkWell(
@@ -360,10 +373,22 @@ class _WeekStrip extends StatelessWidget {
             ),
           );
         }),
-      IconButton(
-        icon: Icon(Icons.description_outlined, color: p.accent),
-        onPressed: () => _weeklyReport(context, sunday),
-      ),
+      Builder(builder: (context) {
+        // the report icon fills up with the week's tracked nights (4 make a report)
+        final count = s.nights
+            .where((n) => !n.day.isBefore(sunday) && n.day.isBefore(sunday.add(const Duration(days: 7))))
+            .length;
+        return IconButton(
+          tooltip: 'Weekly report ($count/7 nights)',
+          icon: Badge(
+            label: Text('$count'),
+            backgroundColor: count >= 4 ? p.positive : p.surfaceHi,
+            textColor: count >= 4 ? p.onCta : p.text,
+            child: Icon(Icons.description_outlined, color: p.accent),
+          ),
+          onPressed: () => _weeklyReport(context, sunday),
+        );
+      }),
     ]);
   }
 
@@ -392,16 +417,22 @@ class _WeekStrip extends StatelessWidget {
     final week = AppState.I.nights
         .where((n) => !n.day.isBefore(sunday) && n.day.isBefore(sunday.add(const Duration(days: 7))))
         .toList();
-    if (week.isEmpty) {
-      showInfoSheet(context, 'Weekly report',
-          'Track a few nights this week and a summary will be ready on Monday morning.');
+    if (week.length < 4) {
+      showInfoSheet(
+          context,
+          'Weekly report',
+          week.isEmpty
+              ? 'Track at least four nights this week and a summary will be ready on Monday morning.'
+              : '${week.length} of 4 nights so far. Track ${4 - week.length} more this week to get a summary on Monday.');
       return;
     }
     final q = week.map((n) => n.quality).reduce((a, b) => a + b) ~/ week.length;
     final a = week.map((n) => n.asleepMinutes).reduce((a, b) => a + b) ~/ week.length;
-    showInfoSheet(context, 'Weekly report',
+    showInfoSheet(
+        context,
+        'Weekly report',
         '${week.length} ${week.length == 1 ? 'night' : 'nights'} tracked\nAverage quality: $q%\nAverage asleep: ${fmtDuration(a)}\n\n'
-        'Your most consistent bedtime keeps your quality steady — keep it up.');
+            'Your most consistent bedtime keeps your quality steady — keep it up.');
   }
 }
 
@@ -427,53 +458,218 @@ class _RingPainter extends CustomPainter {
   bool shouldRepaint(_RingPainter old) => old.value != value || old.color != color;
 }
 
+/// The snore track under the graph: a tick per snore stretch, its height
+/// following how long it lasted, laid out on the same time axis.
 class _SnoreRow extends StatelessWidget {
   final Night night;
   const _SnoreRow({required this.night});
   @override
   Widget build(BuildContext context) {
-    final rng = math.Random(night.wentToBed.millisecondsSinceEpoch);
     final p = context.palette;
     return Row(children: [
       SizedBox(width: 62, child: Text('Snore', style: TextStyle(color: p.textMuted, fontSize: 12))),
       Expanded(
         child: SizedBox(
-          height: 14,
-          child: LayoutBuilder(
-            builder: (c, b) => Stack(children: [
-              for (var i = 0; i < night.snoreMinutes ~/ 2; i++)
-                Positioned(
-                  left: rng.nextDouble() * (b.maxWidth - 6),
-                  top: 4,
-                  child: Container(width: 6, height: 6, decoration: BoxDecoration(color: p.textFaint, shape: BoxShape.circle)),
-                ),
-            ]),
-          ),
+          height: 22,
+          child: CustomPaint(
+              painter: _SnoreTrackPainter(
+                  night.snoreTrack, math.max(1, night.session.timeInBed.inSeconds), p.textMuted, p.surfaceHi)),
         ),
       ),
     ]);
   }
 }
 
+class _SnoreTrackPainter extends CustomPainter {
+  final List<(int, int)> spans;
+  final int total;
+  final Color color, base;
+  _SnoreTrackPainter(this.spans, this.total, this.color, this.base);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final mid = size.height / 2;
+    canvas.drawLine(
+        Offset(0, mid),
+        Offset(size.width, mid),
+        Paint()
+          ..color = base
+          ..strokeWidth = 1);
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    for (final s in spans) {
+      final x0 = size.width * s.$1 / total, x1 = math.max(x0 + 2, size.width * s.$2 / total);
+      // a little waveform: ticks every 3 px, heights varying with position
+      for (var x = x0; x <= x1; x += 3) {
+        final h = mid * (0.35 + 0.65 * (0.5 + 0.5 * math.sin(x * 1.7)).abs());
+        canvas.drawLine(Offset(x, mid - h), Offset(x, mid + h), p);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SnoreTrackPainter o) => o.spans != spans || o.color != color;
+}
+
+/// The night's recordings: time, kind (snoring / other sound, or who it was
+/// when Who's snoring is on) and a play button each.
+class _SoundsCard extends StatefulWidget {
+  final Night night;
+  const _SoundsCard({required this.night});
+  @override
+  State<_SoundsCard> createState() => _SoundsCardState();
+}
+
+class _SoundsCardState extends State<_SoundsCard> {
+  final _player = AudioPlayer();
+  String? _playing;
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle(SoundClip c) async {
+    if (_playing == c.path) {
+      await _player.stop();
+      setState(() => _playing = null);
+      return;
+    }
+    setState(() => _playing = c.path);
+    try {
+      await _player.setFilePath(c.path);
+      await _player.play();
+    } catch (_) {}
+    if (mounted && _playing == c.path) setState(() => _playing = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final clips = widget.night.clips.where((c) => c.exists).toList();
+    final whos = AppState.I.pref('whos_snoring') == 'On';
+    return GlassCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Text('Sounds', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+          const Spacer(),
+          if (clips.isNotEmpty) Text('${clips.length}', style: TextStyle(color: p.textMuted)),
+        ]),
+        const SizedBox(height: 8),
+        if (clips.isEmpty)
+          Text(
+              AppState.I.pref('sound_detection').startsWith('0')
+                  ? 'Sound recording is off. Turn it on in Profile › More › Sound detection.'
+                  : 'Snoring and other sounds from the night will appear here.',
+              style: TextStyle(color: p.textMuted))
+        else
+          for (final c in clips)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: IconButton.filledTonal(
+                icon: Icon(_playing == c.path ? Icons.stop : Icons.play_arrow),
+                onPressed: () => _toggle(c),
+              ),
+              title: Text(c.kind == 'snore' ? (whos ? 'Snoring · you' : 'Snoring') : 'Sound'),
+              subtitle: Text(
+                  '${fmtDt(widget.night.wentToBed.add(Duration(seconds: c.offsetSec)))} · ${(c.durationMs / 1000).round()} s',
+                  style: TextStyle(color: p.textMuted)),
+              trailing: Text('+${c.peakDb.round()} dB', style: TextStyle(color: p.textFaint, fontSize: 12)),
+            ),
+      ]),
+    );
+  }
+}
+
+/// Render the night's summary card to an image and open the share sheet.
+Future<void> shareNight(BuildContext context, Night night) async {
+  final key = GlobalKey();
+  final overlay = OverlayEntry(
+    builder: (c) => Positioned(
+      left: -2000, // laid out off screen, captured, then removed
+      child: RepaintBoundary(key: key, child: Material(child: _ShareCard(night: night, palette: c.palette))),
+    ),
+  );
+  Overlay.of(context).insert(overlay);
+  await WidgetsBinding.instance.endOfFrame;
+  try {
+    final boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final image = await boundary.toImage(pixelRatio: 3);
+    final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+    final dir = await getTemporaryDirectory();
+    final f = File('${dir.path}/night_${night.wokeUp.millisecondsSinceEpoch}.png');
+    await f.writeAsBytes(bytes);
+    await SharePlus.instance.share(ShareParams(
+        files: [XFile(f.path)],
+        text: 'My sleep: ${night.quality}% quality, ${fmtDuration(night.asleepMinutes)} asleep'));
+  } catch (_) {
+    if (context.mounted) toast(context, 'Couldn\'t create the share image');
+  } finally {
+    overlay.remove();
+  }
+}
+
+class _ShareCard extends StatelessWidget {
+  final Night night;
+  final SleepPalette palette;
+  const _ShareCard({required this.night, required this.palette});
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 360,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+            gradient: LinearGradient(
+                colors: [palette.bg, palette.deep], begin: Alignment.topCenter, end: Alignment.bottomCenter)),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('${_weekdays[night.wokeUp.weekday - 1]} ${night.wokeUp.day} ${_months[night.wokeUp.month - 1]}',
+              style: TextStyle(color: palette.textMuted, fontSize: 16)),
+          const SizedBox(height: 16),
+          StageRing(phases: night.session.phases, quality: night.quality, subtitle: fmtDuration(night.asleepMinutes)),
+          const SizedBox(height: 16),
+          Hypnogram(phases: night.session.phases, start: night.wentToBed, height: 100),
+          const SizedBox(height: 12),
+          Text('${fmtDt(night.wentToBed)} – ${fmtDt(night.wokeUp)}', style: TextStyle(color: palette.text)),
+        ]),
+      );
+}
+
 class _StatGrid extends StatelessWidget {
   final Night night;
   const _StatGrid({required this.night});
 
-  static const _moods = ['Bad', 'Okay', 'Good'];
-
   @override
   Widget build(BuildContext context) {
     final items = <(IconData, String, String, String)>[
-      (Icons.bar_chart, '${night.regularity}%', 'Regularity',
-          'How consistent your bed and wake times are compared with recent nights.'),
-      (Icons.timelapse, '${night.asleepAfterMinutes} min', 'Asleep after',
-          'Time from going to bed until you fell asleep.'),
+      (
+        Icons.bar_chart,
+        '${night.regularity}%',
+        'Regularity',
+        'How consistent your bed and wake times are compared with recent nights.'
+      ),
+      (
+        Icons.timelapse,
+        '${night.asleepAfterMinutes} min',
+        'Asleep after',
+        'Time from going to bed until you fell asleep.'
+      ),
       (Icons.nightlight, fmtDt(night.wentToBed), 'Went to bed', 'When you started tracking.'),
       (Icons.alarm, fmtDt(night.wokeUp), 'Woke up', 'When tracking stopped.'),
       (Icons.graphic_eq, '${night.snoreMinutes} min', 'Snore', 'Minutes of detected snoring.'),
-      (Icons.directions_walk, night.steps == null ? '—' : '${night.steps}', 'Steps', 'Steps the day before, from Health Connect.'),
-      (Icons.sentiment_satisfied, night.mood == null ? 'Add' : _moods[night.mood!], 'Wake up mood', ''),
-      (Icons.cloud, night.weatherF == null ? '—' : '${night.weatherF} °F', 'Weather', 'Morning weather at your location.'),
+      (
+        Icons.directions_walk,
+        night.steps == null ? '—' : '${night.steps}',
+        'Steps',
+        'Steps the day before, from Health Connect.'
+      ),
+      (Icons.sentiment_satisfied, night.mood == null ? 'Add' : moodLabels[night.mood!], 'Wake up mood', ''),
+      (
+        Icons.cloud,
+        night.weatherF == null ? '—' : '${night.weatherF} °F',
+        'Weather',
+        'Morning weather at your location.'
+      ),
     ];
     return GridView.count(
       crossAxisCount: 2,
@@ -487,10 +683,13 @@ class _StatGrid extends StatelessWidget {
             child: Row(children: [
               Icon(it.$1, color: context.palette.accent, size: 26),
               const SizedBox(width: 12),
-              Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(it.$2, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-                Text('${it.$3} ›', style: TextStyle(color: context.palette.textMuted, fontSize: 13)),
-              ]),
+              Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(it.$2, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                    Text('${it.$3} ›', style: TextStyle(color: context.palette.textMuted, fontSize: 13)),
+                  ]),
             ]),
           ),
       ],
@@ -514,8 +713,9 @@ class _StatGrid extends StatelessWidget {
                   Navigator.pop(c);
                 },
                 child: Column(children: [
-                  Text(['☹️', '😐', '🙂'][i], style: const TextStyle(fontSize: 44)),
-                  Text(_moods[i]),
+                  SizedBox(width: 64, height: 64, child: CustomPaint(painter: MoodFacePainter(i, c.palette.accent))),
+                  const SizedBox(height: 6),
+                  Text(moodLabels[i]),
                 ]),
               ),
           ]),
@@ -551,17 +751,39 @@ class _TileGrid extends StatelessWidget {
       ]);
 }
 
+/// Alertness: the test while this morning's window is open, the result once
+/// taken (against your own average), otherwise a reminder for tomorrow.
 class _AlertnessCard extends StatefulWidget {
-  const _AlertnessCard();
+  final Night night;
+  final bool demo;
+  const _AlertnessCard({required this.night, required this.demo});
   @override
   State<_AlertnessCard> createState() => _AlertnessCardState();
 }
 
 class _AlertnessCardState extends State<_AlertnessCard> {
   bool _remind = false;
+
+  Future<void> _setReminder() async {
+    final s = AppState.I;
+    final now = DateTime.now();
+    final at = DateTime(now.year, now.month, now.day + 1, s.alarmHour, s.alarmMinute).add(const Duration(minutes: 15));
+    await Notifications.I.requestPermission();
+    await Notifications.I.scheduleAlertnessReminder(at);
+    setState(() => _remind = true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final n = widget.night;
+    final r = n.alertness;
+    final open = !widget.demo && alertnessAvailable(n);
+    final past = [
+      for (final o in AppState.I.nights)
+        if (o.alertness != null && o != n) o.alertness!.reactionMs
+    ];
+    final avg = past.isEmpty ? null : past.reduce((a, b) => a + b) ~/ past.length;
     return _Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -570,20 +792,51 @@ class _AlertnessCardState extends State<_AlertnessCard> {
             Text('Beta ', style: TextStyle(color: p.warn, fontWeight: FontWeight.w700)),
             Text('Alertness', style: TextStyle(color: p.textMuted)),
             const Spacer(),
-            Icon(Icons.bolt, color: p.textFaint),
+            Icon(Icons.bolt, color: r != null ? p.warn : p.textFaint),
           ]),
           const SizedBox(height: 8),
-          const Text('Test available tomorrow', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Text('A one-minute reaction test after you wake shows how rested you really are. '
-              'Track tonight to take it tomorrow morning.',
-              style: TextStyle(color: p.textMuted, height: 1.4)),
-          TextButton.icon(
-            style: TextButton.styleFrom(padding: EdgeInsets.zero),
-            onPressed: () => setState(() => _remind = !_remind),
-            icon: Icon(_remind ? Icons.notifications_active : Icons.notifications, color: p.accent),
-            label: Text(_remind ? 'Reminder set' : 'Remind me tomorrow', style: TextStyle(color: p.accent)),
-          ),
+          if (r != null) ...[
+            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text('${r.score}', style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w700)),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text('${r.reactionMs} ms · ${(r.accuracy * 100).round()}% accuracy',
+                    style: TextStyle(color: p.textMuted)),
+              ),
+            ]),
+            const SizedBox(height: 6),
+            Text(
+                avg == null
+                    ? 'Your first alertness score. Play again tomorrow to get a baseline.'
+                    : r.reactionMs < avg * 0.95
+                        ? 'Sharper than your average of $avg ms today.'
+                        : r.reactionMs > avg * 1.05
+                            ? 'Slower than your average of $avg ms today. Take it easy.'
+                            : 'Right on your average of $avg ms.',
+                style: TextStyle(color: p.textMuted, height: 1.4)),
+          ] else if (open) ...[
+            Text('Test available until ${fmtDt(n.wokeUp.add(AppState.alertnessWindow))}',
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text('Play the one-minute game and see how sharp you are today.',
+                style: TextStyle(color: p.textMuted, height: 1.4)),
+            const SizedBox(height: 8),
+            PillButton('Test alertness', width: 200, onPressed: () => push(context, AlertnessGame(night: n))),
+          ] else ...[
+            const Text('Test available tomorrow', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text(
+                'A one-minute reaction test after you wake shows how rested you really are. '
+                'Track tonight to take it tomorrow morning.',
+                style: TextStyle(color: p.textMuted, height: 1.4)),
+            TextButton.icon(
+              style: TextButton.styleFrom(padding: EdgeInsets.zero),
+              onPressed: _remind || widget.demo ? null : _setReminder,
+              icon: Icon(_remind ? Icons.notifications_active : Icons.notifications, color: p.accent),
+              label: Text(_remind ? 'Reminder set' : 'Remind me tomorrow', style: TextStyle(color: p.accent)),
+            ),
+          ],
         ]),
       ),
     );

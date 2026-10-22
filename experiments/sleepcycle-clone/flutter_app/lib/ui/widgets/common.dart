@@ -2,13 +2,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../app_state.dart';
 import '../../theme.dart';
+import 'illustrations.dart';
 
 /// Shared building blocks so every screen follows the same templates as the
 /// original: starry night backdrop, back-arrow settings pages built from a
 /// radio list + "About" block, grouped navigation rows with trailing values.
 
-void push(BuildContext context, Widget page) =>
-    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+void push(BuildContext context, Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
 String fmtTime(int hour, int minute) {
   final h = hour % 12 == 0 ? 12 : hour % 12;
@@ -80,8 +80,8 @@ class _StarsPainter extends CustomPainter {
     final p = Paint();
     for (var i = 0; i < 70; i++) {
       p.color = color.withOpacity(0.1 + rng.nextDouble() * 0.45);
-      canvas.drawCircle(Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height * 0.8),
-          0.5 + rng.nextDouble() * 1.1, p);
+      canvas.drawCircle(
+          Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height * 0.8), 0.5 + rng.nextDouble() * 1.1, p);
     }
   }
 
@@ -157,8 +157,7 @@ class PrefRadioList extends StatelessWidget {
   final String prefKey;
   final List<String> options;
   final void Function(String)? onPicked;
-  const PrefRadioList(
-      {super.key, this.header, required this.prefKey, required this.options, this.onPicked});
+  const PrefRadioList({super.key, this.header, required this.prefKey, required this.options, this.onPicked});
   @override
   Widget build(BuildContext context) {
     return Watch((context, s) {
@@ -219,48 +218,55 @@ class CircleArt extends StatelessWidget {
   final IconData icon;
   final double size;
   final List<Color>? colors; // defaults to the theme's light → deep stage blend
-  const CircleArt({super.key, this.asset, required this.icon, this.size = 220, this.colors});
+  final Art? art; // our own illustration, used whenever [asset] is absent
+  const CircleArt({super.key, this.asset, required this.icon, this.size = 220, this.colors, this.art});
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final fallback = DecoratedBox(
-      decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(colors: colors ?? [p.light, p.deep], begin: Alignment.topLeft)),
-      child: Center(child: Icon(icon, size: size * 0.4, color: Colors.white)),
-    );
+    final fallback = art != null
+        ? Illustration(art!, size: size)
+        : DecoratedBox(
+            decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(colors: colors ?? [p.light, p.deep], begin: Alignment.topLeft)),
+            child: Center(child: Icon(icon, size: size * 0.4, color: Colors.white)),
+          );
     return SizedBox(
       width: size,
       height: size,
       child: ClipOval(
-        child: asset == null
-            ? fallback
-            : Image.asset(asset!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback),
+        child:
+            asset == null ? fallback : Image.asset(asset!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback),
       ),
     );
   }
 }
 
-/// Gradient cover art with an optional centered label.
+/// Cover art: a procedural night scene in [colors] (stable per item), with an
+/// optional centered label or icon.
 class ArtBox extends StatelessWidget {
   final List<Color> colors;
   final String? label;
   final double radius;
   final IconData? icon;
-  const ArtBox({super.key, required this.colors, this.label, this.radius = 14, this.icon});
+  final int? seed;
+  const ArtBox({super.key, required this.colors, this.label, this.radius = 14, this.icon, this.seed});
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        gradient: LinearGradient(colors: colors, begin: Alignment.topCenter, end: Alignment.bottomCenter),
+    final sd = seed ?? Object.hash(colors.first.toARGB32(), colors.last.toARGB32(), label);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: CustomPaint(
+        painter: SceneArt(colors, sd),
+        child: Container(
+          alignment: Alignment.center,
+          child: label != null
+              ? Text(label!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontWeight: FontWeight.w600, shadows: [Shadow(blurRadius: 6)]))
+              : (icon != null ? Icon(icon, color: Colors.white70, size: 36) : null),
+        ),
       ),
-      alignment: Alignment.center,
-      child: label != null
-          ? Text(label!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.w600, shadows: [Shadow(blurRadius: 6)]))
-          : (icon != null ? Icon(icon, color: Colors.white70, size: 36) : null),
     );
   }
 }

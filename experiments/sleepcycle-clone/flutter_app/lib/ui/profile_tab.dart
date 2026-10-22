@@ -14,9 +14,7 @@ class ProfileTab extends StatelessWidget {
         child: Watch((context, s) {
           final n = s.nights;
           final avgQ = n.isEmpty ? '—' : '${n.map((e) => e.quality).reduce((a, b) => a + b) ~/ n.length}%';
-          final avgT = n.isEmpty
-              ? '—'
-              : fmtDuration(n.map((e) => e.asleepMinutes).reduce((a, b) => a + b) ~/ n.length);
+          final avgT = n.isEmpty ? '—' : fmtDuration(n.map((e) => e.asleepMinutes).reduce((a, b) => a + b) ~/ n.length);
           void open(Widget w) => push(context, w);
           return ListView(padding: const EdgeInsets.only(bottom: 32), children: [
             Padding(
@@ -49,29 +47,64 @@ class ProfileTab extends StatelessWidget {
             ),
             const Divider(indent: 20, endIndent: 20),
             const SectionTitle('Settings'),
-            NavRow(icon: Icons.palette_outlined, title: 'Theme', value: s.pref('theme'),
+            NavRow(
+                icon: Icons.palette_outlined,
+                title: 'Theme',
+                value: s.pref('theme'),
                 onTap: () => open(const ThemePage())),
-            NavRow(icon: Icons.track_changes, title: 'Sleep Goal', value: s.pref('sleep_goal'),
+            NavRow(
+                icon: Icons.track_changes,
+                title: 'Sleep Goal',
+                value: s.pref('sleep_goal'),
                 onTap: () => open(const SleepGoalPage())),
-            NavRow(icon: Icons.music_note, title: 'Sound', value: s.pref('alarm_sound'),
+            NavRow(
+                icon: Icons.notifications_active,
+                title: 'Bedtime reminder',
+                value: s.pref('bedtime_reminder'),
+                onTap: () => open(const BedtimeReminderPage())),
+            NavRow(
+                icon: Icons.music_note,
+                title: 'Sound',
+                value: s.pref('alarm_sound'),
                 onTap: () => open(const AlarmSoundPage())),
-            NavRow(icon: Icons.alarm, title: 'Wake up phase', value: '${s.pref('wake_phase')} min',
+            NavRow(
+                icon: Icons.alarm,
+                title: 'Wake up phase',
+                value: '${s.pref('wake_phase')} min',
                 onTap: () => open(const WakeUpPhasePage())),
             NavRow(icon: Icons.watch, title: 'Watch', onTap: () => open(const WatchPage())),
-            NavRow(icon: Icons.description_outlined, title: 'Weekly report', value: s.pref('weekly_report'),
+            NavRow(
+                icon: Icons.description_outlined,
+                title: 'Weekly report',
+                value: s.pref('weekly_report'),
                 onTap: () => open(const WeeklyReportPage())),
             NavRow(icon: Icons.more_horiz, title: 'More', onTap: () => open(const MorePage())),
             const SectionTitle('Premium'),
-            NavRow(icon: Icons.cloud, title: 'Online backup', value: s.pref('online_backup'),
+            NavRow(
+                icon: Icons.cloud,
+                title: 'Online backup',
+                value: s.pref('online_backup'),
                 onTap: () => open(const OnlineBackupPage())),
             NavRow(icon: Icons.bedtime, title: 'Sleep aid', onTap: () => open(const SleepAidSettingsPage())),
-            NavRow(icon: Icons.edit, title: 'Sleep notes', value: _onOff(s.pref('sleep_notes')),
+            NavRow(
+                icon: Icons.edit,
+                title: 'Sleep notes',
+                value: _onOff(s.pref('sleep_notes')),
                 onTap: () => open(const SleepNotesPage())),
-            NavRow(icon: Icons.sentiment_satisfied, title: 'Wake up mood', value: _onOff(s.pref('wake_up_mood')),
+            NavRow(
+                icon: Icons.sentiment_satisfied,
+                title: 'Wake up mood',
+                value: _onOff(s.pref('wake_up_mood')),
                 onTap: () => open(const WakeUpMoodPage())),
-            NavRow(icon: Icons.cloud_queue, title: 'Weather', value: _onOff(s.pref('weather')),
+            NavRow(
+                icon: Icons.cloud_queue,
+                title: 'Weather',
+                value: _onOff(s.pref('weather')),
                 onTap: () => open(const WeatherPage())),
-            NavRow(icon: Icons.record_voice_over, title: "Who's snoring", value: s.pref('whos_snoring'),
+            NavRow(
+                icon: Icons.record_voice_over,
+                title: "Who's snoring",
+                value: s.pref('whos_snoring'),
                 onTap: () => open(const WhosSnoringPage())),
             const SectionTitle('Help'),
             NavRow(icon: Icons.help, title: 'Help', onTap: () => open(const HelpPage())),
@@ -96,11 +129,16 @@ class _Tile extends StatelessWidget {
       Icon(icon, color: color ?? context.palette.accent, size: 30),
       const SizedBox(width: 12),
       Expanded(
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          Text(label, style: TextStyle(color: context.palette.textMuted, fontSize: 13)),
-        ]),
+        child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text(label, style: TextStyle(color: context.palette.textMuted, fontSize: 13)),
+            ]),
       ),
     ]);
   }

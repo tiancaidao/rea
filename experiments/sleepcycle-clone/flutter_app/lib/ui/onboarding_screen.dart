@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
+import 'package:record/record.dart';
+import '../device/notifications.dart';
 import '../theme.dart';
 import '../strings.dart';
+import 'widgets/illustrations.dart';
 
 /// Guided onboarding. The first step plays the app's real vector animation
 /// (Lottie) when the asset is present, matching the original's animated intro;
@@ -28,6 +31,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       perks: const [],
     ),
     _Step(
+      art: Art.weeklyReport,
+      icon: Icons.favorite_outline,
+      title: 'Sleep is your health',
+      body: 'Deep sleep restores the body, REM sorts the mind. We show how much of each you get, '
+          'and what changes them.',
+    ),
+    _Step(
+      art: Art.sleepGoal,
+      icon: Icons.trending_up,
+      title: 'Small changes, better nights',
+      body: 'A steady bedtime, a darker room, less late caffeine: track a few nights and see what works for you.',
+    ),
+    _Step(
+      kind: _Ask.microphone,
       icon: Icons.mic_none,
       title: S.get('ob_mic_headline', 'Allow microphone access to:'),
       perks: [
@@ -38,6 +55,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       footnote: S.get('ob_privacy'),
     ),
     _Step(
+      kind: _Ask.notifications,
       icon: Icons.notifications_none,
       title: S.get('ob_notif_headline', 'Turn on notifications to:'),
       perks: [
@@ -55,7 +73,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ),
   ];
 
-  void _next() {
+  Future<void> _next() async {
+    // the consent steps ask for the permission when you continue, as the original
+    switch (_steps[_page].kind) {
+      case _Ask.microphone:
+        try {
+          final rec = AudioRecorder();
+          await rec.hasPermission();
+          await rec.dispose();
+        } catch (_) {}
+      case _Ask.notifications:
+        await Notifications.I.requestPermission();
+      case null:
+        break;
+    }
+    if (!mounted) return;
     if (_page == _steps.length - 1) {
       widget.onDone != null ? widget.onDone!() : Navigator.pop(context, true);
     } else {
@@ -67,7 +99,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: DecoratedBox(
-        decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: context.palette.backdrop)),
+        decoration: BoxDecoration(
+            gradient: LinearGradient(
+                begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: context.palette.backdrop)),
         child: SafeArea(
           child: Column(
             children: [
@@ -103,9 +137,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     onPressed: _next,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      child: Text(_page == _steps.length - 1
-                          ? 'Get started'
-                          : S.get('ob_next', 'Next')),
+                      child: Text(_page == _steps.length - 1 ? 'Get started' : S.get('ob_next', 'Next')),
                     ),
                   ),
                 ),
@@ -118,8 +150,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 }
 
+enum _Ask { microphone, notifications }
+
 class _Step {
   final String? lottie;
+  final Art? art; // our own illustration instead of an icon badge
+  final _Ask? kind; // permission requested when continuing from this step
   final IconData icon;
   final String title;
   final String body;
@@ -128,6 +164,8 @@ class _Step {
   final String? bigValue;
   const _Step({
     this.lottie,
+    this.art,
+    this.kind,
     required this.icon,
     required this.title,
     this.body = '',
@@ -150,10 +188,7 @@ class _StepView extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           Positioned.fill(
-            child: Lottie.asset(step.lottie!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: context.palette.backdrop)))),
+            child: Lottie.asset(step.lottie!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const NightIntro()),
           ),
           Positioned.fill(
             child: DecoratedBox(
@@ -175,14 +210,11 @@ class _StepView extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(step.title,
-                    style: Theme.of(context)
-                        .textTheme
-                        .displaySmall
-                        ?.copyWith(fontWeight: FontWeight.w800, height: 1.05)),
+                    style:
+                        Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800, height: 1.05)),
                 if (step.body.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  Text(step.body,
-                      style: TextStyle(color: context.palette.textMuted, fontSize: 16, height: 1.4)),
+                  Text(step.body, style: TextStyle(color: context.palette.textMuted, fontSize: 16, height: 1.4)),
                 ],
               ],
             ),
@@ -210,14 +242,12 @@ class _StepView extends StatelessWidget {
           if (step.body.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(step.body,
-                style: TextStyle(color: context.palette.textMuted, height: 1.4),
-                textAlign: TextAlign.center),
+                style: TextStyle(color: context.palette.textMuted, height: 1.4), textAlign: TextAlign.center),
           ],
           if (step.bigValue != null) ...[
             const SizedBox(height: 16),
             Text(step.bigValue!,
-                style: TextStyle(
-                    fontSize: 56, fontWeight: FontWeight.bold, color: context.palette.accent)),
+                style: TextStyle(fontSize: 56, fontWeight: FontWeight.bold, color: context.palette.accent)),
           ],
           if (step.perks.isNotEmpty) ...[
             const SizedBox(height: 20),
@@ -229,8 +259,7 @@ class _StepView extends StatelessWidget {
                   children: [
                     Icon(Icons.check_circle, size: 20, color: context.palette.accent),
                     const SizedBox(width: 10),
-                    Expanded(
-                        child: Text(p, style: const TextStyle(color: Colors.white, height: 1.3))),
+                    Expanded(child: Text(p, style: const TextStyle(color: Colors.white, height: 1.3))),
                   ],
                 ),
               ),
@@ -238,8 +267,7 @@ class _StepView extends StatelessWidget {
           if (step.footnote != null && step.footnote!.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(step.footnote!,
-                style: TextStyle(color: context.palette.textFaint, fontSize: 12),
-                textAlign: TextAlign.center),
+                style: TextStyle(color: context.palette.textFaint, fontSize: 12), textAlign: TextAlign.center),
           ],
         ],
       ),
@@ -262,6 +290,7 @@ class _Art extends StatelessWidget {
         errorBuilder: (_, __, ___) => _iconBadge(context),
       );
     }
+    if (step.art != null) return Illustration(step.art!, size: 170);
     return _iconBadge(context);
   }
 

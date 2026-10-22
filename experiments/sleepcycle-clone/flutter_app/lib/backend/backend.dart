@@ -21,12 +21,12 @@ class BackendConfig {
   static const mode = String.fromEnvironment('BACKEND', defaultValue: 'off');
   // Android emulator reaches the host machine at 10.0.2.2
   static const emulatorHost = String.fromEnvironment('EMULATOR_HOST', defaultValue: '10.0.2.2');
-  static const apiBaseUrl = String.fromEnvironment('API_BASE_URL',
-      defaultValue: mode == 'emulator' ? 'http://$emulatorHost:8080' : '');
+  static const apiBaseUrl =
+      String.fromEnvironment('API_BASE_URL', defaultValue: mode == 'emulator' ? 'http://$emulatorHost:8080' : '');
 
   // the app's own named database (projects may be shared with other apps)
-  static const database = String.fromEnvironment('FIRESTORE_DATABASE',
-      defaultValue: mode == 'cloud' ? 'sleep-tracker' : '(default)');
+  static const database =
+      String.fromEnvironment('FIRESTORE_DATABASE', defaultValue: mode == 'cloud' ? 'sleep-tracker' : '(default)');
 
   static bool get enabled => mode == 'emulator' || mode == 'cloud';
 
@@ -66,8 +66,7 @@ class Backend {
   String? lastError;
 
   FirebaseAuth get _auth => FirebaseAuth.instance;
-  FirebaseFirestore get _db =>
-      FirebaseFirestore.instanceFor(app: Firebase.app(), databaseId: BackendConfig.database);
+  FirebaseFirestore get _db => FirebaseFirestore.instanceFor(app: Firebase.app(), databaseId: BackendConfig.database);
   User? get user => enabled ? _auth.currentUser : null;
 
   Future<void> init() async {
@@ -86,11 +85,11 @@ class Backend {
 
   // ── auth ──────────────────────────────────────────────────────────────────
 
-  Future<User> signIn(String email, String password) => _authCall(
-      () => _auth.signInWithEmailAndPassword(email: email, password: password));
+  Future<User> signIn(String email, String password) =>
+      _authCall(() => _auth.signInWithEmailAndPassword(email: email, password: password));
 
-  Future<User> signUp(String email, String password) => _authCall(
-      () => _auth.createUserWithEmailAndPassword(email: email, password: password));
+  Future<User> signUp(String email, String password) =>
+      _authCall(() => _auth.createUserWithEmailAndPassword(email: email, password: password));
 
   Future<User> _authCall(Future<UserCredential> Function() f) async {
     try {
@@ -118,8 +117,7 @@ class Backend {
 
   // ── Firestore sync ────────────────────────────────────────────────────────
 
-  DocumentReference<Map<String, dynamic>>? get _userDoc =>
-      user == null ? null : _db.doc('users/${user!.uid}');
+  DocumentReference<Map<String, dynamic>>? get _userDoc => user == null ? null : _db.doc('users/${user!.uid}');
 
   String nightId(Night n) => '${n.wentToBed.millisecondsSinceEpoch}';
 
@@ -190,6 +188,29 @@ class Backend {
   Future<Map<String, dynamic>?> verifyPurchase(String productId, String purchaseToken) async =>
       (await _api('POST', '/v1/billing/verify', body: {'productId': productId, 'purchaseToken': purchaseToken}))
           as Map<String, dynamic>?;
+
+  Future<Map<String, dynamic>?> recommendations({int? goalMinutes}) async {
+    final tz = DateTime.now().timeZoneOffset.inMinutes;
+    return (await _api(
+            'GET', '/v1/insights/recommendations?tzOffsetMin=$tz${goalMinutes == null ? '' : '&goalMin=$goalMinutes'}'))
+        as Map<String, dynamic>?;
+  }
+
+  Future<void> saveConsent({required bool storage, required bool sounds, required bool product}) async =>
+      _api('POST', '/v1/consent', body: {'storage': storage, 'sounds': sounds, 'product': product});
+
+  Future<void> saveProperties(Map<String, String> properties) async =>
+      _api('POST', '/v1/user/properties', body: properties);
+
+  Future<void> registerDevice(String token, String platform) async =>
+      _api('POST', '/v1/devices/register', body: {'token': token, 'platform': platform});
+
+  /// Server-recorded trial (once per account); the reminder is local.
+  Future<Map<String, dynamic>?> startTrial(String productId) async =>
+      (await _api('POST', '/v1/trial/start', body: {'productId': productId})) as Map<String, dynamic>?;
+
+  Future<Map<String, dynamic>?> redeemGiftCard(String code) async =>
+      (await _api('POST', '/v1/giftcards/redeem', body: {'code': code})) as Map<String, dynamic>?;
 
   Future<void> eraseData() async => _api('POST', '/v1/account/erase-data');
 

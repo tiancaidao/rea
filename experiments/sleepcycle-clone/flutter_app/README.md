@@ -29,12 +29,24 @@ flutter run --dart-define=BACKEND=emulator                 # local Firebase emul
 flutter run $(../backend/scripts/app_defines.sh <project> <api-url>)   # deployed project
 ```
 
-### Real tracking
+### Real tracking and the alarm
 
-The tracking screen records the accelerometer and (in microphone mode) sound
-levels — no audio is kept — and keeps the screen on. Nights shorter than 20
-minutes are too short to analyse; for testing you can save a sample night
-instead.
+The tracking screen records the accelerometer, the ambient light sensor and
+(in microphone mode) sound levels, with short clips of loud moments kept on
+the phone for as long as Profile › More › Sound detection says (0 nights keeps
+none). A foreground service keeps it running with the screen off. Nights
+shorter than 20 minutes are too short to analyse; for testing you can save a
+sample night instead.
+
+The alarm rings in-app: the smart alarm watches the night's movement inside
+the wake-up window and rings at the lightest moment (a regular alarm at the
+time), fading the chosen alarm sound in with vibration per Profile › More ›
+Vibration. Snooze with the button, two taps anywhere, or by picking the phone
+up; smart snooze halves the time left to your alarm each time. An OS
+alarm-clock notification is scheduled as a backup in case the app is killed,
+and a dying battery rings early. Stopping the alarm runs the morning flow:
+wake-up mood (when on) and the one-minute alertness game. To try it quickly:
+Profile › More › Database › **Test alarm**, then Start on the Sleep tab.
 
 > This project is authored as source; it wasn't compiled in the environment that
 > generated it. If `flutter analyze` flags anything, it'll be a small fix — the
@@ -149,7 +161,27 @@ To repopulate for a side-by-side demo on your own machine:
 # strings.en.json (real UI copy) is produced from the APK string table separately
 ```
 
+## Our own media
+
+A clean checkout ships everything it plays and draws:
+
+- `assets/audio/own/`: 8 alarm melodies and 10 loopable ambiences (rain,
+  wind, ocean, fire, night forest, stream, brown/pink/white noise, droplets),
+  synthesised by `tools/generate_media.py` (numpy + ffmpeg). The APK
+  placeholders take precedence when present.
+- `assets/fonts/`: DM Sans (SIL OFL 1.1).
+- `lib/ui/widgets/illustrations.dart`: vector illustrations (placement and
+  snooze tips, settings heroes, Benefits), procedural cover art for sleep aid
+  and programs, the now-playing equaliser and the animated onboarding intro.
+- The alarm screen sun, the alertness game's stars, bursts and confetti are
+  painted in code.
+
 ## How close is this to Sleep Cycle?
+
+The latest side-by-side audit (APK manifest, assets, strings and 67
+screenshots of the original against the clone) is in the research workspace
+(`parity-audit/06_gaps.md`). The original has no home-screen widgets, launcher
+shortcuts or Quick Settings tile, so there are none to match.
 
 Honest, feature-by-feature. "Design parity" = same approach, our own code/params.
 "Gap" = real product work still needed.
@@ -165,7 +197,11 @@ Honest, feature-by-feature. "Design parity" = same approach, our own code/params
 | Sample night realism | learned cyclic staging | **cyclic deep-early / REM-late architecture prior**; realistic stage mix + score (fixed all-deep/score-100 bug) | Functional |
 | Movement tracking | accelerometer, calibrated, per-minute events | accelerometer aggregator, calibration, 30 s epochs | **Design parity** (needs real sensor feed) |
 | Sleep staging | learned model (breathing+movement) → 4 stages, smoothed | transparent movement→depth heuristic, Gaussian-smoothed, 4 stages | Baseline; **gap**: train a real model |
-| Smart alarm | per-night learned thresholds, eased window | per-night percentile thresholds, eased window | **Design parity** |
+| Smart alarm | per-night learned thresholds, eased window; rings, snooze, vibration | per-night percentile thresholds, eased window; **rings in-app + OS backup**, smart/regular snooze, tap/pick-up snooze, vibration modes | **Parity** |
+| Notifications | bedtime / set-alarm reminder, alertness reminder, weekly report, trial, tracking, battery | **same channels**, all local | **Parity** (no push server) |
+| Morning flow | wake-up mood sheet, Awake alertness game | **mood sheet + our own alertness game** with baseline | **Parity** |
+| Night sounds | clips per night, playback, kept N nights | **clips recorded while tracking, Journal player, pruning** | **Parity** (who's snoring: label only) |
+| Light | ambient light metric + chart | **light sensor per epoch, Light chart** | **Parity** |
 | Snore detection | sound-event model + event rules | event rules ready; **you plug in the model** | Rules parity; **gap**: your sound model |
 | Hypnogram + score | polished native charts | Flutter hypnogram + score + trends screen | Functional |
 | Tracking visuals | live animated night view | animated night view (breathing moon, stars) | Functional |
@@ -174,7 +210,7 @@ Honest, feature-by-feature. "Design parity" = same approach, our own code/params
 | Wake-up mood | 5-point morning mood log | **5-point mood row** on results | **Parity** (needs logging/correlation) |
 | Statistics | trends over time | trends screen (score line, stage bars) | Functional |
 | Accounts / cloud sync | Ory + GCP backend | mock API only | **gap**: real backend |
-| Wear OS / HealthKit | yes | — | **gap** |
+| Wear OS / HealthKit | yes | Health Connect only | **gap**: Wear OS companion |
 | Paywall / billing | dynamic server-driven | server-driven mock paywall (no billing) | Partial; **gap**: StoreKit/Billing |
 
 **Summary:** with the APK assets wired in as local placeholders, the *surface*

@@ -3,12 +3,16 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:in_app_review/in_app_review.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'backend/backend.dart';
 import 'data/night.dart';
 import 'data/recorded_night.dart';
 import 'data/sleep_aid_catalog.dart';
+import 'data/sound_clips.dart';
+import 'device/notifications.dart';
 
 /// App-wide state for the prototype: alarm, settings, recorded nights and the
 /// chosen sleep-aid track. Persisted locally with shared_preferences (a real
@@ -28,6 +32,11 @@ class AppState extends ChangeNotifier {
     await RecordedNight.load();
     await _loadAudioPool();
     try {
+      _clipsRoot = '${(await getApplicationSupportDirectory()).path}/clips';
+    } catch (_) {
+      _clipsRoot = null; // tests / no file system: no clips
+    }
+    try {
       final sp = await SharedPreferences.getInstance();
       final raw = sp.getString(_storeKey);
       if (raw != null) _restore(json.decode(raw) as Map<String, dynamic>);
@@ -43,6 +52,62 @@ class AppState extends ChangeNotifier {
     if (!_loaded) return;
     _saveTimer?.cancel();
     _saveTimer = Timer(const Duration(milliseconds: 400), _save);
+  }
+
+  // ── night sounds ──────────────────────────────────────────────────────────
+  String? _clipsRoot;
+
+  /// Where tonight's clips go, or null when Sound detection keeps none.
+  String? clipDirForTonight() {
+    if (_clipsRoot == null || keepNightsFor(pref('sound_detection')) == 0) return null;
+    return '$_clipsRoot/${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  /// Drop clips older than the Sound detection setting allows.
+  Future<void> pruneClips() async {
+    await pruneClipFiles([for (final n in nights) n.clips], keepNightsFor(pref('sound_detection')));
+    notifyListeners();
+  }
+
+  // ── morning ───────────────────────────────────────────────────────────────
+  /// Set when the alarm is stopped: the tabs then run the morning flow (wake-up
+  /// mood prompt, alertness test offer) for this night, and clear it.
+  final ValueNotifier<Night?> morning = ValueNotifier(null);
+
+  /// The alertness test can be taken this long after waking up.
+  static const alertnessWindow = Duration(hours: 3);
+
+  void saveAlertness(Night n, AlertnessResult r) {
+    n.alertness = r;
+    nightChanged(n);
+  }
+
+  /// Profile › More › Database › "Test alarm": the next tracking session rings
+  /// a regular alarm 10 seconds after it starts.
+  bool testAlarmArmed = false;
+  DateTime? takeTestAlarm() {
+    if (!testAlarmArmed) return null;
+    testAlarmArmed = false;
+    return DateTime.now().add(const Duration(seconds: 10));
+  }
+
+  // ── reminders ─────────────────────────────────────────────────────────────
+  /// Bedtime: the alarm time minus the sleep goal (8 h when none is set).
+  DateTime get bedtime {
+    final goal = pref('sleep_goal');
+    var minutes = 8 * 60;
+    final m = RegExp(r'(\d+)h(?: (\d+)m)?').firstMatch(goal);
+    if (m != null) minutes = int.parse(m.group(1)!) * 60 + int.parse(m.group(2) ?? '0');
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day, alarmHour, alarmMinute).subtract(Duration(minutes: minutes));
+  }
+
+  /// Re-schedule the local reminders from the current settings.
+  Future<void> rescheduleReminders() async {
+    final r = pref('bedtime_reminder');
+    final before = r == 'At bedtime' ? 0 : int.tryParse(r.split(' ').first);
+    await Notifications.I.scheduleBedtimeReminder(before == null ? null : bedtime.subtract(Duration(minutes: before)));
+    await Notifications.I.scheduleWeeklyReport(pref('weekly_report') == 'On' && pref('weekly_report_notify') == 'On');
   }
 
   void finishOnboarding() {
@@ -134,36 +199,106 @@ class AppState extends ChangeNotifier {
     (j['prefs'] as Map?)?.forEach((k, v) => _prefs[k as String] = v as String);
     themeName.value = pref('theme');
     final notes = (j['sleepNotes'] as List?)?.cast<String>();
-    if (notes != null) sleepNotes
-      ..clear()
-      ..addAll(notes);
+    if (notes != null)
+      sleepNotes
+        ..clear()
+        ..addAll(notes);
     completedLessons.addAll((j['completedLessons'] as List? ?? const []).cast<String>());
-    nights.addAll([
-      for (final n in j['nights'] as List? ?? const []) Night.fromJson((n as Map).cast<String, dynamic>())
-    ]);
+    nights
+        .addAll([for (final n in j['nights'] as List? ?? const []) Night.fromJson((n as Map).cast<String, dynamic>())]);
   }
 
   // ── local audio ───────────────────────────────────────────────────────────
   /// Audio files present in assets/audio/ (the extracted comparison
-  /// placeholders). Empty in a clean checkout, where playback is mocked.
+  /// placeholders). Empty in a clean checkout, where our own synthesised
+  /// clips in assets/audio/own/ (tools/generate_media.py) play instead.
   List<String> ambienceAudio = [];
   List<String> alarmAudio = [];
+
+  static const ownDir = 'assets/audio/own/';
+  static const ownAlarms = [
+    'soft_breeze',
+    'forest_clearing',
+    'morning_haze',
+    'first_light',
+    'dewdrops',
+    'classical_morning',
+    'rain_and_wind',
+    'far_memories',
+  ];
+  static const ownAmbiences = [
+    'rain',
+    'wind',
+    'ocean',
+    'fire',
+    'night_forest',
+    'stream',
+    'brown_noise',
+    'pink_noise',
+    'white_noise',
+    'droplets',
+  ];
 
   Future<void> _loadAudioPool() async {
     try {
       final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
-      final audio = manifest.listAssets().where((a) => a.startsWith('assets/audio/') &&
-          (a.endsWith('.mp3') || a.endsWith('.ogg') || a.endsWith('.m4a')) &&
-          !a.contains('silence')).toList()
+      final audio = manifest
+          .listAssets()
+          .where((a) =>
+              a.startsWith('assets/audio/') &&
+              !a.startsWith(ownDir) &&
+              (a.endsWith('.mp3') || a.endsWith('.ogg') || a.endsWith('.m4a')) &&
+              !a.contains('silence'))
+          .toList()
         ..sort();
       alarmAudio = audio.where((a) => a.contains('alarm_sound')).toList();
       ambienceAudio = audio.where((a) => !a.contains('alarm_sound')).toList();
     } catch (_) {}
   }
 
+  /// Our own ambience for a catalog item: matched on its title, else a stable
+  /// pick, so every soundscape has a sound of its own.
+  static String ownAmbienceFor(SleepAidItem item) {
+    final t = '${item.id} ${item.title}'.toLowerCase();
+    const keys = {
+      'rain': 'rain',
+      'glass': 'rain',
+      'wind': 'wind',
+      'ocean': 'ocean',
+      'sea': 'ocean',
+      'swell': 'ocean',
+      'wave': 'ocean',
+      'tide': 'ocean',
+      'fire': 'fire',
+      'ember': 'fire',
+      'forest': 'night_forest',
+      'cricket': 'night_forest',
+      'stream': 'stream',
+      'river': 'stream',
+      'brown': 'brown_noise',
+      'pink': 'pink_noise',
+      'white': 'white_noise',
+      'drop': 'droplets',
+      'dawn': 'droplets',
+    };
+    for (final e in keys.entries) {
+      if (t.contains(e.key)) return '${ownDir}amb_${e.value}.mp3';
+    }
+    final i = item.id.codeUnits.fold(0, (a, b) => a + b) % ownAmbiences.length;
+    return '${ownDir}amb_${ownAmbiences[i]}.mp3';
+  }
+
+  /// Our own alarm melody for an alarm-sound name (premium names reuse the
+  /// free melodies in turn).
+  static String ownAlarmFor(String name, List<String> allNames) {
+    final i = math.max(0, allNames.indexOf(name));
+    return '${ownDir}alarm_${ownAlarms[i % ownAlarms.length]}.mp3';
+  }
+
   /// Local file to play for a catalog item: its own asset if it has one,
   /// otherwise a stable pick from the local pool (ambience first for
-  /// soundscapes, the melodic alarm tracks for music/stories/guides).
+  /// soundscapes, the melodic alarm tracks for music/stories/guides), and
+  /// with no placeholders at all, our own ambience.
   String? audioFor(SleepAidItem item) {
     if (item.asset != null && (ambienceAudio.contains(item.asset) || alarmAudio.contains(item.asset))) {
       return item.asset;
@@ -171,7 +306,7 @@ class AppState extends ChangeNotifier {
     final pool = item.minutes == 0
         ? (ambienceAudio.isNotEmpty ? ambienceAudio : alarmAudio)
         : (alarmAudio.isNotEmpty ? alarmAudio : ambienceAudio);
-    if (pool.isEmpty) return null;
+    if (pool.isEmpty) return ownAmbienceFor(item);
     return pool[item.id.codeUnits.fold(0, (a, b) => a + b) % pool.length];
   }
 
@@ -195,6 +330,7 @@ class AppState extends ChangeNotifier {
     alarmHour = h;
     alarmMinute = m;
     notifyListeners();
+    if (pref('bedtime_reminder') != 'No reminder') unawaited(rescheduleReminders());
   }
 
   void setAlarmMode(int m) {
@@ -214,6 +350,9 @@ class AppState extends ChangeNotifier {
     'watch_auto_start': 'Off',
     'weekly_report': 'On',
     'weekly_report_notify': 'On',
+    'bedtime_reminder': 'No reminder',
+    'whats_new_seen': '',
+    'home_location': '',
     'online_backup': 'On',
     'sleep_aid_download': 'Wi-Fi only',
     'sleep_aid_keep': '20 nights (recommended)',
@@ -248,14 +387,44 @@ class AppState extends ChangeNotifier {
   void setPref(String key, String value) {
     _prefs[key] = value;
     if (key == 'theme') themeName.value = value;
+    if (const {'bedtime_reminder', 'weekly_report', 'weekly_report_notify', 'sleep_goal'}.contains(key)) {
+      unawaited(rescheduleReminders());
+    }
+    if (key == 'sound_detection') unawaited(pruneClips());
+    if (Backend.I.user != null) unawaited(_syncPref(key).catchError((_) {}));
     notifyListeners();
+  }
+
+  /// Consent choices and "About you" also go to the API (a GDPR record and
+  /// the profile used for insights).
+  Future<void> _syncPref(String key) async {
+    if (key.startsWith('consent_')) {
+      await Backend.I.saveConsent(
+          storage: pref('consent_storage') == 'true',
+          sounds: pref('consent_sounds') == 'true',
+          product: pref('consent_product') == 'true');
+    } else if (const {'units', 'weight', 'height', 'gender', 'birth', 'survey'}.contains(key)) {
+      await Backend.I.saveProperties({key: pref(key)});
+    }
   }
 
   // ── sleep notes ───────────────────────────────────────────────────────────
   final List<String> sleepNotes = [
-    'Caffeine late', 'Big dinner', 'Warm shower', 'Read a book', 'Exercise',
-    'Alcohol', 'Stress', 'Nap', 'Screen time', 'Meditated', 'Feeling sick',
-    'Medication', 'Travel', 'Tea', 'Outdoors',
+    'Caffeine late',
+    'Big dinner',
+    'Warm shower',
+    'Read a book',
+    'Exercise',
+    'Alcohol',
+    'Stress',
+    'Nap',
+    'Screen time',
+    'Meditated',
+    'Feeling sick',
+    'Medication',
+    'Travel',
+    'Tea',
+    'Outdoors',
   ];
   void notesChanged() => notifyListeners();
 
@@ -263,8 +432,7 @@ class AppState extends ChangeNotifier {
   final List<Night> nights = []; // oldest first
   int? selectedNight; // index into nights; null = latest
 
-  Night? get currentNight =>
-      nights.isEmpty ? null : nights[selectedNight ?? nights.length - 1];
+  Night? get currentNight => nights.isEmpty ? null : nights[selectedNight ?? nights.length - 1];
 
   void addNight(Night n) {
     nights.add(n);
@@ -272,6 +440,15 @@ class AppState extends ChangeNotifier {
     selectedNight = nights.indexOf(n);
     notifyListeners();
     unawaited(Backend.I.saveNight(n).catchError((_) {}));
+    // ask for a store rating after a few good nights, as the original does
+    if ((nights.length == 3 || nights.length == 10) && n.quality >= 70) unawaited(_askForReview());
+  }
+
+  Future<void> _askForReview() async {
+    try {
+      final r = InAppReview.instance;
+      if (await r.isAvailable()) await r.requestReview();
+    } catch (_) {}
   }
 
   void selectNight(int i) {
@@ -299,8 +476,7 @@ class AppState extends ChangeNotifier {
     final today = DateTime.now();
     final rng = math.Random();
     for (var d = count; d >= 1; d--) {
-      final morning = DateTime(today.year, today.month, today.day - d + 1, 6 + rng.nextInt(2),
-          rng.nextInt(60));
+      final morning = DateTime(today.year, today.month, today.day - d + 1, 6 + rng.nextInt(2), rng.nextInt(60));
       nights.add(sampleNight(morning, 1 + rng.nextInt(1 << 30)));
     }
     nights.sort((a, b) => a.wokeUp.compareTo(b.wokeUp));
@@ -333,21 +509,29 @@ class AppState extends ChangeNotifier {
     if (item == null) return;
     sleepAidPlaying = true;
     notifyListeners();
+    _armFade();
     final file = item.url == null ? audioFor(item) : null;
     if (item.url == null && file == null) return; // nothing to play: mock playback
     try {
+      await player.setVolume(1);
       if (item.url != null) {
-        await player.setUrl(item.url!); // streamed from Cloud Storage
+        final cached = sleepAidCache[item.id];
+        if (cached != null) {
+          await player.setFilePath(cached); // downloaded on the track sheet
+        } else {
+          await player.setUrl(item.url!); // streamed from Cloud Storage
+        }
       } else {
         await player.setAsset(file!);
       }
       await player.play();
     } catch (_) {
-      // placeholder audio not extracted locally: keep the mock "playing" state
+      // file missing: keep the mock "playing" state
     }
   }
 
   Future<void> pauseSleepAid() async {
+    _fadeTimer?.cancel();
     sleepAidPlaying = false;
     notifyListeners();
     try {
@@ -355,6 +539,53 @@ class AppState extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> toggleSleepAid() =>
-      sleepAidPlaying ? pauseSleepAid() : playSleepAid();
+  Future<void> toggleSleepAid() => sleepAidPlaying ? pauseSleepAid() : playSleepAid();
+
+  /// Downloaded streamed tracks (item id → local file), from the track sheet.
+  final Map<String, String> sleepAidCache = {};
+
+  // ── sleep-aid fade-out ────────────────────────────────────────────────────
+  Timer? _fadeTimer;
+
+  /// Minutes until the sleep aid fades out, from Profile › Sleep aid. "Smart"
+  /// fades once tracking sees you fall asleep ([sleepOnsetDetected]), with 45
+  /// minutes as the cap; "All night" never fades.
+  int? get fadeMinutes {
+    final v = pref('sleep_aid_fade');
+    if (v.startsWith('All')) return null;
+    if (v.startsWith('Smart')) return 45;
+    return int.tryParse(v.split(' ').first);
+  }
+
+  void _armFade() {
+    _fadeTimer?.cancel();
+    final m = fadeMinutes;
+    if (m == null) return;
+    _fadeTimer = Timer(Duration(minutes: m), fadeOutSleepAid);
+  }
+
+  /// Called by the tracking screen when the night's first sleep epoch shows up.
+  void sleepOnsetDetected() {
+    if (sleepAidPlaying && pref('sleep_aid_fade').startsWith('Smart')) {
+      _fadeTimer?.cancel();
+      _fadeTimer = Timer(const Duration(minutes: 5), fadeOutSleepAid);
+    }
+  }
+
+  /// Ramp the volume down over a minute, then pause.
+  Future<void> fadeOutSleepAid({Duration over = const Duration(seconds: 60)}) async {
+    if (!sleepAidPlaying) return;
+    const steps = 30;
+    for (var i = steps; i >= 0; i--) {
+      if (!sleepAidPlaying) return;
+      try {
+        await player.setVolume(i / steps);
+      } catch (_) {}
+      await Future.delayed(over ~/ steps);
+    }
+    await pauseSleepAid();
+    try {
+      await player.setVolume(1);
+    } catch (_) {}
+  }
 }

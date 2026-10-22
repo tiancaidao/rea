@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../backend/backend.dart';
 import '../device/health_connect.dart';
+import '../device/location.dart';
+import '../device/notifications.dart';
 import '../theme.dart';
 import 'welcome_screen.dart';
 import 'widgets/common.dart';
+import 'widgets/illustrations.dart';
 
 /// Every settings screen reachable from Profile and Profile › More. They all
 /// share one template (SettingsPage + PrefRadioList + AboutBlock). Copy is our
@@ -67,8 +70,7 @@ class _ThemeOption extends StatelessWidget {
             height: 84,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                  begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: t.backdrop),
+              gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: t.backdrop),
               border: Border.all(color: cur.stroke),
             ),
             padding: const EdgeInsets.all(10),
@@ -114,7 +116,7 @@ class SleepGoalPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return SettingsPage(title: 'Sleep Goal', children: [
       const SizedBox(height: 40),
-      const Center(child: CircleArt(icon: Icons.track_changes, size: 240)),
+      const Center(child: CircleArt(icon: Icons.track_changes, art: Art.sleepGoal, size: 240)),
       const AboutBlock(
           'Going to bed and getting up at the same times every day is one of the most effective ways to sleep better. '
           'Set a goal and we\'ll track how often you hit it.'),
@@ -141,20 +143,35 @@ class SleepGoalPage extends StatelessWidget {
 class AlarmSoundPage extends StatelessWidget {
   const AlarmSoundPage({super.key});
   static const free = [
-    'Soft breeze', 'Forest clearing', 'Morning haze', 'First light', 'Dewdrops', 'Classical morning',
-    'Rain and wind', 'Far memories',
+    'Soft breeze',
+    'Forest clearing',
+    'Morning haze',
+    'First light',
+    'Dewdrops',
+    'Classical morning',
+    'Rain and wind',
+    'Far memories',
   ];
   static const premium = [
-    'Slow waltz', 'Songbird', 'City dawn', 'Meadow', 'Sea dreams', 'Riddle', 'Stillness',
-    'Winter moon', 'Park bench', 'Metro', 'Good morning',
+    'Slow waltz',
+    'Songbird',
+    'City dawn',
+    'Meadow',
+    'Sea dreams',
+    'Riddle',
+    'Stillness',
+    'Winter moon',
+    'Park bench',
+    'Metro',
+    'Good morning',
   ];
 
   /// Local file for an alarm sound name: a stable pick from the alarm sounds
   /// extracted into assets/audio/ (comparison placeholders), if present.
   static String? fileFor(String name) {
     final pool = AppState.I.alarmAudio;
-    if (pool.isEmpty) return null;
     final all = [...free, ...premium];
+    if (pool.isEmpty) return AppState.ownAlarmFor(name, all);
     return pool[math.max(0, all.indexOf(name)) % pool.length];
   }
 
@@ -199,10 +216,16 @@ class WatchPage extends StatelessWidget {
   const WatchPage({super.key});
   @override
   Widget build(BuildContext context) => Watch((context, s) => SettingsPage(title: 'Watch', children: [
-        NavRow(icon: Icons.notifications, title: 'Alarm type', value: s.pref('watch_alarm_type'),
-            onTap: () => push(context, const SimpleRadioPage('Alarm type', 'watch_alarm_type',
-                ['Automatic', 'Phone only', 'Watch only']))),
-        NavRow(icon: Icons.play_circle_outline, title: 'Automatic start', value: s.pref('watch_auto_start'),
+        NavRow(
+            icon: Icons.notifications,
+            title: 'Alarm type',
+            value: s.pref('watch_alarm_type'),
+            onTap: () => push(context,
+                const SimpleRadioPage('Alarm type', 'watch_alarm_type', ['Automatic', 'Phone only', 'Watch only']))),
+        NavRow(
+            icon: Icons.play_circle_outline,
+            title: 'Automatic start',
+            value: s.pref('watch_auto_start'),
             onTap: () => push(context, const SimpleRadioPage('Automatic start', 'watch_auto_start', ['On', 'Off']))),
         const AboutBlock('With a paired watch, keep your phone nearby — it still does the analysis — and use the '
             'watch to wake you silently. Automatic start begins tracking when the watch detects you\'ve fallen asleep.'),
@@ -214,9 +237,39 @@ class WeeklyReportPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const SettingsPage(title: 'Weekly report', children: [
         PrefRadioList(header: 'Weekly report', prefKey: 'weekly_report', options: ['On', 'Off']),
-        PrefRadioList(header: 'Notify me when my report is ready', prefKey: 'weekly_report_notify', options: ['On', 'Off']),
-        AboutBlock('A short summary of your week, found in the Journal next to the days at the top.'),
+        PrefRadioList(
+            header: 'Notify me when my report is ready', prefKey: 'weekly_report_notify', options: ['On', 'Off']),
+        AboutBlock(
+            'A short summary of your week, found in the Journal next to the days at the top. '
+            'It needs at least four tracked nights in the week.',
+            art: CircleArt(icon: Icons.description, art: Art.weeklyReport)),
       ]);
+}
+
+class BedtimeReminderPage extends StatelessWidget {
+  const BedtimeReminderPage({super.key});
+  static const options = [
+    'No reminder',
+    'At bedtime',
+    '15 minutes before',
+    '30 minutes before',
+    '45 minutes before',
+    '60 minutes before',
+  ];
+  @override
+  Widget build(BuildContext context) => Watch((context, s) => SettingsPage(title: 'Bedtime reminder', children: [
+        PrefRadioList(
+            prefKey: 'bedtime_reminder',
+            options: options,
+            onPicked: (o) {
+              if (o != 'No reminder') Notifications.I.requestPermission();
+            }),
+        AboutBlock(
+            'Your bedtime is ${fmtDt(s.bedtime)}: your alarm time minus your sleep goal'
+            '${s.pref('sleep_goal') == 'Not set' ? ' (8 hours until you set one)' : ''}. '
+            'We\'ll remind you to start tracking and put your phone by your bed.',
+            art: const CircleArt(icon: Icons.bedtime, art: Art.alarm)),
+      ]));
 }
 
 // ── Profile › More ──────────────────────────────────────────────────────────
@@ -232,40 +285,66 @@ class MorePage extends StatelessWidget {
         NavRow(icon: Icons.person, title: 'Account', onTap: () => open(const AccountPage())),
         NavRow(icon: Icons.straighten, title: 'About you', onTap: () => open(const AboutYouPage())),
         NavRow(icon: Icons.thumb_up, title: 'Consent and privacy', onTap: () => open(const ConsentPage())),
-        NavRow(icon: Icons.favorite, title: 'Health Connect',
+        NavRow(
+            icon: Icons.favorite,
+            title: 'Health Connect',
             value: s.pref('health_connect') == 'On' ? 'Connected' : 'Not connected',
             onTap: () => open(const HealthConnectPage())),
         const SectionTitle('Alarm'),
-        NavRow(icon: Icons.sensors, title: 'Motion detection', value: s.pref('motion_detection').split(' ').first,
-            onTap: () => open(const SimpleRadioPage('Motion detection', 'motion_detection',
-                ['Microphone (recommended)', 'Accelerometer'],
-                about: 'The microphone works with the phone on the nightstand. With the accelerometer, the phone must lie on the mattress.',
-                art: Icons.phone_android, artAsset: 'assets/images/acc_placement_reminder.jpg'))),
-        NavRow(icon: Icons.mic, title: 'Sound detection', value: s.pref('sound_detection').split(' (').first,
+        NavRow(
+            icon: Icons.sensors,
+            title: 'Motion detection',
+            value: s.pref('motion_detection').split(' ').first,
+            onTap: () => open(const SimpleRadioPage(
+                'Motion detection', 'motion_detection', ['Microphone (recommended)', 'Accelerometer'],
+                about:
+                    'The microphone works with the phone on the nightstand. With the accelerometer, the phone must lie on the mattress.',
+                art: Icons.phone_android,
+                illustration: Art.motion))),
+        NavRow(
+            icon: Icons.mic,
+            title: 'Sound detection',
+            value: s.pref('sound_detection').split(' (').first,
             onTap: () => open(const SimpleRadioPage('Sound detection', 'sound_detection',
                 ['0 nights', '1 night', '20 nights (recommended)', '100 nights', 'Forever'],
                 header: 'Keep audio clips for',
                 about: 'Short clips of snoring and talking are kept on your phone for this long.'))),
-        NavRow(icon: Icons.info, title: 'Placement reminders', value: s.pref('placement_reminders'),
+        NavRow(
+            icon: Icons.info,
+            title: 'Placement reminders',
+            value: s.pref('placement_reminders'),
             onTap: () => open(const SimpleRadioPage('Placement reminders', 'placement_reminders', ['On', 'Off'],
                 about: 'Show the placement and snooze tips each time you start tracking.'))),
-        NavRow(icon: Icons.snooze, title: 'Snooze', value: s.pref('snooze').split(' (').first,
+        NavRow(
+            icon: Icons.snooze,
+            title: 'Snooze',
+            value: s.pref('snooze').split(' (').first,
             onTap: () => open(const SimpleRadioPage('Snooze', 'snooze', ['Smart (recommended)', 'Regular', 'Off'],
                 about: 'Smart snooze shortens each snooze as your alarm time gets closer, so you still get up on time.',
-                art: Icons.touch_app, artAsset: 'assets/images/acc_snooze_reminder.jpg'))),
-        NavRow(icon: Icons.vibration, title: 'Vibration', value: s.pref('vibration'),
+                art: Icons.touch_app,
+                illustration: Art.snooze))),
+        NavRow(
+            icon: Icons.vibration,
+            title: 'Vibration',
+            value: s.pref('vibration'),
             onTap: () => open(const SimpleRadioPage('Vibration', 'vibration', ['As backup', 'Never', 'Only vibration'],
                 about: 'As backup, vibration starts if the alarm sound alone hasn\'t woken you.'))),
-        NavRow(icon: Icons.battery_alert, title: 'Battery warning', value: s.pref('battery_warning'),
+        NavRow(
+            icon: Icons.battery_alert,
+            title: 'Battery warning',
+            value: s.pref('battery_warning'),
             onTap: () => open(const SimpleRadioPage('Battery warning', 'battery_warning', ['On', 'Off'],
                 about: 'Sound the alarm early if the battery is about to run out during the night.'))),
         const SectionTitle('Other'),
         NavRow(icon: Icons.storage, title: 'Database', onTap: () => open(const DatabasePage())),
-        NavRow(icon: Icons.extension, title: 'Third-party software',
+        NavRow(
+            icon: Icons.extension,
+            title: 'Third-party software',
             onTap: () => showLicensePage(context: context, applicationName: 'Sleep Tracker')),
         Padding(
           padding: const EdgeInsets.all(24),
-          child: Center(child: Text('Sleep Tracker v0.1.0 (prototype)', style: TextStyle(color: context.palette.textFaint))),
+          child: Center(
+              child: Text('Sleep Tracker v0.1.0 (prototype)', style: TextStyle(color: context.palette.textFaint))),
         ),
       ]);
     });
@@ -300,8 +379,8 @@ class AccountPage extends StatelessWidget {
             if (await confirm(context, 'Log out?', 'Your nights stay backed up online.', 'Log out')) {
               s.logOut();
               if (!context.mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const WelcomeScreen()), (_) => false);
+              Navigator.of(context)
+                  .pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const WelcomeScreen()), (_) => false);
             }
           }),
           link('Erase your data', () async {
@@ -318,8 +397,8 @@ class AccountPage extends StatelessWidget {
               s.nights.clear();
               s.logOut();
               if (!context.mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const WelcomeScreen()), (_) => false);
+              Navigator.of(context)
+                  .pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const WelcomeScreen()), (_) => false);
             }
           }, color: context.palette.awake),
         ]),
@@ -335,15 +414,25 @@ class AboutYouPage extends StatelessWidget {
   Widget build(BuildContext context) => Watch((context, s) {
         void open(String t, String k, List<String> o) => push(context, SimpleRadioPage(t, k, o));
         return SettingsPage(title: 'About you', children: [
-          NavRow(title: 'Unit of measurement', value: s.pref('units'),
+          NavRow(
+              title: 'Unit of measurement',
+              value: s.pref('units'),
               onTap: () => open('Unit of measurement', 'units', ['Metric', 'Imperial'])),
-          NavRow(title: 'Weight', value: s.pref('weight'),
+          NavRow(
+              title: 'Weight',
+              value: s.pref('weight'),
               onTap: () => open('Weight', 'weight', ['< 50 kg', '50–70 kg', '70–90 kg', '> 90 kg'])),
-          NavRow(title: 'Height', value: s.pref('height'),
+          NavRow(
+              title: 'Height',
+              value: s.pref('height'),
               onTap: () => open('Height', 'height', ['< 160 cm', '160–175 cm', '175–190 cm', '> 190 cm'])),
-          NavRow(title: 'Gender', value: s.pref('gender'),
+          NavRow(
+              title: 'Gender',
+              value: s.pref('gender'),
               onTap: () => open('Gender', 'gender', ['Female', 'Male', 'Other', 'Prefer not to say'])),
-          NavRow(title: 'Year of birth', value: s.pref('birth'),
+          NavRow(
+              title: 'Year of birth',
+              value: s.pref('birth'),
               onTap: () => open('Year of birth', 'birth', ['1960s', '1970s', '1980s', '1990s', '2000s'])),
           const PrefRadioList(
               header: 'Take part in our anonymous sleep research survey?', prefKey: 'survey', options: ['Yes', 'No']),
@@ -375,8 +464,10 @@ class ConsentPage extends StatelessWidget {
             );
         return SettingsPage(title: 'Consent and privacy', children: [
           block('Store sleep data online', 'Needed for online backup and moving to a new phone.', 'consent_storage'),
-          block('Share sounds', 'Let us use anonymous sound clips to improve snore and sound detection.', 'consent_sounds'),
-          block('Improve the product', 'Share anonymous usage statistics so we can see which features help.', 'consent_product'),
+          block('Share sounds', 'Let us use anonymous sound clips to improve snore and sound detection.',
+              'consent_sounds'),
+          block('Improve the product', 'Share anonymous usage statistics so we can see which features help.',
+              'consent_product'),
         ]);
       });
 }
@@ -387,34 +478,51 @@ class DatabasePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = AppState.I;
     return SettingsPage(title: 'Database', children: [
-      NavRow(icon: Icons.share, title: 'Export database to CSV', onTap: () async {
-        final rows = ['start,end,quality,asleep_min,in_bed_min,snore_min,steps'];
-        for (final n in s.nights) {
-          rows.add('${n.wentToBed.toIso8601String()},${n.wokeUp.toIso8601String()},${n.quality},'
-              '${n.asleepMinutes},${n.inBedMinutes},${n.snoreMinutes},${n.steps ?? ''}');
-        }
-        try {
-          final f = File('${Directory.systemTemp.path}/sleep_export.csv')..writeAsStringSync(rows.join('\n'));
-          if (context.mounted) toast(context, 'Exported ${s.nights.length} nights to ${f.path}');
-        } catch (_) {
-          if (context.mounted) toast(context, 'Export failed');
-        }
-      }),
+      NavRow(
+          icon: Icons.share,
+          title: 'Export database to CSV',
+          onTap: () async {
+            final rows = ['start,end,quality,asleep_min,in_bed_min,snore_min,steps'];
+            for (final n in s.nights) {
+              rows.add('${n.wentToBed.toIso8601String()},${n.wokeUp.toIso8601String()},${n.quality},'
+                  '${n.asleepMinutes},${n.inBedMinutes},${n.snoreMinutes},${n.steps ?? ''}');
+            }
+            try {
+              final f = File('${Directory.systemTemp.path}/sleep_export.csv')..writeAsStringSync(rows.join('\n'));
+              if (context.mounted) toast(context, 'Exported ${s.nights.length} nights to ${f.path}');
+            } catch (_) {
+              if (context.mounted) toast(context, 'Export failed');
+            }
+          }),
       // Full nights incl. the 30-s hypnogram, for comparison/benchmark/benchmark_night.py
-      NavRow(icon: Icons.compare_arrows, title: 'Export nights for benchmarking (JSON)', onTap: () async {
-        try {
-          final f = File('${Directory.systemTemp.path}/sleep_export.json')
-            ..writeAsStringSync(jsonEncode([for (final n in s.nights) n.toJson()]));
-          if (context.mounted) toast(context, 'Exported ${s.nights.length} nights to ${f.path}');
-        } catch (_) {
-          if (context.mounted) toast(context, 'Export failed');
-        }
-      }),
+      NavRow(
+          icon: Icons.compare_arrows,
+          title: 'Export nights for benchmarking (JSON)',
+          onTap: () async {
+            try {
+              final f = File('${Directory.systemTemp.path}/sleep_export.json')
+                ..writeAsStringSync(jsonEncode([for (final n in s.nights) n.toJson()]));
+              if (context.mounted) toast(context, 'Exported ${s.nights.length} nights to ${f.path}');
+            } catch (_) {
+              if (context.mounted) toast(context, 'Export failed');
+            }
+          }),
+      // Like the original's debug "Trigger alarm after 10s".
+      NavRow(
+          icon: Icons.alarm_on,
+          title: 'Test alarm (rings 10 s after you start)',
+          onTap: () {
+            s.testAlarmArmed = true;
+            toast(context, 'Start tracking on the Sleep tab: the alarm rings after 10 seconds');
+          }),
       // Prototype helper: populate every screen without tracking for real.
-      NavRow(icon: Icons.science, title: 'Load sample nights (prototype)', onTap: () {
-        s.loadSampleNights();
-        toast(context, 'Added 7 sample nights');
-      }),
+      NavRow(
+          icon: Icons.science,
+          title: 'Load sample nights (prototype)',
+          onTap: () {
+            s.loadSampleNights();
+            toast(context, 'Added 7 sample nights');
+          }),
       const AboutBlock('Export all your nights as a CSV file to open in a spreadsheet.'),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -468,13 +576,20 @@ class SleepAidSettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const SettingsPage(title: 'Sleep aid', children: [
         PrefRadioList(header: 'Download files', prefKey: 'sleep_aid_download', options: ['Always', 'Wi-Fi only']),
-        PrefRadioList(header: 'Keep downloaded files for', prefKey: 'sleep_aid_keep',
-            options: ['1 night', '20 nights (recommended)', 'Forever']),
         PrefRadioList(
-            header: 'Fade out ambient sounds after',
-            prefKey: 'sleep_aid_fade',
-            options: ['Smart (recommended)', '10 minutes', '20 minutes', '30 minutes', '45 minutes', '60 minutes',
-              '90 minutes', 'All night']),
+            header: 'Keep downloaded files for',
+            prefKey: 'sleep_aid_keep',
+            options: ['1 night', '20 nights (recommended)', 'Forever']),
+        PrefRadioList(header: 'Fade out ambient sounds after', prefKey: 'sleep_aid_fade', options: [
+          'Smart (recommended)',
+          '10 minutes',
+          '20 minutes',
+          '30 minutes',
+          '45 minutes',
+          '60 minutes',
+          '90 minutes',
+          'All night'
+        ]),
       ]);
 }
 
@@ -485,7 +600,19 @@ class SleepNotesPage extends StatelessWidget {
         const _Radio('sleep_notes', ['Show', 'Hide']),
         const Divider(indent: 20, endIndent: 20),
         NavRow(title: 'Edit sleep notes', onTap: () => push(context, const EditSleepNotesPage())),
-        NavRow(title: 'Home location', onTap: () => toast(context, 'Used to tag nights away from home')),
+        Watch((context, s) => NavRow(
+            title: 'Home location',
+            value: s.pref('home_location').isEmpty ? 'Not set' : 'Set',
+            onTap: () async {
+              final loc = await coarseLocation();
+              if (!context.mounted) return;
+              if (loc == null) {
+                toast(context, 'Location is off. Allow it to tag nights away from home.');
+                return;
+              }
+              s.setPref('home_location', '${loc.$1},${loc.$2}');
+              toast(context, 'Home set. Nights far from here get the Travel note.');
+            })),
         const AboutBlock('Tag each night with things that might affect your sleep — then see which ones matter.'),
       ]);
 }
@@ -571,7 +698,8 @@ class WhosSnoringPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const SimpleRadioPage("Who's snoring", 'whos_snoring', ['On', 'Off'],
       about: 'Tell your snoring apart from a partner\'s. Confirm a few clips and detection learns your voice.',
-      art: Icons.record_voice_over, artAsset: 'assets/images/who_is_snoring_fallback.jpg');
+      art: Icons.record_voice_over,
+      artAsset: 'assets/images/who_is_snoring_fallback.jpg');
 }
 
 // ── Gift / Help ─────────────────────────────────────────────────────────────
@@ -579,26 +707,68 @@ class WhosSnoringPage extends StatelessWidget {
 class BenefitsPage extends StatelessWidget {
   const BenefitsPage({super.key});
   @override
-  Widget build(BuildContext context) => const SettingsPage(title: 'Benefits', children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(32, 40, 32, 60),
+  Widget build(BuildContext context) => SettingsPage(title: 'Benefits', children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(32, 40, 32, 40),
           child: Text('Offers and gifts for you and your friends will show up here.',
               textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
         ),
-        Center(child: CircleArt(icon: Icons.card_giftcard, size: 220,
-            colors: null)),
+        const Center(child: CircleArt(icon: Icons.card_giftcard, art: Art.gift, size: 220)),
+        const SizedBox(height: 32),
+        Center(
+          child: PillButton('Redeem a gift card', width: 240, onPressed: () => redeemGiftCard(context)),
+        ),
       ]);
+}
+
+/// Enter a gift-card code; the backend checks it and grants Premium.
+Future<void> redeemGiftCard(BuildContext context) async {
+  final ctrl = TextEditingController();
+  final code = await showDialog<String>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: const Text('Redeem gift card'),
+      content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(hintText: 'XXXX-XXXX-XXXX')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('Redeem')),
+      ],
+    ),
+  );
+  if (code == null || code.isEmpty || !context.mounted) return;
+  if (Backend.I.user == null) {
+    toast(context, 'Sign in first to redeem a gift card');
+    return;
+  }
+  try {
+    final r = await Backend.I.redeemGiftCard(code);
+    AppState.I.premium = true;
+    AppState.I.notesChanged();
+    if (context.mounted) toast(context, 'Premium unlocked until ${r?['premiumUntil'] ?? 'later'}');
+  } catch (e) {
+    if (context.mounted) toast(context, 'That code didn\'t work: $e');
+  }
 }
 
 class HelpPage extends StatelessWidget {
   const HelpPage({super.key});
   static const topics = {
     'Getting started': [
-      ('Where should I put my phone?', 'Next to your bed, screen down and charging. With the accelerometer, on the mattress.'),
+      (
+        'Where should I put my phone?',
+        'Next to your bed, screen down and charging. With the accelerometer, on the mattress.'
+      ),
       ('Do I need to be online?', 'No. Tracking and analysis run on your phone.'),
     ],
     'Top questions': [
-      ('Why did the alarm ring before my alarm time?', 'The smart alarm wakes you in light sleep within your wake-up phase.'),
+      (
+        'Why did the alarm ring before my alarm time?',
+        'The smart alarm wakes you in light sleep within your wake-up phase.'
+      ),
       ('How is quality calculated?', 'From time asleep, how often you woke, and deeper sleep.'),
     ],
     'Subscriptions': [
@@ -664,13 +834,14 @@ class SimpleRadioPage extends StatelessWidget {
   final String? header;
   final IconData? art;
   final String? artAsset;
+  final Art? illustration;
   const SimpleRadioPage(this.title, this.prefKey, this.options,
-      {super.key, this.about, this.header, this.art, this.artAsset});
+      {super.key, this.about, this.header, this.art, this.artAsset, this.illustration});
   @override
   Widget build(BuildContext context) => SettingsPage(title: title, children: [
         PrefRadioList(header: header, prefKey: prefKey, options: options),
         if (about != null)
-          AboutBlock(about!, art: art == null ? null : CircleArt(asset: artAsset, icon: art!)),
+          AboutBlock(about!, art: art == null ? null : CircleArt(asset: artAsset, icon: art!, art: illustration)),
       ]);
 }
 

@@ -19,6 +19,7 @@ class SleepAidItem {
   final List<Color> art; // gradient standing in for cover artwork
   final String? asset;
   final String? url; // streamed media (signed URL from the API)
+  final bool? premiumFlag; // from the server catalog; built-in items use [SleepAidCatalog.freeIds]
   const SleepAidItem({
     required this.id,
     required this.title,
@@ -29,7 +30,11 @@ class SleepAidItem {
     required this.art,
     this.asset,
     this.url,
+    this.premiumFlag,
   });
+
+  /// Premium content (a badge on the tile; free users get the paywall).
+  bool get premium => premiumFlag ?? !SleepAidCatalog.freeIds.contains(id);
 
   factory SleepAidItem.fromJson(Map<String, dynamic> j) {
     Color hex(String s) => Color(int.parse(s.replaceFirst('#', 'FF'), radix: 16));
@@ -43,6 +48,7 @@ class SleepAidItem {
       narrator: (j['narrator'] as String?) ?? '',
       art: [hex(art[0]), hex(art[1])],
       url: j['url'] as String?,
+      premiumFlag: j['premium'] as bool?,
     );
   }
 }
@@ -91,6 +97,21 @@ class SleepAidCatalog {
       return null;
     }
   }
+
+  /// Built-in items anyone can play; the rest are Premium.
+  static const freeIds = {
+    'slow-exhale',
+    'box-breath',
+    'rain-wind',
+    'dawn',
+    'drops',
+    'brown',
+    'pink',
+    'lighthouse',
+    'low-tide',
+    'first-snow',
+    'twinkle',
+  };
 
   static const _dusk = [Color(0xFFF0A36B), Color(0xFF3B2F5C)];
   static const _sea = [Color(0xFF2E7D9A), Color(0xFF0D2236)];
@@ -177,6 +198,66 @@ class SleepAidCatalog {
       SleepAidItem(id: 'brush', title: 'Soft brush', art: _violet),
       SleepAidItem(id: 'tapping', title: 'Tapping', art: _ember),
       SleepAidItem(id: 'window', title: 'Rain on glass', art: _rain),
+    ]),
+    SleepAidSection('Winter evenings', SectionLayout.hero, [
+      SleepAidItem(
+          id: 'first-snow',
+          title: 'First Snow',
+          description: 'Muffled footsteps and a crackling stove in a cabin far from town.',
+          minutes: 18,
+          narrator: 'Ida Moberg',
+          art: _rain),
+      SleepAidItem(
+          id: 'long-night',
+          title: 'The Long Night',
+          description: 'A drowsy walk through a village as the lights go out one by one.',
+          minutes: 22,
+          narrator: 'Tom Ashby',
+          art: _violet),
+    ]),
+    SleepAidSection('Spatial audio', SectionLayout.grid, [
+      SleepAidItem(id: 'sp-rain', title: 'Rain all around', art: _rain),
+      SleepAidItem(id: 'sp-shore', title: 'On the shore', art: _sea),
+      SleepAidItem(id: 'sp-forest', title: 'Forest at night', art: _forest),
+      SleepAidItem(id: 'sp-fire', title: 'By the fire', art: _ember),
+    ]),
+    SleepAidSection('Classical', SectionLayout.hero, [
+      SleepAidItem(
+          id: 'nocturne',
+          title: 'Quiet Nocturnes',
+          description: 'Slow solo piano, recorded close and soft.',
+          minutes: 35,
+          author: 'Northlight Ensemble',
+          art: _violet),
+      SleepAidItem(
+          id: 'strings',
+          title: 'Strings at Dusk',
+          description: 'A string quartet in its gentlest register.',
+          minutes: 28,
+          author: 'Northlight Ensemble',
+          art: _dusk),
+    ]),
+    SleepAidSection('Bedtime rhymes', SectionLayout.grid, [
+      SleepAidItem(id: 'twinkle', title: 'Little star', art: _violet),
+      SleepAidItem(id: 'moon-boat', title: 'The moon boat', art: _sea),
+      SleepAidItem(id: 'sleepy-bear', title: 'Sleepy bear', art: _forest),
+      SleepAidItem(id: 'counting', title: 'Counting sheep', art: _dusk),
+    ]),
+    SleepAidSection('Guides', SectionLayout.hero, [
+      SleepAidItem(
+          id: 'body-scan',
+          title: 'Body Scan',
+          description: 'Move your attention slowly from your toes to your head.',
+          minutes: 15,
+          narrator: 'Maya Lind',
+          art: _forest),
+      SleepAidItem(
+          id: 'let-go',
+          title: 'Letting Go of the Day',
+          description: 'Put today\'s thoughts down, one by one.',
+          minutes: 10,
+          narrator: 'Maya Lind',
+          art: _city),
     ]),
     SleepAidSection('Sleep coaching', SectionLayout.hero, [
       SleepAidItem(

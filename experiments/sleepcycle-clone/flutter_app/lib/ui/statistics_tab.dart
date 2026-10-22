@@ -42,34 +42,41 @@ Color _chart(SleepPalette p) => p.chart;
 Color _line(SleepPalette p) => p.chartAlt;
 Color _deep(SleepPalette p) => p.deep;
 Color _positive(SleepPalette p) => p.positive;
+Color _warn(SleepPalette p) => p.warn;
 
 final metrics = <Metric>[
-  Metric('Sleep quality', ChartKind.bar, _quality, (n) => n.quality.toDouble(),
-      (v) => '${v.round()}%', 'Your nightly quality score.', maxY: 100),
-  Metric('Regularity', ChartKind.range, _chart, (n) => _clock(n.wokeUp),
-      _clockFmt, 'Each bar spans bedtime to wake-up. Shorter spread between nights means a steadier rhythm.',
+  Metric('Sleep quality', ChartKind.bar, _quality, (n) => n.quality.toDouble(), (v) => '${v.round()}%',
+      'Your nightly quality score.',
+      maxY: 100),
+  Metric('Regularity', ChartKind.range, _chart, (n) => _clock(n.wokeUp), _clockFmt,
+      'Each bar spans bedtime to wake-up. Shorter spread between nights means a steadier rhythm.',
       low: (n) => _clock(n.wentToBed)),
-  Metric('Went to bed', ChartKind.line, _line, (n) => _clock(n.wentToBed), _clockFmt,
-      'When you started tracking.'),
-  Metric('Woke up', ChartKind.line, _line, (n) => _clock(n.wokeUp), _clockFmt,
-      'When tracking stopped.'),
-  Metric('Time in bed', ChartKind.bar, _chart, (n) => n.inBedMinutes / 60,
-      (v) => '${v.toStringAsFixed(1)}h', 'Total time tracked each night.'),
-  Metric('Asleep', ChartKind.bar, _chart, (n) => n.asleepMinutes / 60,
-      (v) => '${v.toStringAsFixed(1)}h', 'Time actually asleep.'),
-  Metric('Asleep after', ChartKind.line, _line, (n) => n.asleepAfterMinutes.toDouble(),
-      (v) => '${v.round()}m', 'How long it took to fall asleep.'),
-  Metric('Snore', ChartKind.bar, _chart, (n) => n.snoreMinutes.toDouble(),
-      (v) => '${v.round()}m', 'Minutes of snoring per night.'),
-  Metric('Coughing', ChartKind.bar, _chart, (n) => n.coughs.toDouble(),
-      (v) => v.toStringAsFixed(0), 'Coughs detected per night.'),
-  Metric('Steps', ChartKind.bar, _chart, (n) => (n.steps ?? 0).toDouble(),
-      (v) => v.round().toString(), 'Steps the day before each night.'),
-  Metric('Deep sleep', ChartKind.bar, _deep,
-      (n) => (n.session.phaseMinutes['deep'] ?? 0) / 60, (v) => '${v.toStringAsFixed(1)}h',
-      'Hours in deep sleep.'),
-  Metric('Breathing disruptions', ChartKind.bar, _positive, (n) => n.breathingPerHour,
-      (v) => v.toStringAsFixed(1), 'Breathing disruptions per hour of sleep.'),
+  Metric('Went to bed', ChartKind.line, _line, (n) => _clock(n.wentToBed), _clockFmt, 'When you started tracking.'),
+  Metric('Woke up', ChartKind.line, _line, (n) => _clock(n.wokeUp), _clockFmt, 'When tracking stopped.'),
+  Metric('Time in bed', ChartKind.bar, _chart, (n) => n.inBedMinutes / 60, (v) => '${v.toStringAsFixed(1)}h',
+      'Total time tracked each night.'),
+  Metric('Asleep', ChartKind.bar, _chart, (n) => n.asleepMinutes / 60, (v) => '${v.toStringAsFixed(1)}h',
+      'Time actually asleep.'),
+  Metric('Asleep after', ChartKind.line, _line, (n) => n.asleepAfterMinutes.toDouble(), (v) => '${v.round()}m',
+      'How long it took to fall asleep.'),
+  Metric('Snore', ChartKind.bar, _chart, (n) => n.snoreMinutes.toDouble(), (v) => '${v.round()}m',
+      'Minutes of snoring per night.'),
+  Metric('Coughing', ChartKind.bar, _chart, (n) => n.coughs.toDouble(), (v) => v.toStringAsFixed(0),
+      'Coughs detected per night.'),
+  Metric('Steps', ChartKind.bar, _chart, (n) => (n.steps ?? 0).toDouble(), (v) => v.round().toString(),
+      'Steps the day before each night.'),
+  Metric('Deep sleep', ChartKind.bar, _deep, (n) => (n.session.phaseMinutes['deep'] ?? 0) / 60,
+      (v) => '${v.toStringAsFixed(1)}h', 'Hours in deep sleep.'),
+  Metric('Breathing disruptions', ChartKind.bar, _positive, (n) => n.breathingPerHour, (v) => v.toStringAsFixed(1),
+      'Breathing disruptions per hour of sleep.'),
+  Metric(
+      'Light',
+      ChartKind.bar,
+      _warn,
+      (n) => n.lightLux ?? 0,
+      (v) => '${v.toStringAsFixed(1)} lx',
+      'How bright your bedroom was overnight (median, from the phone\'s light sensor). Below 1 lux is properly dark; '
+          'streetlight through curtains or a screen can be 5 to 20 lux.'),
 ];
 
 class _Point {
@@ -88,8 +95,7 @@ List<_Point> _series(Metric m, List<Night> nights, int period) {
   if (period == 0) {
     final last = nights.length > 7 ? nights.sublist(nights.length - 7) : nights;
     return [
-      for (final n in last)
-        _Point('${_wd[n.day.weekday - 1]}\n${n.day.day}/${n.day.month}', m.value(n), m.low?.call(n))
+      for (final n in last) _Point('${_wd[n.day.weekday - 1]}\n${n.day.day}/${n.day.month}', m.value(n), m.low?.call(n))
     ];
   }
   final groups = <String, List<Night>>{};
@@ -106,8 +112,7 @@ List<_Point> _series(Metric m, List<Night> nights, int period) {
   final cap = period == 1 ? 8 : (period == 2 ? 6 : 24);
   if (entries.length > cap) entries = entries.sublist(entries.length - cap);
   return [
-    for (final e in entries)
-      _Point(e.key, avg(e.value.map(m.value)), m.low == null ? null : avg(e.value.map(m.low!)))
+    for (final e in entries) _Point(e.key, avg(e.value.map(m.value)), m.low == null ? null : avg(e.value.map(m.low!)))
   ];
 }
 
@@ -139,7 +144,8 @@ class _StatisticsTabState extends State<StatisticsTab> {
             const Eyebrow('Personal insights'),
             const SizedBox(height: 10),
             _insight(nights),
-            for (final m in metrics) _ChartCard(metric: m, points: _series(m, nights, _period), demo: demo, nights: nights),
+            for (final m in metrics)
+              _ChartCard(metric: m, points: _series(m, nights, _period), demo: demo, nights: nights),
           ]);
           return demo
               ? DemoOverlay(hint: 'Your statistics will be available here after your first night.', child: content)
@@ -285,7 +291,8 @@ class _MetricDetailState extends State<_MetricDetail> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _Segments(value: _period, onChanged: (v) => setState(() => _period = v)),
           const SizedBox(height: 20),
-          SizedBox(height: 260, child: CustomPaint(painter: _ChartPainter(m, pts, context.palette), size: Size.infinite)),
+          SizedBox(
+              height: 260, child: CustomPaint(painter: _ChartPainter(m, pts, context.palette), size: Size.infinite)),
           const SizedBox(height: 20),
           Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
             _kv('Average', stat((v) => v.reduce((a, b) => a + b) / v.length)),
@@ -315,7 +322,9 @@ class _ChartPainter extends CustomPainter {
     if (pts.isEmpty) return;
     const left = 58.0, bottom = 34.0;
     final w = size.width - left, h = size.height - bottom;
-    final all = [for (final p in pts) ...[p.v, if (p.lo != null) p.lo!]];
+    final all = [
+      for (final p in pts) ...[p.v, if (p.lo != null) p.lo!]
+    ];
     var lo = all.reduce(math.min), hi = all.reduce(math.max);
     if (m.kind == ChartKind.bar) lo = math.min(0, lo);
     // keep a sensible span so a single night (or flat data) doesn't zoom in to noise
@@ -354,10 +363,12 @@ class _ChartPainter extends CustomPainter {
         final o = Offset(x(i), y(pts[i].v));
         i == 0 ? path.moveTo(o.dx, o.dy) : path.lineTo(o.dx, o.dy);
       }
-      canvas.drawPath(path, Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2);
+      canvas.drawPath(
+          path,
+          Paint()
+            ..color = color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2);
       for (var i = 0; i < pts.length; i++) {
         canvas.drawCircle(Offset(x(i), y(pts[i].v)), 4, paint);
       }
@@ -376,7 +387,8 @@ class _ChartPainter extends CustomPainter {
 
     final every = (pts.length / 8).ceil();
     for (var i = 0; i < pts.length; i += every) {
-      tp.text = TextSpan(text: pts[i].label, style: TextStyle(color: p.textMuted, fontSize: 10, fontFamily: p.fontFamily));
+      tp.text =
+          TextSpan(text: pts[i].label, style: TextStyle(color: p.textMuted, fontSize: 10, fontFamily: p.fontFamily));
       tp.layout(maxWidth: slot * every);
       tp.paint(canvas, Offset(x(i) - tp.width / 2, h + 6));
     }
