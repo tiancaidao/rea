@@ -179,8 +179,8 @@ A clean checkout ships everything it plays and draws:
 ## How close is this to Sleep Cycle?
 
 The latest side-by-side audit (APK manifest, assets, strings and 67
-screenshots of the original against the clone) is in the research workspace
-(`parity-audit/06_gaps.md`). The original has no home-screen widgets, launcher
+screenshots of the original against the clone) is in the project files
+(`SleepCycle-analysis/parity/gap-audit.md`). The original has no home-screen widgets, launcher
 shortcuts or Quick Settings tile, so there are none to match.
 
 Honest, feature-by-feature. "Design parity" = same approach, our own code/params.
