@@ -43,3 +43,9 @@ flutter_app/assets/data/strings.en.json
 # project config for --dart-define-from-file (keep out of the public repo)
 flutter_app/config/*.json
 !flutter_app/config/backend.example.json
+
+# Flutter-generated iOS files (machine-specific)
+flutter_app/ios/Flutter/Generated.xcconfig
+flutter_app/ios/Flutter/ephemeral/
+flutter_app/ios/Flutter/flutter_export_environment.sh
+flutter_app/ios/Runner/GeneratedPluginRegistrant.*
