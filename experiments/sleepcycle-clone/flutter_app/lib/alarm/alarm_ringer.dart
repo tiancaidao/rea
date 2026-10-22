@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:audio_session/audio_session.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:vibration/vibration.dart';
 import '../app_state.dart';
@@ -16,7 +17,8 @@ class AlarmRinger {
   AlarmRinger._();
   static final AlarmRinger I = AlarmRinger._();
 
-  final AudioPlayer _player = AudioPlayer();
+  // alarm stream, not media: rings at alarm volume even when media is muted
+  final AudioPlayer _player = AudioPlayer(androidApplyAudioAttributes: false, handleInterruptions: false);
   Timer? _ramp, _vibrateLater;
   bool ringing = false;
 
@@ -43,6 +45,8 @@ class AlarmRinger {
     final file = AlarmSoundPage.fileFor(name);
     if (file == null) return;
     try {
+      await _player.setAndroidAudioAttributes(const AndroidAudioAttributes(
+          usage: AndroidAudioUsage.alarm, contentType: AndroidAudioContentType.sonification));
       await _player.setLoopMode(LoopMode.one);
       await _player.setAsset(file);
       await _player.setVolume(0.08);

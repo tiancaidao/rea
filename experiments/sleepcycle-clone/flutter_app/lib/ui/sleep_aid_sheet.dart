@@ -418,6 +418,19 @@ class _TrackSheetState extends State<_TrackSheet> {
         height: 400,
         child: Stack(children: [
           Positioned.fill(child: ArtBox(colors: it.art, radius: 0, seed: it.id.hashCode)),
+          // scrim so the title and credits stay readable over the art
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x33000000), Color(0x99000000), Color(0x33000000)],
+                  stops: [0.1, 0.35, 0.7],
+                ),
+              ),
+            ),
+          ),
           Positioned(
             left: 4,
             top: 4,
