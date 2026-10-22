@@ -8,6 +8,7 @@ import '../theme.dart';
 import 'settings_pages.dart';
 import 'widgets/common.dart';
 import 'widgets/hypnogram.dart';
+import 'widgets/themed.dart';
 
 const _weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -36,13 +37,12 @@ class DemoOverlay extends StatelessWidget {
 
 Future<void> showInfoSheet(BuildContext context, String title, String body) => showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0E2230),
       builder: (c) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
-          Text(body, style: const TextStyle(color: Colors.white70, height: 1.45)),
+          Text(body, style: TextStyle(color: c.palette.textMuted, height: 1.45)),
         ]),
       ),
     );
@@ -81,10 +81,14 @@ class _NightView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppState.I;
+    final p = context.palette;
     final start = night.wentToBed, end = night.wokeUp;
     final range = start.day == end.day
         ? '${end.day} ${_months[end.month - 1]}'
         : '${start.day}-${end.day} ${_months[end.month - 1]}';
+    final mins = night.session.phaseMinutes;
+    final asleep = night.asleepMinutes == 0 ? 1 : night.asleepMinutes;
+    double share(String k) => (mins[k] ?? 0) / asleep;
     return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 40), children: [
       // ── header ───────────────────────────────────────────────────────────
       Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -93,63 +97,90 @@ class _NightView extends StatelessWidget {
         const SizedBox(width: 8),
         Padding(
           padding: const EdgeInsets.only(bottom: 5),
-          child: Text(range, style: const TextStyle(color: Colors.white70)),
+          child: Text(range, style: TextStyle(color: p.textMuted)),
         ),
         const Spacer(),
         IconButton(
-          icon: const Icon(Icons.calendar_month, color: AppTheme.accent),
+          icon: Icon(Icons.ios_share, color: p.accent),
+          onPressed: () => toast(context, 'Share card (not wired in the prototype)'),
+        ),
+        IconButton(
+          icon: Icon(Icons.calendar_month, color: p.accent),
           onPressed: () => _calendar(context),
         ),
       ]),
       const SizedBox(height: 8),
       _WeekStrip(night: night),
-      const Divider(height: 28, color: Colors.white12),
-      // ── summary ──────────────────────────────────────────────────────────
-      Row(children: [
-        GestureDetector(
-          onTap: () => showInfoSheet(context, 'Quality',
+      const SizedBox(height: 28),
+      // ── report hero ──────────────────────────────────────────────────────
+      Text(_greeting(end), textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
+      const SizedBox(height: 6),
+      Text(_verdict(night.quality),
+          textAlign: TextAlign.center, style: TextStyle(color: p.textMuted, fontSize: 15, height: 1.4)),
+      const SizedBox(height: 24),
+      Center(
+        child: GestureDetector(
+          onTap: () => showInfoSheet(context, 'Quality · ${night.quality}%',
               'A 0–100% score from how long you slept, how often you woke and how much time you spent in deeper sleep.'),
-          child: SizedBox(
-            width: 120,
-            height: 120,
-            child: CustomPaint(
-              painter: _RingPainter(night.quality / 100),
-              child: Center(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Text('${night.quality}%', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-                  const Text('Quality ›', style: TextStyle(color: Colors.white60, fontSize: 12)),
-                ]),
-              ),
-            ),
+          child: StageRing(
+            phases: night.session.phases,
+            quality: night.quality,
+            subtitle: fmtDuration(night.asleepMinutes),
           ),
         ),
-        const SizedBox(width: 24),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _big(fmtDuration(night.inBedMinutes), 'In bed ›'),
-            const SizedBox(height: 12),
-            _big(fmtDuration(night.asleepMinutes), 'Asleep ›'),
-          ]),
-        ),
-        IconButton(
-          icon: const Icon(Icons.share, color: AppTheme.accent),
-          onPressed: () => toast(context, 'Share card (not wired in the prototype)'),
-        ),
+      ),
+      const SizedBox(height: 18),
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Icon(Icons.nightlight_round, size: 18, color: p.textMuted),
+        const SizedBox(width: 6),
+        Text(fmtDt(start), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+        const SizedBox(width: 28),
+        Icon(Icons.wb_sunny_outlined, size: 18, color: p.textMuted),
+        const SizedBox(width: 6),
+        Text(fmtDt(end), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
       ]),
       const SizedBox(height: 24),
-      Hypnogram(phases: night.session.phases, start: start),
-      const SizedBox(height: 10),
-      _SnoreRow(night: night),
-      const SizedBox(height: 24),
+      // ── stage tiles ──────────────────────────────────────────────────────
+      _TileGrid(children: [
+        StatTile(color: p.deep, label: 'Deep sleep', minutes: mins['deep'] ?? 0,
+            status: share('deep') >= 0.13 ? 'In range' : 'Below avg',
+            statusIcon: share('deep') >= 0.13 ? Icons.check_circle : Icons.arrow_circle_down),
+        StatTile(color: p.light, label: 'Light sleep', minutes: mins['light'] ?? 0,
+            status: share('light') <= 0.6 ? 'In range' : 'Above avg',
+            statusIcon: share('light') <= 0.6 ? Icons.check_circle : Icons.arrow_circle_up),
+        StatTile(color: p.rem, label: 'REM', minutes: mins['rem'] ?? 0,
+            status: share('rem') >= 0.18 ? 'In range' : 'Below avg',
+            statusIcon: share('rem') >= 0.18 ? Icons.check_circle : Icons.arrow_circle_down),
+        StatTile(color: p.awake, label: 'Awake', minutes: mins['awake'] ?? 0,
+            status: (mins['awake'] ?? 0) <= 30 ? 'Low' : 'High',
+            statusIcon: (mins['awake'] ?? 0) <= 30 ? Icons.check_circle : Icons.arrow_circle_up),
+      ]),
+      const SizedBox(height: 16),
+      // ── graph ────────────────────────────────────────────────────────────
+      GlassCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Text('Sleep graph', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+            const Spacer(),
+            Text('${fmtDuration(night.inBedMinutes)} in bed', style: TextStyle(color: p.textMuted)),
+          ]),
+          const SizedBox(height: 16),
+          Hypnogram(phases: night.session.phases, start: start),
+          const SizedBox(height: 10),
+          _SnoreRow(night: night),
+        ]),
+      ),
+      const SizedBox(height: 16),
       // ── stat grid ────────────────────────────────────────────────────────
-      _StatGrid(night: night),
+      GlassCard(padding: const EdgeInsets.fromLTRB(16, 8, 8, 8), child: _StatGrid(night: night)),
       const SizedBox(height: 16),
       _Card(
         child: ListTile(
-          leading: const Icon(Icons.track_changes, color: AppTheme.accent),
+          leading: Icon(Icons.track_changes, color: p.accent),
           title: const Text('Sleep Goal'),
           trailing: Text(s.pref('sleep_goal') == 'Not set' ? 'Add new ›' : s.pref('sleep_goal'),
-              style: const TextStyle(color: AppTheme.accent)),
+              style: TextStyle(color: p.accent)),
           onTap: () => push(context, const SleepGoalPage()),
         ),
       ),
@@ -157,27 +188,24 @@ class _NightView extends StatelessWidget {
       Align(
         alignment: Alignment.centerLeft,
         child: ActionChip(
-          avatar: const Icon(Icons.edit, size: 18, color: AppTheme.accent),
+          avatar: Icon(Icons.edit, size: 18, color: p.accent),
           label: const Text('Add sleep notes'),
-          labelStyle: const TextStyle(color: AppTheme.accent),
-          backgroundColor: const Color(0xFF15303F),
-          shape: const StadiumBorder(side: BorderSide.none),
+          labelStyle: TextStyle(color: p.accent),
+          backgroundColor: p.surface,
+          shape: StadiumBorder(side: BorderSide(color: p.stroke)),
           onPressed: () => _notesSheet(context),
         ),
       ),
       if (night.notes.isNotEmpty)
         Wrap(spacing: 8, children: [for (final n in night.notes) Chip(label: Text(n))]),
       const SizedBox(height: 16),
-      const _Card(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Sounds', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-            SizedBox(height: 8),
-            Text('Snoring and other sounds from the night will appear here.',
-                style: TextStyle(color: Colors.white60)),
-          ]),
-        ),
+      GlassCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Sounds', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Text('Snoring and other sounds from the night will appear here.',
+              style: TextStyle(color: p.textMuted)),
+        ]),
       ),
       const SizedBox(height: 16),
       const _AlertnessCard(),
@@ -189,31 +217,30 @@ class _NightView extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Row(children: [
-                Text('Breathing disruptions', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-                Spacer(),
-                Icon(Icons.swap_vert, color: AppTheme.accent),
+              Row(children: [
+                const Text('Breathing disruptions', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                const Spacer(),
+                Icon(Icons.swap_vert, color: p.accent),
               ]),
               const SizedBox(height: 10),
               Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                 Text(night.breathingPerHour.toStringAsFixed(1),
                     style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w700)),
-                const Text(' /h', style: TextStyle(color: Colors.white60)),
+                Text(' /h', style: TextStyle(color: p.textMuted)),
                 const Spacer(),
                 _Level(value: night.breathingPerHour),
               ]),
-              const Text('Average', style: TextStyle(color: Colors.white60)),
+              Text('Average', style: TextStyle(color: p.textMuted)),
             ]),
           ),
         ),
       ),
       const SizedBox(height: 20),
       Row(children: [
-        const Text('Online backup  ', style: TextStyle(color: Colors.white60)),
-        Icon(Icons.circle, size: 10, color: s.pref('online_backup') == 'On' ? Colors.greenAccent : Colors.white24),
+        Text('Online backup  ', style: TextStyle(color: p.textMuted)),
+        Icon(Icons.circle, size: 10, color: s.pref('online_backup') == 'On' ? p.positive : p.textFaint),
         const SizedBox(width: 6),
-        Text(s.pref('online_backup') == 'On' ? 'Backed up' : 'Off',
-            style: const TextStyle(color: Colors.white60)),
+        Text(s.pref('online_backup') == 'On' ? 'Backed up' : 'Off', style: TextStyle(color: p.textMuted)),
       ]),
       if (!demo)
         Align(
@@ -225,22 +252,27 @@ class _NightView extends StatelessWidget {
                 s.deleteNight(night);
               }
             },
-            child: const Text('Delete night', style: TextStyle(color: Colors.redAccent)),
+            child: Text('Delete night', style: TextStyle(color: p.awake)),
           ),
         ),
     ]);
   }
 
-  Widget _big(String v, String k) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(v, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
-        Text(k, style: const TextStyle(color: Colors.white60)),
-      ]);
+  static String _greeting(DateTime wokeUp) =>
+      wokeUp.hour < 12 ? 'Good morning' : (wokeUp.hour < 18 ? 'Good afternoon' : 'Good evening');
+
+  static String _verdict(int q) => q >= 85
+      ? 'Your sleep report is in, and it looks great.'
+      : q >= 70
+          ? 'Your sleep report is in, and it\'s looking good.'
+          : q >= 50
+              ? 'Your sleep report is in. A fair night, with room to improve.'
+              : 'Your sleep report is in. A rough night; go easy today.';
 
   void _calendar(BuildContext context) {
     final s = AppState.I;
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0E2230),
       builder: (c) => ListView(children: [
         const Padding(
           padding: EdgeInsets.all(20),
@@ -263,7 +295,6 @@ class _NightView extends StatelessWidget {
   void _notesSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0E2230),
       builder: (c) => StatefulBuilder(
         builder: (c, setSt) => Padding(
           padding: const EdgeInsets.all(20),
@@ -294,6 +325,7 @@ class _WeekStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppState.I;
+    final p = context.palette;
     final day = night.day;
     final sunday = day.subtract(Duration(days: day.weekday % 7));
     return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -309,22 +341,27 @@ class _WeekStrip extends StatelessWidget {
               width: 38,
               height: 38,
               child: CustomPaint(
-                foregroundPainter: n == null ? null : _RingPainter(n.quality / 100, stroke: 3, track: false),
+                foregroundPainter:
+                    n == null ? null : _RingPainter(n.quality / 100, p.quality, p.surfaceHi, stroke: 3, track: false),
                 child: Container(
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: selected ? const Color(0xFF1C3A4A) : const Color(0xFF102633),
+                    color: selected ? p.segThumb : p.surface,
+                    border: Border.all(color: p.stroke),
                   ),
                   child: Text('SMTWTFS'[i],
-                      style: TextStyle(color: selected ? Colors.white : Colors.white54, fontSize: 13)),
+                      style: TextStyle(
+                          color: selected ? p.segThumbText : p.textMuted,
+                          fontSize: 13,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.w400)),
                 ),
               ),
             ),
           );
         }),
       IconButton(
-        icon: const Icon(Icons.description_outlined, color: AppTheme.accent),
+        icon: Icon(Icons.description_outlined, color: p.accent),
         onPressed: () => _weeklyReport(context, sunday),
       ),
     ]);
@@ -370,9 +407,11 @@ class _WeekStrip extends StatelessWidget {
 
 class _RingPainter extends CustomPainter {
   final double value;
+  final Color color;
+  final Color trackColor;
   final double stroke;
   final bool track;
-  _RingPainter(this.value, {this.stroke = 12, this.track = true});
+  _RingPainter(this.value, this.color, this.trackColor, {this.stroke = 12, this.track = true});
   @override
   void paint(Canvas canvas, Size size) {
     final r = Rect.fromLTWH(stroke / 2, stroke / 2, size.width - stroke, size.height - stroke);
@@ -380,12 +419,12 @@ class _RingPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round;
-    if (track) canvas.drawArc(r, 0, 2 * math.pi, false, p..color = const Color(0xFF1C3442));
-    canvas.drawArc(r, -math.pi / 2, 2 * math.pi * value.clamp(0, 1), false, p..color = const Color(0xFFD08A2E));
+    if (track) canvas.drawArc(r, 0, 2 * math.pi, false, p..color = trackColor);
+    canvas.drawArc(r, -math.pi / 2, 2 * math.pi * value.clamp(0, 1), false, p..color = color);
   }
 
   @override
-  bool shouldRepaint(_RingPainter old) => old.value != value;
+  bool shouldRepaint(_RingPainter old) => old.value != value || old.color != color;
 }
 
 class _SnoreRow extends StatelessWidget {
@@ -394,8 +433,9 @@ class _SnoreRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rng = math.Random(night.wentToBed.millisecondsSinceEpoch);
+    final p = context.palette;
     return Row(children: [
-      const SizedBox(width: 62, child: Text('Snore', style: TextStyle(color: Colors.white60, fontSize: 12))),
+      SizedBox(width: 62, child: Text('Snore', style: TextStyle(color: p.textMuted, fontSize: 12))),
       Expanded(
         child: SizedBox(
           height: 14,
@@ -405,7 +445,7 @@ class _SnoreRow extends StatelessWidget {
                 Positioned(
                   left: rng.nextDouble() * (b.maxWidth - 6),
                   top: 4,
-                  child: Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.white38, shape: BoxShape.circle)),
+                  child: Container(width: 6, height: 6, decoration: BoxDecoration(color: p.textFaint, shape: BoxShape.circle)),
                 ),
             ]),
           ),
@@ -445,11 +485,11 @@ class _StatGrid extends StatelessWidget {
           InkWell(
             onTap: () => it.$3 == 'Wake up mood' ? _mood(context) : showInfoSheet(context, it.$3, it.$4),
             child: Row(children: [
-              Icon(it.$1, color: AppTheme.accent, size: 28),
+              Icon(it.$1, color: context.palette.accent, size: 26),
               const SizedBox(width: 12),
               Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(it.$2, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-                Text('${it.$3} ›', style: const TextStyle(color: Colors.white60, fontSize: 13)),
+                Text('${it.$3} ›', style: TextStyle(color: context.palette.textMuted, fontSize: 13)),
               ]),
             ]),
           ),
@@ -460,7 +500,6 @@ class _StatGrid extends StatelessWidget {
   void _mood(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0E2230),
       builder: (c) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -490,12 +529,26 @@ class _Card extends StatelessWidget {
   final Widget child;
   const _Card({required this.child});
   @override
-  Widget build(BuildContext context) => Material(
-        color: const Color(0xFF102633),
-        borderRadius: BorderRadius.circular(14),
-        clipBehavior: Clip.antiAlias,
-        child: child,
-      );
+  Widget build(BuildContext context) => GlassCard(padding: EdgeInsets.zero, child: child);
+}
+
+/// Two-column grid of equal-height tiles.
+class _TileGrid extends StatelessWidget {
+  final List<Widget> children;
+  const _TileGrid({required this.children});
+  @override
+  Widget build(BuildContext context) => Column(children: [
+        for (var i = 0; i < children.length; i += 2) ...[
+          if (i > 0) const SizedBox(height: 12),
+          IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Expanded(child: children[i]),
+              const SizedBox(width: 12),
+              Expanded(child: i + 1 < children.length ? children[i + 1] : const SizedBox()),
+            ]),
+          ),
+        ],
+      ]);
 }
 
 class _AlertnessCard extends StatefulWidget {
@@ -508,28 +561,28 @@ class _AlertnessCardState extends State<_AlertnessCard> {
   bool _remind = false;
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return _Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Row(children: [
-            Text('Beta ', style: TextStyle(color: Color(0xFFE8B04A), fontWeight: FontWeight.w700)),
-            Text('Alertness', style: TextStyle(color: Colors.white60)),
-            Spacer(),
-            Icon(Icons.bolt, color: Colors.white38),
+          Row(children: [
+            Text('Beta ', style: TextStyle(color: p.warn, fontWeight: FontWeight.w700)),
+            Text('Alertness', style: TextStyle(color: p.textMuted)),
+            const Spacer(),
+            Icon(Icons.bolt, color: p.textFaint),
           ]),
           const SizedBox(height: 8),
           const Text('Test available tomorrow', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          const Text('A one-minute reaction test after you wake shows how rested you really are. '
+          Text('A one-minute reaction test after you wake shows how rested you really are. '
               'Track tonight to take it tomorrow morning.',
-              style: TextStyle(color: Colors.white60, height: 1.4)),
+              style: TextStyle(color: p.textMuted, height: 1.4)),
           TextButton.icon(
             style: TextButton.styleFrom(padding: EdgeInsets.zero),
             onPressed: () => setState(() => _remind = !_remind),
-            icon: Icon(_remind ? Icons.notifications_active : Icons.notifications, color: AppTheme.accent),
-            label: Text(_remind ? 'Reminder set' : 'Remind me tomorrow',
-                style: const TextStyle(color: AppTheme.accent)),
+            icon: Icon(_remind ? Icons.notifications_active : Icons.notifications, color: p.accent),
+            label: Text(_remind ? 'Reminder set' : 'Remind me tomorrow', style: TextStyle(color: p.accent)),
           ),
         ]),
       ),
@@ -553,7 +606,10 @@ class _Level extends StatelessWidget {
             width: 26,
             height: 6,
             margin: const EdgeInsets.only(right: 2),
-            color: i == level + (level == 2 ? 1 : 0) ? const Color(0xFFE8B04A) : Colors.white24,
+            decoration: BoxDecoration(
+              color: i == level + (level == 2 ? 1 : 0) ? context.palette.warn : context.palette.surfaceHi,
+              borderRadius: BorderRadius.circular(3),
+            ),
           ),
       ]),
     ]);

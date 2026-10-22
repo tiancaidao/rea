@@ -132,6 +132,7 @@ class AppState extends ChangeNotifier {
     alarmMinute = j['alarmMinute'] as int? ?? alarmMinute;
     alarmMode = j['alarmMode'] as int? ?? alarmMode;
     (j['prefs'] as Map?)?.forEach((k, v) => _prefs[k as String] = v as String);
+    themeName.value = pref('theme');
     final notes = (j['sleepNotes'] as List?)?.cast<String>();
     if (notes != null) sleepNotes
       ..clear()
@@ -205,6 +206,7 @@ class AppState extends ChangeNotifier {
 
   // ── settings (key → current option label) ─────────────────────────────────
   final Map<String, String> _prefs = {
+    'theme': 'Midnight',
     'sleep_goal': 'Not set',
     'alarm_sound': 'Soft breeze',
     'wake_phase': '30',
@@ -238,8 +240,14 @@ class AppState extends ChangeNotifier {
     'consent_product': 'true',
   };
   String pref(String key) => _prefs[key] ?? '';
+
+  /// Active theme label (see `AppThemeId`), mirrored out of the prefs so the
+  /// app root can listen to it alone.
+  final ValueNotifier<String> themeName = ValueNotifier('Midnight');
+
   void setPref(String key, String value) {
     _prefs[key] = value;
+    if (key == 'theme') themeName.value = value;
     notifyListeners();
   }
 

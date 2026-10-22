@@ -71,16 +71,16 @@ class _LoginScreenState extends State<LoginScreen> {
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+                child: Text(_error!, style: TextStyle(color: context.palette.awake)),
               ),
             if (!Backend.I.enabled)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
                 child: Text('Offline build: your nights stay on this device.',
-                    style: TextStyle(color: Colors.white54)),
+                    style: TextStyle(color: context.palette.textMuted)),
               ),
             _busy
-                ? const Center(child: CircularProgressIndicator(color: AppTheme.accent))
+                ? Center(child: CircularProgressIndicator(color: context.palette.accent))
                 : PillButton(title, onPressed: _submit),
           ]),
         ),

@@ -53,9 +53,33 @@ lib/
   data/programs.dart           # programs + lessons (our own placeholder content)
   sensing/sleep_tracker.dart   # orchestrates a night; SimulatedNight source for dev
   app_state.dart               # in-memory app state (alarm, settings, nights, sleep aid)
+  theme.dart                   # theme entry point (re-exports theme/)
+  theme/palette.dart           # SleepPalette: every color/radius/font token, read via context.palette
+  theme/{midnight,mist,classic}_theme.dart  # one palette per theme
+  theme/app_themes.dart        # AppThemeId list + palette → ThemeData builder
   ui/                          # screens, see "Navigation" below
+  ui/widgets/themed.dart       # glass card, pill segments, stage ring/bars, stat + insight cards
 test/
+tool/theme_screenshots_test.dart  # renders each theme to build/theme_screenshots/
 ```
+
+## Themes
+
+Pick one in **Profile › Theme** (saved with the other settings; Midnight is the default).
+
+| Theme | Look |
+|---|---|
+| **Midnight** | Near-black glass cards, DM Sans, blue stage gradient (royal blue deep, mid-blue light, pale cyan REM, pink-red awake), a stage ring report and pill segmented controls. |
+| **Mist** | The light counterpart: misty sage-grey air, frosted white cards, forest-ink text and a forest → sage → mint stage scale with terracotta for awake. |
+| **Classic** | The original teal night sky with the orange call to action. |
+
+Screens never hard-code colors: they read `context.palette`, so a new theme is
+one new `SleepPalette` file plus an `AppThemeId` entry. Regenerate the previews
+with `flutter test tool/theme_screenshots_test.dart`.
+
+![Midnight](docs/themes/midnight.png)
+![Mist](docs/themes/mist.png)
+![Classic](docs/themes/classic.png)
 
 ## Navigation
 

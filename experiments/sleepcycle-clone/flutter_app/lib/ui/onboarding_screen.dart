@@ -67,7 +67,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: DecoratedBox(
-        decoration: const BoxDecoration(gradient: AppTheme.nightGradient),
+        decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: context.palette.backdrop)),
         child: SafeArea(
           child: Column(
             children: [
@@ -89,7 +89,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       width: i == _page ? 22 : 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: i == _page ? AppTheme.primary : Colors.white24,
+                        color: i == _page ? context.palette.accent : context.palette.textFaint,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
@@ -153,15 +153,15 @@ class _StepView extends StatelessWidget {
             child: Lottie.asset(step.lottie!,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) =>
-                    const DecoratedBox(decoration: BoxDecoration(gradient: AppTheme.nightGradient))),
+                    DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: context.palette.backdrop)))),
           ),
-          const Positioned.fill(
+          Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.center,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0x00000000), Color(0xCC080B18)],
+                  colors: [context.palette.bg.withOpacity(0), context.palette.bg.withOpacity(0.85)],
                 ),
               ),
             ),
@@ -182,7 +182,7 @@ class _StepView extends StatelessWidget {
                 if (step.body.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(step.body,
-                      style: const TextStyle(color: Colors.white70, fontSize: 16, height: 1.4)),
+                      style: TextStyle(color: context.palette.textMuted, fontSize: 16, height: 1.4)),
                 ],
               ],
             ),
@@ -210,14 +210,14 @@ class _StepView extends StatelessWidget {
           if (step.body.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(step.body,
-                style: const TextStyle(color: Colors.white70, height: 1.4),
+                style: TextStyle(color: context.palette.textMuted, height: 1.4),
                 textAlign: TextAlign.center),
           ],
           if (step.bigValue != null) ...[
             const SizedBox(height: 16),
             Text(step.bigValue!,
-                style: const TextStyle(
-                    fontSize: 56, fontWeight: FontWeight.bold, color: AppTheme.accent)),
+                style: TextStyle(
+                    fontSize: 56, fontWeight: FontWeight.bold, color: context.palette.accent)),
           ],
           if (step.perks.isNotEmpty) ...[
             const SizedBox(height: 20),
@@ -227,7 +227,7 @@ class _StepView extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.check_circle, size: 20, color: AppTheme.accent),
+                    Icon(Icons.check_circle, size: 20, color: context.palette.accent),
                     const SizedBox(width: 10),
                     Expanded(
                         child: Text(p, style: const TextStyle(color: Colors.white, height: 1.3))),
@@ -238,7 +238,7 @@ class _StepView extends StatelessWidget {
           if (step.footnote != null && step.footnote!.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(step.footnote!,
-                style: const TextStyle(color: Colors.white38, fontSize: 12),
+                style: TextStyle(color: context.palette.textFaint, fontSize: 12),
                 textAlign: TextAlign.center),
           ],
         ],
@@ -259,13 +259,13 @@ class _Art extends StatelessWidget {
       return Lottie.asset(
         step.lottie!,
         fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => _iconBadge(),
+        errorBuilder: (_, __, ___) => _iconBadge(context),
       );
     }
-    return _iconBadge();
+    return _iconBadge(context);
   }
 
-  Widget _iconBadge() => TweenAnimationBuilder<double>(
+  Widget _iconBadge(BuildContext context) => TweenAnimationBuilder<double>(
         tween: Tween(begin: 0.8, end: 1),
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeOutBack,
@@ -273,8 +273,8 @@ class _Art extends StatelessWidget {
         child: Container(
           width: 140,
           height: 140,
-          decoration: const BoxDecoration(shape: BoxShape.circle, color: AppTheme.surfaceHi),
-          child: Icon(step.icon, size: 68, color: AppTheme.accent),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: context.palette.surfaceHi),
+          child: Icon(step.icon, size: 68, color: context.palette.accent),
         ),
       );
 }

@@ -5,6 +5,7 @@ import '../data/recorded_night.dart';
 import '../theme.dart';
 import 'journal_tab.dart' show DemoOverlay;
 import 'widgets/common.dart';
+import 'widgets/themed.dart';
 
 /// Statistics tab: Days / Weeks / Months / All segmented control over a stack
 /// of per-metric charts, each with "More ›" into a detail page. Before the
@@ -20,7 +21,7 @@ enum ChartKind { bar, line, range }
 class Metric {
   final String title;
   final ChartKind kind;
-  final Color color;
+  final Color Function(SleepPalette) color;
   final double Function(Night) value;
   final double Function(Night)? low; // range charts: value = high end
   final String Function(double) fmt;
@@ -36,32 +37,38 @@ String _clockFmt(double v) {
   return fmtTime(m ~/ 60, m % 60);
 }
 
+Color _quality(SleepPalette p) => p.quality;
+Color _chart(SleepPalette p) => p.chart;
+Color _line(SleepPalette p) => p.chartAlt;
+Color _deep(SleepPalette p) => p.deep;
+Color _positive(SleepPalette p) => p.positive;
+
 final metrics = <Metric>[
-  Metric('Sleep quality', ChartKind.bar, const Color(0xFFD08A2E), (n) => n.quality.toDouble(),
+  Metric('Sleep quality', ChartKind.bar, _quality, (n) => n.quality.toDouble(),
       (v) => '${v.round()}%', 'Your nightly quality score.', maxY: 100),
-  Metric('Regularity', ChartKind.range, const Color(0xFF2C7F98), (n) => _clock(n.wokeUp),
+  Metric('Regularity', ChartKind.range, _chart, (n) => _clock(n.wokeUp),
       _clockFmt, 'Each bar spans bedtime to wake-up. Shorter spread between nights means a steadier rhythm.',
       low: (n) => _clock(n.wentToBed)),
-  Metric('Went to bed', ChartKind.line, const Color(0xFF7FA6B8), (n) => _clock(n.wentToBed), _clockFmt,
+  Metric('Went to bed', ChartKind.line, _line, (n) => _clock(n.wentToBed), _clockFmt,
       'When you started tracking.'),
-  Metric('Woke up', ChartKind.line, const Color(0xFF7FA6B8), (n) => _clock(n.wokeUp), _clockFmt,
+  Metric('Woke up', ChartKind.line, _line, (n) => _clock(n.wokeUp), _clockFmt,
       'When tracking stopped.'),
-  Metric('Time in bed', ChartKind.bar, const Color(0xFF2C7F98), (n) => n.inBedMinutes / 60,
+  Metric('Time in bed', ChartKind.bar, _chart, (n) => n.inBedMinutes / 60,
       (v) => '${v.toStringAsFixed(1)}h', 'Total time tracked each night.'),
-  Metric('Asleep', ChartKind.bar, const Color(0xFF2C7F98), (n) => n.asleepMinutes / 60,
+  Metric('Asleep', ChartKind.bar, _chart, (n) => n.asleepMinutes / 60,
       (v) => '${v.toStringAsFixed(1)}h', 'Time actually asleep.'),
-  Metric('Asleep after', ChartKind.line, const Color(0xFF7FA6B8), (n) => n.asleepAfterMinutes.toDouble(),
+  Metric('Asleep after', ChartKind.line, _line, (n) => n.asleepAfterMinutes.toDouble(),
       (v) => '${v.round()}m', 'How long it took to fall asleep.'),
-  Metric('Snore', ChartKind.bar, const Color(0xFF2C7F98), (n) => n.snoreMinutes.toDouble(),
+  Metric('Snore', ChartKind.bar, _chart, (n) => n.snoreMinutes.toDouble(),
       (v) => '${v.round()}m', 'Minutes of snoring per night.'),
-  Metric('Coughing', ChartKind.bar, const Color(0xFF2C7F98), (n) => n.coughs.toDouble(),
+  Metric('Coughing', ChartKind.bar, _chart, (n) => n.coughs.toDouble(),
       (v) => v.toStringAsFixed(0), 'Coughs detected per night.'),
-  Metric('Steps', ChartKind.bar, const Color(0xFF2C7F98), (n) => (n.steps ?? 0).toDouble(),
+  Metric('Steps', ChartKind.bar, _chart, (n) => (n.steps ?? 0).toDouble(),
       (v) => v.round().toString(), 'Steps the day before each night.'),
-  Metric('Deep sleep', ChartKind.bar, const Color(0xFF8C8A4E),
+  Metric('Deep sleep', ChartKind.bar, _deep,
       (n) => (n.session.phaseMinutes['deep'] ?? 0) / 60, (v) => '${v.toStringAsFixed(1)}h',
       'Hours in deep sleep.'),
-  Metric('Breathing disruptions', ChartKind.bar, const Color(0xFF2E7D5B), (n) => n.breathingPerHour,
+  Metric('Breathing disruptions', ChartKind.bar, _positive, (n) => n.breathingPerHour,
       (v) => v.toStringAsFixed(1), 'Breathing disruptions per hour of sleep.'),
 ];
 
@@ -123,9 +130,15 @@ class _StatisticsTabState extends State<StatisticsTab> {
           final demo = s.nights.isEmpty;
           final nights = demo ? _demo : s.nights;
           final content = ListView(padding: const EdgeInsets.fromLTRB(20, 24, 20, 120), children: [
-            const Text('Statistics', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700)),
+            const Text('Sleep stats', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
             _Segments(value: _period, onChanged: (v) => setState(() => _period = v)),
+            const SizedBox(height: 20),
+            _WeekOverview(nights: nights),
+            const SizedBox(height: 24),
+            const Eyebrow('Personal insights'),
+            const SizedBox(height: 10),
+            _insight(nights),
             for (final m in metrics) _ChartCard(metric: m, points: _series(m, nights, _period), demo: demo, nights: nights),
           ]);
           return demo
@@ -137,32 +150,80 @@ class _StatisticsTabState extends State<StatisticsTab> {
   }
 }
 
+/// Bedtime consistency over the last week, phrased as a tip.
+Widget _insight(List<Night> nights) {
+  final last = nights.length > 7 ? nights.sublist(nights.length - 7) : nights;
+  if (last.length < 2) {
+    return const InsightCard(
+        icon: Icons.bedtime_outlined,
+        title: 'Keep tracking',
+        body: 'A few more nights and we can spot patterns in your sleep.');
+  }
+  final beds = [for (final n in last) _clock(n.wentToBed)];
+  final mean = beds.reduce((a, b) => a + b) / beds.length;
+  final sd = math.sqrt(beds.map((b) => (b - mean) * (b - mean)).reduce((a, b) => a + b) / beds.length);
+  return sd > 30
+      ? InsightCard(
+          icon: Icons.layers_outlined,
+          title: 'Try to be more consistent',
+          body: 'Your bedtime moved by about ${sd.round()} minutes this week. Going to bed and getting up '
+              'at the same time each day steadies your rhythm.')
+      : const InsightCard(
+          icon: Icons.layers_outlined,
+          title: 'Nicely consistent',
+          body: 'You went to bed at about the same time every night this week. That steadiness shows in '
+              'your deep sleep, so keep it up.');
+}
+
+/// Average time asleep plus one stage bar per night of the last week.
+class _WeekOverview extends StatelessWidget {
+  final List<Night> nights;
+  const _WeekOverview({required this.nights});
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final last = nights.length > 7 ? nights.sublist(nights.length - 7) : nights;
+    final avg = last.isEmpty ? 0 : last.map((n) => n.asleepMinutes).reduce((a, b) => a + b) ~/ last.length;
+    final big = TextStyle(fontSize: 34, fontWeight: FontWeight.w600, color: p.text, height: 1.1);
+    final small = TextStyle(fontSize: 17, color: p.textMuted);
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.bed_outlined, size: 18, color: p.textMuted),
+          const SizedBox(width: 8),
+          Text('Average time asleep', style: TextStyle(color: p.textMuted)),
+        ]),
+        const SizedBox(height: 6),
+        Text.rich(TextSpan(children: [
+          TextSpan(text: '${avg ~/ 60}', style: big),
+          TextSpan(text: ' h ', style: small),
+          TextSpan(text: '${avg.remainder(60)}', style: big),
+          TextSpan(text: ' min', style: small),
+        ])),
+        const SizedBox(height: 18),
+        StageBars(nights: [
+          for (final n in last) ('MTWTFSS'[n.day.weekday - 1], n.wentToBed, n.session.phases),
+        ]),
+        const SizedBox(height: 14),
+        Wrap(spacing: 14, runSpacing: 6, children: [
+          LegendDot(p.deep, 'Deep'),
+          LegendDot(p.light, 'Light'),
+          LegendDot(p.rem, 'REM'),
+          LegendDot(p.awake, 'Awake'),
+        ]),
+      ]),
+    );
+  }
+}
+
 class _Segments extends StatelessWidget {
   final int value;
   final ValueChanged<int> onChanged;
   const _Segments({required this.value, required this.onChanged});
   @override
-  Widget build(BuildContext context) {
-    const labels = ['Days', 'Weeks', 'Months', 'All'];
-    return Container(
-      height: 40,
-      decoration: BoxDecoration(color: const Color(0xFF102633), borderRadius: BorderRadius.circular(8)),
-      child: Row(children: [
-        for (var i = 0; i < 4; i++)
-          Expanded(
-            child: GestureDetector(
-              onTap: () => onChanged(i),
-              child: Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                    color: value == i ? const Color(0xFF2A5C70) : null, borderRadius: BorderRadius.circular(8)),
-                child: Text(labels[i], style: TextStyle(color: value == i ? Colors.white : Colors.white60)),
-              ),
-            ),
-          ),
-      ]),
-    );
-  }
+  Widget build(BuildContext context) =>
+      SegmentedPill(labels: const ['Days', 'Weeks', 'Months', 'All'], value: value, onChanged: onChanged);
 }
 
 class _ChartCard extends StatelessWidget {
@@ -173,28 +234,31 @@ class _ChartCard extends StatelessWidget {
   const _ChartCard({required this.metric, required this.points, required this.demo, required this.nights});
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return Padding(
-      padding: const EdgeInsets.only(top: 28),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(metric.title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
-          if (demo)
-            const Padding(
-              padding: EdgeInsets.only(left: 6, bottom: 3),
-              child: Text('(DEMO DATA)', style: TextStyle(fontSize: 11, color: Colors.white60)),
+      padding: const EdgeInsets.only(top: 16),
+      child: GlassCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Text(metric.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            if (demo)
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: Text('(DEMO DATA)', style: TextStyle(fontSize: 11, color: p.textMuted)),
+              ),
+            const Spacer(),
+            ActionChip(
+              label: const Text('More ›'),
+              labelStyle: TextStyle(color: p.accent, fontSize: 13),
+              backgroundColor: p.surfaceHi,
+              shape: StadiumBorder(side: BorderSide(color: p.stroke)),
+              onPressed: () => push(context, _MetricDetail(metric: metric, nights: nights)),
             ),
-          const Spacer(),
-          ActionChip(
-            label: const Text('More ›'),
-            labelStyle: const TextStyle(color: AppTheme.accent, fontSize: 13),
-            backgroundColor: const Color(0xFF102633),
-            shape: const StadiumBorder(side: BorderSide.none),
-            onPressed: () => push(context, _MetricDetail(metric: metric, nights: nights)),
-          ),
+          ]),
+          const SizedBox(height: 8),
+          SizedBox(height: 160, child: CustomPaint(painter: _ChartPainter(metric, points, p), size: Size.infinite)),
         ]),
-        const SizedBox(height: 8),
-        SizedBox(height: 170, child: CustomPaint(painter: _ChartPainter(metric, points), size: Size.infinite)),
-      ]),
+      ),
     );
   }
 }
@@ -221,7 +285,7 @@ class _MetricDetailState extends State<_MetricDetail> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _Segments(value: _period, onChanged: (v) => setState(() => _period = v)),
           const SizedBox(height: 20),
-          SizedBox(height: 260, child: CustomPaint(painter: _ChartPainter(m, pts), size: Size.infinite)),
+          SizedBox(height: 260, child: CustomPaint(painter: _ChartPainter(m, pts, context.palette), size: Size.infinite)),
           const SizedBox(height: 20),
           Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
             _kv('Average', stat((v) => v.reduce((a, b) => a + b) / v.length)),
@@ -236,14 +300,15 @@ class _MetricDetailState extends State<_MetricDetail> {
 
   Widget _kv(String k, String v) => Column(children: [
         Text(v, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-        Text(k, style: const TextStyle(color: Colors.white60)),
+        Text(k, style: TextStyle(color: context.palette.textMuted)),
       ]);
 }
 
 class _ChartPainter extends CustomPainter {
   final Metric m;
   final List<_Point> pts;
-  _ChartPainter(this.m, this.pts);
+  final SleepPalette p;
+  _ChartPainter(this.m, this.pts, this.p);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -270,18 +335,19 @@ class _ChartPainter extends CustomPainter {
 
     final tp = TextPainter(textDirection: TextDirection.ltr, textAlign: TextAlign.center);
     final grid = Paint()
-      ..color = Colors.white12
+      ..color = p.divider
       ..strokeWidth = 1;
     for (var g = 0; g <= 3; g++) {
       final v = lo + (hi - lo) * g / 3;
       final yy = y(v);
       canvas.drawLine(Offset(left, yy), Offset(size.width, yy), grid);
-      tp.text = TextSpan(text: m.fmt(v), style: const TextStyle(color: Colors.white60, fontSize: 10));
+      tp.text = TextSpan(text: m.fmt(v), style: TextStyle(color: p.textMuted, fontSize: 10, fontFamily: p.fontFamily));
       tp.layout(maxWidth: left - 4);
       tp.paint(canvas, Offset(0, yy - tp.height / 2));
     }
 
-    final paint = Paint()..color = m.color;
+    final color = m.color(p);
+    final paint = Paint()..color = color;
     if (m.kind == ChartKind.line) {
       final path = Path();
       for (var i = 0; i < pts.length; i++) {
@@ -289,7 +355,7 @@ class _ChartPainter extends CustomPainter {
         i == 0 ? path.moveTo(o.dx, o.dy) : path.lineTo(o.dx, o.dy);
       }
       canvas.drawPath(path, Paint()
-        ..color = m.color
+        ..color = color
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2);
       for (var i = 0; i < pts.length; i++) {
@@ -303,19 +369,19 @@ class _ChartPainter extends CustomPainter {
         canvas.drawRRect(
             RRect.fromRectAndRadius(
                 Rect.fromLTRB(x(i) - bw / 2, math.min(top, base), x(i) + bw / 2, math.max(top, base)),
-                const Radius.circular(4)),
+                Radius.circular(math.min(bw / 2, 8))),
             paint);
       }
     }
 
     final every = (pts.length / 8).ceil();
     for (var i = 0; i < pts.length; i += every) {
-      tp.text = TextSpan(text: pts[i].label, style: const TextStyle(color: Colors.white60, fontSize: 10));
+      tp.text = TextSpan(text: pts[i].label, style: TextStyle(color: p.textMuted, fontSize: 10, fontFamily: p.fontFamily));
       tp.layout(maxWidth: slot * every);
       tp.paint(canvas, Offset(x(i) - tp.width / 2, h + 6));
     }
   }
 
   @override
-  bool shouldRepaint(_ChartPainter old) => old.pts != pts;
+  bool shouldRepaint(_ChartPainter old) => old.pts != pts || old.p != p;
 }

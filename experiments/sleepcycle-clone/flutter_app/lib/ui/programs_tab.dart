@@ -44,10 +44,10 @@ class _ProgramCard extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(program.title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 6),
-                Text(program.subtitle, style: const TextStyle(color: Colors.white70, height: 1.3)),
+                Text(program.subtitle, style: TextStyle(color: context.palette.textMuted, height: 1.3)),
               ]),
             ),
-            Icon(program.icon, size: 72, color: Colors.white30),
+            Icon(program.icon, size: 72, color: context.palette.textFaint),
           ]),
         ),
       ),
@@ -75,7 +75,7 @@ class ProgramDetail extends StatelessWidget {
                 decoration: BoxDecoration(
                     gradient: LinearGradient(
                         colors: program.colors, begin: Alignment.topCenter, end: Alignment.bottomCenter)),
-                child: Icon(program.icon, size: 140, color: Colors.white24),
+                child: Icon(program.icon, size: 140, color: context.palette.textFaint),
               ),
             ),
           ),
@@ -112,8 +112,8 @@ class ProgramDetail extends StatelessWidget {
                                     colors: program.colors,
                                     icon: l.kind == LessonKind.video ? Icons.play_circle : program.icon)),
                             if (s.completedLessons.contains(l.id))
-                              const Positioned(
-                                  right: 6, top: 6, child: Icon(Icons.check_circle, color: AppTheme.accent)),
+                              Positioned(
+                                  right: 6, top: 6, child: Icon(Icons.check_circle, color: context.palette.accent)),
                           ]),
                         ),
                         const SizedBox(height: 6),
@@ -200,7 +200,7 @@ class _VideoLessonState extends State<_VideoLesson> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
               child: FilledButton.icon(
-                style: FilledButton.styleFrom(backgroundColor: AppTheme.cta, foregroundColor: Colors.white),
+                style: FilledButton.styleFrom(backgroundColor: context.palette.cta.first, foregroundColor: context.palette.onCta),
                 onPressed: () => setState(() => _muted = !_muted),
                 icon: Icon(_muted ? Icons.volume_off : Icons.volume_up),
                 label: Text(_muted ? 'Unmute' : 'Mute'),
@@ -261,7 +261,7 @@ class _CardsLessonState extends State<_CardsLesson> {
                 padding: const EdgeInsets.all(24),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const SizedBox(height: 40),
-                  Center(child: Icon(cards[i].icon, size: 160, color: Colors.white70)),
+                  Center(child: Icon(cards[i].icon, size: 160, color: context.palette.textMuted)),
                   const SizedBox(height: 48),
                   _rich(cards[i].text),
                 ]),

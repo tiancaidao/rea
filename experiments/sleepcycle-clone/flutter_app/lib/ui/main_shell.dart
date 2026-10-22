@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme.dart';
 import 'journal_tab.dart';
 import 'profile_tab.dart';
 import 'programs_tab.dart';
@@ -34,17 +33,10 @@ class MainShell extends StatelessWidget {
           bottomNavigationBar: NavigationBar(
             selectedIndex: s.tab,
             onDestinationSelected: s.goTab,
-            backgroundColor: const Color(0xFF0A1B26),
-            indicatorColor: Colors.transparent,
             height: 68,
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             destinations: [
-              for (final t in _tabs)
-                NavigationDestination(
-                  icon: Icon(t.$1, color: const Color(0xFF5F8396)),
-                  selectedIcon: Icon(t.$1, color: AppTheme.accent),
-                  label: t.$2,
-                ),
+              for (final t in _tabs) NavigationDestination(icon: Icon(t.$1), label: t.$2),
             ],
           ),
         ));

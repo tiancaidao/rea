@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/models.dart';
+import '../../theme.dart';
 
 /// Smooth "wave" hypnogram: depth curve (Awake at top, Deep sleep at bottom)
 /// drawn as a moving-average of per-epoch stages so transitions read as waves
@@ -15,10 +16,11 @@ class Hypnogram extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const style = TextStyle(color: Colors.white60, fontSize: 12);
+    final p = context.palette;
+    final style = TextStyle(color: p.textMuted, fontSize: 12);
     final chart = SizedBox(
       height: height,
-      child: CustomPaint(painter: HypnogramPainter(phases), size: Size.infinite),
+      child: CustomPaint(painter: HypnogramPainter(phases, p), size: Size.infinite),
     );
     if (!labels) return chart;
     final hours = <int>[];
@@ -35,7 +37,7 @@ class Hypnogram extends StatelessWidget {
         SizedBox(
           width: 62,
           height: height,
-          child: const Column(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -49,7 +51,7 @@ class Hypnogram extends StatelessWidget {
       ]),
       const SizedBox(height: 6),
       Row(children: [
-        const SizedBox(width: 62, child: Text('Time', style: style)),
+        SizedBox(width: 62, child: Text('Time', style: style)),
         Expanded(
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
             for (final h in hours) Text('${h % 12 == 0 ? 12 : h % 12}', style: style),
@@ -62,7 +64,8 @@ class Hypnogram extends StatelessWidget {
 
 class HypnogramPainter extends CustomPainter {
   final List<PhasePoint> phases;
-  HypnogramPainter(this.phases);
+  final SleepPalette p;
+  HypnogramPainter(this.phases, this.p);
 
   // depth: awake=0 (top) ... deep=3 (bottom)
   static const _depth = {'awake': 0.0, 'rem': 1.0, 'light': 2.0, 'deep': 3.0};
@@ -89,7 +92,7 @@ class HypnogramPainter extends CustomPainter {
     final pts = [for (var i = 0; i < n; i++) Offset(x(i), y(sm[i]))];
 
     final grid = Paint()
-      ..color = Colors.white10
+      ..color = p.divider
       ..strokeWidth = 1;
     for (var l = 0; l <= 3; l++) {
       final yy = y(l.toDouble());
@@ -110,16 +113,21 @@ class HypnogramPainter extends CustomPainter {
     canvas.drawPath(
       fill,
       Paint()
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0x553FC1E0), Color(0x05071620)],
+          colors: [p.light.withOpacity(0.35), p.deep.withOpacity(0.02)],
         ).createShader(Offset.zero & size),
     );
     canvas.drawPath(
       line,
       Paint()
-        ..color = const Color(0xFF4FC6E6)
+        // stroke shades by depth: awake at the top through to deep sleep
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [p.awake, p.rem, p.light, p.deep],
+        ).createShader(Offset.zero & size)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5
         ..strokeJoin = StrokeJoin.round,
@@ -127,5 +135,5 @@ class HypnogramPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(HypnogramPainter old) => old.phases != phases;
+  bool shouldRepaint(HypnogramPainter old) => old.phases != phases || old.p != p;
 }

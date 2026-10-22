@@ -1,0 +1,40 @@
+import 'package:flutter/material.dart';
+import 'palette.dart';
+
+/// Near-black glass with a blue stage gradient: deep sleep in royal blue,
+/// light sleep in mid blue, REM in pale cyan and awake in a warm pink-red.
+/// A faint mauve bloom sits behind hero elements like a bedside lamp.
+const midnightPalette = SleepPalette(
+  brightness: Brightness.dark,
+  fontFamily: 'DMSans',
+  bg: Color(0xFF0A0A0D),
+  backdrop: [Color(0xFF18171D), Color(0xFF0A0A0D)],
+  glow: Color(0x405A4468),
+  stars: Color(0xFFE4E6F5),
+  surface: Color(0xFF17171C),
+  surfaceHi: Color(0xFF24242B),
+  sheet: Color(0xFF141418),
+  stroke: Color(0x14FFFFFF),
+  divider: Color(0x14FFFFFF),
+  radius: 22,
+  text: Color(0xFFF3F3F6),
+  textMuted: Color(0xFF9C9CA8),
+  textFaint: Color(0xFF5F5F6A),
+  accent: Color(0xFF8AB0FF),
+  cta: [Color(0xFF3E5BDB), Color(0xFF5E9CF2)],
+  onCta: Colors.white,
+  warn: Color(0xFFF2A65A),
+  positive: Color(0xFF7DD3A8),
+  nav: Color(0xFF0E0E12),
+  navIdle: Color(0xFF5F5F6A),
+  segTrack: Color(0xFF26252C),
+  segThumb: Color(0xFF0B0B0E),
+  segThumbText: Colors.white,
+  deep: Color(0xFF3D58DB),
+  light: Color(0xFF5E9CF2),
+  rem: Color(0xFFA6DCF7),
+  awake: Color(0xFFF2416B),
+  quality: Color(0xFF5E9CF2),
+  chart: Color(0xFF4F78E8),
+  chartAlt: Color(0xFFA6DCF7),
+);

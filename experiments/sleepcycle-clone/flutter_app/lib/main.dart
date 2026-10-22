@@ -23,18 +23,24 @@ class SleepApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Sleep Tracker',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark(),
-      home: AppState.I.onboarded
-          ? const MainShell()
-          : Builder(
-              builder: (context) => OnboardingScreen(
-                onDone: () => Navigator.pushReplacement(
-                    context, MaterialPageRoute(builder: (_) => const WelcomeScreen())),
-              ),
-            ),
+    // Rebuild only when the theme preference changes, not on every state tick.
+    return ValueListenableBuilder<String>(
+      valueListenable: AppState.I.themeName,
+      builder: (context, name, _) => MaterialApp(
+        title: 'Sleep Tracker',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(AppThemeId.byLabel(name).palette),
+        home: _home,
+      ),
     );
   }
+
+  Widget get _home => AppState.I.onboarded
+      ? const MainShell()
+      : Builder(
+          builder: (context) => OnboardingScreen(
+            onDone: () => Navigator.pushReplacement(
+                context, MaterialPageRoute(builder: (_) => const WelcomeScreen())),
+          ),
+        );
 }
