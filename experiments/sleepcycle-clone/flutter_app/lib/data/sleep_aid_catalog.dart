@@ -111,6 +111,9 @@ class SleepAidCatalog {
     'drops',
     'brown',
     'pink',
+    'calm-rain',
+    'waves',
+    'white',
     'whale-throat',
     'peter-rabbit',
     'low-tide',
@@ -118,6 +121,7 @@ class SleepAidCatalog {
     'wynken',
   };
 
+  static const _free = 'assets/free/audio/';
   static const _dusk = [Color(0xFFF0A36B), Color(0xFF3B2F5C)];
   static const _sea = [Color(0xFF2E7D9A), Color(0xFF0D2236)];
   static const _rain = [Color(0xFF3C5A78), Color(0xFF101828)];
@@ -162,6 +166,19 @@ class SleepAidCatalog {
       SleepAidItem(id: 'brown', title: 'Brown noise', art: _city),
       SleepAidItem(id: 'pink', title: 'Pink noise', art: _violet),
       SleepAidItem(id: 'swell', title: 'Ocean swell', art: _sea),
+      // Real field recordings (assets/free/CREDITS-audio.md).
+      SleepAidItem(id: 'calm-rain', title: 'Calm rain', art: _rain, asset: '${_free}amb_calm_rain.mp3'),
+      SleepAidItem(id: 'night-rain', title: 'Rain at night', art: _rain, asset: '${_free}amb_night_rain.mp3'),
+      SleepAidItem(id: 'thunder', title: 'Distant thunder', art: _violet, asset: '${_free}amb_thunder.mp3'),
+      SleepAidItem(id: 'rain-birds', title: 'Rain & birdsong', art: _forest, asset: '${_free}amb_rain_birds.mp3'),
+      SleepAidItem(id: 'waves', title: 'Waves on the shore', art: _sea, asset: '${_free}amb_waves.mp3'),
+      SleepAidItem(id: 'waterfall', title: 'Waterfall', art: _forest, asset: '${_free}amb_waterfall.mp3'),
+      SleepAidItem(id: 'river', title: 'Mountain river', art: _sea, asset: '${_free}amb_river.mp3'),
+      SleepAidItem(id: 'forest-birds', title: 'Forest birds', art: _forest, asset: '${_free}amb_forest_birds.mp3'),
+      SleepAidItem(id: 'wind', title: 'Wind in the trees', art: _city, asset: '${_free}amb_wind.mp3'),
+      SleepAidItem(id: 'stream', title: 'Babbling stream', art: _forest, asset: '${_free}amb_stream.mp3'),
+      SleepAidItem(id: 'heartbeat', title: 'Slow heartbeat', art: _ember, asset: '${_free}amb_heartbeat.mp3'),
+      SleepAidItem(id: 'white', title: 'White noise', art: _violet),
     ]),
     // Real public-domain readings from LibriVox (assets/free/CREDITS.md).
     SleepAidSection('Stories', SectionLayout.hero, [

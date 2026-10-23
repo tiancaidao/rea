@@ -337,7 +337,7 @@ class AppState extends ChangeNotifier {
   /// with no placeholders at all, our own ambience.
   String? audioFor(SleepAidItem item) {
     if (item.asset != null &&
-        (item.asset!.startsWith('assets/free/') ||
+        (freeAudio.contains(item.asset) ||
             ambienceAudio.contains(item.asset) ||
             alarmAudio.contains(item.asset))) {
       return item.asset;

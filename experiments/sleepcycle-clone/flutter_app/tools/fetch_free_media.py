@@ -61,6 +61,15 @@ ITEMS = [
  ("amb_night_forest", "File:Audio Hörbild Grillenzirpen - nachts um 3 im Föhrenwald Mödling.wav", 0, 40, "amb"),
  ("amb_stream", "File:433589 jackthemurray stream-river-water-up-close.wav", 0, 60, "amb"),
  ("amb_droplets", "File:Listening to Raindrops (1035382 - heavy loop).mp3", 0, 30, "amb"),
+ ("amb_calm_rain", "File:Calm rain.wav", 60, 90, "amb"),
+ ("amb_night_rain", "File:Chuva da noite (rain version) - Felipe RuizBRX11.wav", 30, 90, "amb"),
+ ("amb_thunder", "File:Gewittergeräusche in Hof 20250521 C1332Gewitter.wav", 0, 36, "amb"),
+ ("amb_rain_birds", "File:Bourne woods Birdsong and rain 2020-06-17 0742.mp3", 2, 70, "amb"),
+ ("amb_waves", "File:Sea waves.wav", 0, 19, "amb"),
+ ("amb_waterfall", "File:Waterfall and birds sounds.wav", 0, 39, "amb"),
+ ("amb_river", "File:20221127 - Céret - Le Tech - Audio.wav", 5, 90, "amb"),
+ ("amb_forest_birds", "File:Birds in mixed forest.wav", 10, 90, "amb"),
+ ("amb_heartbeat", "File:Athletic bradycardia wav.wav", 0, 18, "amb"),
 ]
 credits = []
 for out, title, start, length, kind in ITEMS:
