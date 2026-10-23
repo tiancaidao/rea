@@ -339,7 +339,7 @@ class MorePage extends StatelessWidget {
         NavRow(icon: Icons.storage, title: 'Database', onTap: () => open(const DatabasePage())),
         NavRow(
             icon: Icons.extension,
-            title: 'Third-party software',
+            title: 'Third-party software and media',
             onTap: () => showLicensePage(context: context, applicationName: 'Sleep Tracker')),
         Padding(
           padding: const EdgeInsets.all(24),
