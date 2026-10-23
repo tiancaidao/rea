@@ -250,15 +250,23 @@ class ArtBox extends StatelessWidget {
   final double radius;
   final IconData? icon;
   final int? seed;
-  const ArtBox({super.key, required this.colors, this.label, this.radius = 14, this.icon, this.seed});
+
+  /// Optional cover photo; the procedural scene stays as its fallback.
+  final String? image;
+  const ArtBox(
+      {super.key, required this.colors, this.label, this.radius = 14, this.icon, this.seed, this.image});
   @override
   Widget build(BuildContext context) {
     final sd = seed ?? Object.hash(colors.first.toARGB32(), colors.last.toARGB32(), label);
+    final scene = CustomPaint(painter: SceneArt(colors, sd), child: const SizedBox.expand());
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
-      child: CustomPaint(
-        painter: SceneArt(colors, sd),
-        child: Container(
+      child: Stack(fit: StackFit.expand, children: [
+        image == null
+            ? scene
+            : Image.asset(image!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => scene),
+        if (image != null && (label != null || icon != null)) const ColoredBox(color: Color(0x55000000)),
+        Container(
           alignment: Alignment.center,
           child: label != null
               ? Text(label!,
@@ -266,7 +274,7 @@ class ArtBox extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w600, shadows: [Shadow(blurRadius: 6)]))
               : (icon != null ? Icon(icon, color: Colors.white70, size: 36) : null),
         ),
-      ),
+      ]),
     );
   }
 }

@@ -336,7 +336,10 @@ class AppState extends ChangeNotifier {
   /// soundscapes, the melodic alarm tracks for music/stories/guides), and
   /// with no placeholders at all, our own ambience.
   String? audioFor(SleepAidItem item) {
-    if (item.asset != null && (ambienceAudio.contains(item.asset) || alarmAudio.contains(item.asset))) {
+    if (item.asset != null &&
+        (item.asset!.startsWith('assets/free/') ||
+            ambienceAudio.contains(item.asset) ||
+            alarmAudio.contains(item.asset))) {
       return item.asset;
     }
     final pool = item.minutes == 0

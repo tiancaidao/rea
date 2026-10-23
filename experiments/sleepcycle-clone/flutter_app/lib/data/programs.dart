@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'free_art.dart';
 
 /// Programs: short guided courses. Two lesson formats, as in the original:
 /// a video lesson (one clip + caption) and a stack of full-colour text cards
@@ -30,6 +31,9 @@ class Program {
   final IconData icon;
   final List<Lesson> lessons;
   const Program(this.id, this.title, this.subtitle, this.intro, this.colors, this.icon, this.lessons);
+
+  /// Cover photo (assets/free/images/covers), or null for the gradient.
+  String? get image => programCovers[id];
 }
 
 const _plum = Color(0xFF6E3F63);

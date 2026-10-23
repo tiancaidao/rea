@@ -49,6 +49,8 @@ flutter:
     - assets/audio/own/
     - assets/free/audio/
     - assets/free/images/
+    - assets/free/images/covers/
+    - assets/free/audio/stories/
     - assets/icon/
     - assets/models/
     - assets/images/

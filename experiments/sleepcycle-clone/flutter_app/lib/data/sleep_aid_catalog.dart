@@ -1,5 +1,6 @@
 import 'package:flutter/painting.dart';
 import '../backend/backend.dart';
+import 'free_art.dart';
 
 /// Sleep-aid catalog, organised like the original: a featured item, then
 /// themed sections that render as large "hero" cards or a 2-column tile grid,
@@ -32,6 +33,9 @@ class SleepAidItem {
     this.url,
     this.premiumFlag,
   });
+
+  /// Cover photo (assets/free/images/covers), or null for the procedural cover.
+  String? get image => sleepAidCovers[id];
 
   /// Premium content (a badge on the tile; free users get the paywall).
   bool get premium => premiumFlag ?? !SleepAidCatalog.freeIds.contains(id);
@@ -107,10 +111,11 @@ class SleepAidCatalog {
     'drops',
     'brown',
     'pink',
-    'lighthouse',
+    'whale-throat',
+    'peter-rabbit',
     'low-tide',
     'first-snow',
-    'twinkle',
+    'wynken',
   };
 
   static const _dusk = [Color(0xFFF0A36B), Color(0xFF3B2F5C)];
@@ -158,23 +163,35 @@ class SleepAidCatalog {
       SleepAidItem(id: 'pink', title: 'Pink noise', art: _violet),
       SleepAidItem(id: 'swell', title: 'Ocean swell', art: _sea),
     ]),
+    // Real public-domain readings from LibriVox (assets/free/CREDITS.md).
     SleepAidSection('Stories', SectionLayout.hero, [
       SleepAidItem(
-          id: 'lighthouse',
-          title: 'The Lighthouse Keeper',
-          description: 'A slow tale of a quiet island, told to drift off to.',
-          minutes: 26,
-          author: 'Ida Moberg',
-          narrator: 'Tom Ashby',
-          art: _city),
+          id: 'whale-throat',
+          title: 'How the Whale Got His Throat',
+          description: 'One of Kipling\'s Just So Stories: a curious fish, a clever mariner and a grating.',
+          minutes: 10,
+          author: 'Rudyard Kipling',
+          narrator: 'Tim Bulkeley (LibriVox)',
+          art: _sea,
+          asset: 'assets/free/audio/stories/kipling_whale_throat.mp3'),
       SleepAidItem(
-          id: 'night-train',
-          title: 'Night Train North',
-          description: 'Rails humming through snowy forests until morning.',
-          minutes: 31,
-          author: 'Ida Moberg',
-          narrator: 'Tom Ashby',
-          art: _rain),
+          id: 'peter-rabbit',
+          title: 'The Tale of Peter Rabbit',
+          description: 'Beatrix Potter\'s classic about a very naughty rabbit in Mr. McGregor\'s garden.',
+          minutes: 5,
+          author: 'Beatrix Potter',
+          narrator: 'LibriVox volunteer',
+          art: _forest,
+          asset: 'assets/free/audio/stories/potter_peter_rabbit.mp3'),
+      SleepAidItem(
+          id: 'camel-hump',
+          title: 'How the Camel Got His Hump',
+          description: 'A lazy camel, a busy desert and a Djinn in charge of All Deserts.',
+          minutes: 9,
+          author: 'Rudyard Kipling',
+          narrator: 'Tim Bulkeley (LibriVox)',
+          art: _dusk,
+          asset: 'assets/free/audio/stories/kipling_camel_hump.mp3'),
     ]),
     SleepAidSection('Music', SectionLayout.hero, [
       SleepAidItem(
@@ -238,10 +255,42 @@ class SleepAidCatalog {
           art: _dusk),
     ]),
     SleepAidSection('Bedtime rhymes', SectionLayout.grid, [
-      SleepAidItem(id: 'twinkle', title: 'Little star', art: _violet),
-      SleepAidItem(id: 'moon-boat', title: 'The moon boat', art: _sea),
-      SleepAidItem(id: 'sleepy-bear', title: 'Sleepy bear', art: _forest),
-      SleepAidItem(id: 'counting', title: 'Counting sheep', art: _dusk),
+      SleepAidItem(
+          id: 'wynken',
+          title: 'Wynken, Blynken, and Nod',
+          description: 'Three little fishermen sail off in a wooden shoe on a sea of dew.',
+          minutes: 3,
+          author: 'Eugene Field',
+          narrator: 'Ian King (LibriVox)',
+          art: _sea,
+          asset: 'assets/free/audio/stories/field_wynken_blynken_nod.mp3'),
+      SleepAidItem(
+          id: 'rock-a-by',
+          title: 'The Rock-a-By Lady',
+          description: 'Lullabies from Lullaby-Land: The Rock-a-By Lady, The Night Wind, The Dinkey-Bird and more.',
+          minutes: 14,
+          author: 'Eugene Field',
+          narrator: 'SweetHome (LibriVox)',
+          art: _violet,
+          asset: 'assets/free/audio/stories/field_rock_a_by_lady.mp3'),
+      SleepAidItem(
+          id: 'sugar-plum',
+          title: 'The Sugar-Plum Tree',
+          description: 'More songs of childhood: The Sugar-Plum Tree, Little Blue Pigeon, Teeny-Weeny and others.',
+          minutes: 14,
+          author: 'Eugene Field',
+          narrator: 'SweetHome (LibriVox)',
+          art: _dusk,
+          asset: 'assets/free/audio/stories/field_sugar_plum_tree.mp3'),
+      SleepAidItem(
+          id: 'child-alone',
+          title: 'The Child Alone',
+          description: 'Poems from A Child\'s Garden of Verses, read slowly for bedtime.',
+          minutes: 15,
+          author: 'Robert Louis Stevenson',
+          narrator: 'Arctura (LibriVox)',
+          art: _forest,
+          asset: 'assets/free/audio/stories/stevenson_child_alone.mp3'),
     ]),
     SleepAidSection('Guides', SectionLayout.hero, [
       SleepAidItem(

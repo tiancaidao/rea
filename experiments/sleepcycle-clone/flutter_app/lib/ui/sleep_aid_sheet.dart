@@ -39,7 +39,7 @@ class SleepAidPill extends StatelessWidget {
                 child: Row(children: [
                   if (item != null) ...[
                     SizedBox(
-                        width: 44, height: 44, child: ArtBox(colors: item.art, radius: 22, seed: item.id.hashCode)),
+                        width: 44, height: 44, child: ArtBox(image: item.image, colors: item.art, radius: 22, seed: item.id.hashCode)),
                     const SizedBox(width: 12),
                   ],
                   Expanded(
@@ -197,7 +197,7 @@ class _Featured extends StatelessWidget {
         ]),
         const SizedBox(height: 12),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: 150, height: 96, child: ArtBox(colors: item.art, seed: item.id.hashCode)),
+          SizedBox(width: 150, height: 96, child: ArtBox(image: item.image, colors: item.art, seed: item.id.hashCode)),
           const SizedBox(width: 12),
           Expanded(child: Text(item.description, style: TextStyle(color: context.palette.textMuted, height: 1.35))),
         ]),
@@ -252,7 +252,7 @@ class _Grid extends StatelessWidget {
           InkWell(
             onTap: () => openItem(context, it),
             child: Stack(children: [
-              Positioned.fill(child: ArtBox(colors: it.art, label: it.title, seed: it.id.hashCode)),
+              Positioned.fill(child: ArtBox(image: it.image, colors: it.art, label: it.title, seed: it.id.hashCode)),
               if (it.premium) const Positioned(left: 8, top: 8, child: PremiumBadge()),
               Positioned(
                 right: 8,
@@ -283,7 +283,7 @@ class HeroCard extends StatelessWidget {
           AspectRatio(
             aspectRatio: 2.3,
             child: Stack(children: [
-              Positioned.fill(child: ArtBox(colors: item.art, radius: 16, seed: item.id.hashCode)),
+              Positioned.fill(child: ArtBox(image: item.image, colors: item.art, radius: 16, seed: item.id.hashCode)),
               if (item.premium) const Positioned(left: 10, top: 10, child: PremiumBadge()),
             ]),
           ),
@@ -417,7 +417,7 @@ class _TrackSheetState extends State<_TrackSheet> {
       SizedBox(
         height: 400,
         child: Stack(children: [
-          Positioned.fill(child: ArtBox(colors: it.art, radius: 0, seed: it.id.hashCode)),
+          Positioned.fill(child: ArtBox(image: it.image, colors: it.art, radius: 0, seed: it.id.hashCode)),
           // scrim so the title and credits stay readable over the art
           const Positioned.fill(
             child: DecoratedBox(
@@ -481,7 +481,7 @@ class _TrackSheetState extends State<_TrackSheet> {
             section.layout == SectionLayout.grid
                 ? ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: SizedBox(width: 72, child: ArtBox(colors: other.art, radius: 8, seed: other.id.hashCode)),
+                    leading: SizedBox(width: 72, child: ArtBox(image: other.image, colors: other.art, radius: 8, seed: other.id.hashCode)),
                     title: Text(other.title),
                     trailing: other.premium ? const PremiumBadge() : null,
                     onTap: () {

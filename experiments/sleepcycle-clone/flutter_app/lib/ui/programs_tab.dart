@@ -37,6 +37,13 @@ class _ProgramCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             gradient: LinearGradient(colors: program.colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+            image: program.image == null
+                ? null
+                : DecorationImage(
+                    image: AssetImage(program.image!),
+                    fit: BoxFit.cover,
+                    onError: (_, __) {},
+                    colorFilter: const ColorFilter.mode(Color(0x8C000000), BlendMode.darken)),
           ),
           padding: const EdgeInsets.all(18),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -47,7 +54,7 @@ class _ProgramCard extends StatelessWidget {
                 Text(program.subtitle, style: TextStyle(color: context.palette.textMuted, height: 1.3)),
               ]),
             ),
-            Icon(program.icon, size: 72, color: context.palette.textFaint),
+            if (program.image == null) Icon(program.icon, size: 72, color: context.palette.textFaint),
           ]),
         ),
       ),
@@ -74,8 +81,17 @@ class ProgramDetail extends StatelessWidget {
               background: Container(
                 decoration: BoxDecoration(
                     gradient: LinearGradient(
-                        colors: program.colors, begin: Alignment.topCenter, end: Alignment.bottomCenter)),
-                child: Icon(program.icon, size: 140, color: context.palette.textFaint),
+                        colors: program.colors, begin: Alignment.topCenter, end: Alignment.bottomCenter),
+                    image: program.image == null
+                        ? null
+                        : DecorationImage(
+                            image: AssetImage(program.image!),
+                            fit: BoxFit.cover,
+                            onError: (_, __) {},
+                            colorFilter: const ColorFilter.mode(Color(0x59000000), BlendMode.darken))),
+                child: program.image == null
+                    ? Icon(program.icon, size: 140, color: context.palette.textFaint)
+                    : null,
               ),
             ),
           ),
@@ -109,6 +125,7 @@ class ProgramDetail extends StatelessWidget {
                           child: Stack(children: [
                             Positioned.fill(
                                 child: ArtBox(
+                                    image: program.image,
                                     colors: program.colors,
                                     icon: l.kind == LessonKind.video ? Icons.play_circle : program.icon)),
                             if (s.completedLessons.contains(l.id))
