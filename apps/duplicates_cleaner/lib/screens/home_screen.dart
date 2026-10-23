@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../app.dart';
-import '../core/byte_size.dart';
 import '../core/constants.dart';
 import '../models/enums.dart';
 import '../widgets/dialogs.dart';
@@ -12,9 +11,7 @@ import 'settings_screen.dart';
 
 /// Grid of scan categories plus Settings and About (`HomeScreenActivity`).
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.showFreeLimits = false});
-
-  final bool showFreeLimits;
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -30,41 +27,17 @@ class _HomeScreenState extends State<HomeScreen> {
     ScanType.custom: Icons.extension_outlined,
   };
 
-  @override
-  void initState() {
-    super.initState();
-    if (widget.showFreeLimits) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _showFreeLimits());
-    }
-  }
-
-  Future<void> _showFreeLimits() async {
-    if (AppScope.of(context).premium.isPremium) return;
-    final upgrade = await confirm(
-      context,
-      title: 'Free Version Limits',
-      message:
-          "You're using the free version.\n\n"
-          'Delete up to ${AppConstants.freeDeleteMaxFilesPerOperation} files per operation '
-          'and up to ${formatBytes(AppConstants.freeFileSizeLimit)} at a time.\n\n'
-          'Continue free or upgrade now for unlimited cleanup.',
-      yes: 'Upgrade Now!',
-      no: 'Continue Free',
-    );
-    if (upgrade && mounted) await showUpgradeDialog(context);
-  }
-
   Future<void> _open(ScanType type) async {
     final scope = AppScope.of(context);
     if (type == ScanType.apk && !scope.premium.allowsApkScan) {
-      return showUpgradeDialog(
+      return showPaywall(
         context,
         reason: 'This feature is available in our prime version.',
       );
     }
     if (type == ScanType.custom) {
       if (!scope.premium.allowsCustomExtensions) {
-        return showUpgradeDialog(
+        return showPaywall(
           context,
           reason: 'This feature is available in our prime version.',
         );

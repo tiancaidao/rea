@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app.dart';
-import '../core/constants.dart';
+import '../screens/paywall_screen.dart';
 
 Future<void> showMessage(BuildContext context, String title, String message) =>
     showDialog(
@@ -87,60 +87,12 @@ Future<T?> chooseOne<T>(
   ),
 );
 
-/// The upgrade dialog with the benefits list (`UpgradeDialogFragment`).
-Future<void> showUpgradeDialog(BuildContext context, {String? reason}) {
-  final premium = AppScope.of(context).premium;
-  return showDialog(
-    context: context,
-    builder: (c) => AlertDialog(
-      title: const Text('Upgrade Benefits'),
-      content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (reason != null) ...[Text(reason), const SizedBox(height: 12)],
-            for (final b in AppConstants.premiumBenefits)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.check_circle,
-                      color: AppColors.primary,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(b)),
-                  ],
-                ),
-              ),
-          ],
-        ),
+/// Opens the full-screen paywall (`UpgradeDialogFragment` in the original).
+/// [reason] explains which free-tier limit the user just ran into.
+Future<void> showPaywall(BuildContext context, {String? reason}) =>
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => PaywallScreen(reason: reason),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(c),
-          child: const Text('later'),
-        ),
-        FilledButton(
-          onPressed: () async {
-            Navigator.pop(c);
-            if (premium.canPurchase) {
-              await premium.unlockForTesting();
-            } else {
-              if (context.mounted) {
-                await showMessage(
-                  context,
-                  'Not available',
-                  'In-app purchases are not configured in this build yet.',
-                );
-              }
-            }
-          },
-          child: Text(premium.canPurchase ? 'Unlock (debug)' : 'Upgrade Now!'),
-        ),
-      ],
-    ),
-  );
-}
+    );

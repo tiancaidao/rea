@@ -157,7 +157,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     final blocked = results.freeTierBlockReason(
       isPremium: scope.premium.isPremium,
     );
-    if (blocked != null) return showUpgradeDialog(context, reason: blocked);
+    if (blocked != null) return showPaywall(context, reason: blocked);
     if (scope.settings.promptBeforeDeletion) {
       final ok = await confirm(
         context,
@@ -237,7 +237,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     if (f == null || !mounted) return;
     // Like the original, free users can open the filter; applying it is gated.
     if (!scope.premium.allowsSortAndSelectFilters) {
-      return showUpgradeDialog(
+      return showPaywall(
         context,
         reason: 'Selection filters are a premium feature.',
       );
@@ -260,7 +260,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     );
     if (picked == null || !mounted) return;
     if (!scope.premium.allowsSortAndSelectFilters) {
-      return showUpgradeDialog(
+      return showPaywall(
         context,
         reason: 'Sort filters are a premium feature.',
       );

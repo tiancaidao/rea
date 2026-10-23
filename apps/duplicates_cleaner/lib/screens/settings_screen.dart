@@ -50,7 +50,7 @@ class SettingsScreen extends StatelessWidget {
                   );
                   if (s == null || !context.mounted) return;
                   if (!premium.allowsStorage(s)) {
-                    return showUpgradeDialog(context);
+                    return showPaywall(context);
                   }
                   if (s == StorageSelection.customFolder) {
                     final folder = await scope.storage.pickFolder();
@@ -76,7 +76,7 @@ class SettingsScreen extends StatelessWidget {
                   );
                   if (a == null || !context.mounted) return;
                   if (!premium.allowsAlgorithm(a)) {
-                    return showUpgradeDialog(context);
+                    return showPaywall(context);
                   }
                   settings.algorithm = a;
                 },
@@ -97,7 +97,7 @@ class SettingsScreen extends StatelessWidget {
                   );
                   if (e == null || !context.mounted) return;
                   if (!premium.allowsSizeExclusion(e)) {
-                    return showUpgradeDialog(context);
+                    return showPaywall(context);
                   }
                   settings.sizeExclusion = e;
                 },
@@ -150,7 +150,7 @@ class SettingsScreen extends StatelessWidget {
                         context: context,
                         builder: (_) => const _ExtensionsDialog(),
                       )
-                    : showUpgradeDialog(context),
+                    : showPaywall(context),
               ),
               const SizedBox(height: 12),
               SizedBox(
