@@ -283,7 +283,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final moonIndex = (_now.day % 30);
+    final moonIndex = moonPhaseIndex(_now);
     return Scaffold(
       body: StarryBackground(
         child: SafeArea(
@@ -305,7 +305,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
               child: SizedBox(
                 width: 84,
                 height: 84,
-                child: Image.asset('assets/images/night_moon_$moonIndex.webp',
+                child: Image.asset('assets/free/images/moon_${moonIndex.toString().padLeft(2, '0')}.webp',
                     errorBuilder: (_, __, ___) => const _Moon()),
               ),
             ),
@@ -369,4 +369,14 @@ class _Moon extends StatelessWidget {
           boxShadow: [BoxShadow(color: context.palette.glow, blurRadius: 30)],
         ),
       );
+}
+
+/// Tonight's moon as one of 30 frames from new (0) through full (15) and
+/// back, from the mean synodic month counted from a known new moon.
+int moonPhaseIndex(DateTime t) {
+  const synodic = 29.530588853;
+  final newMoon = DateTime.utc(2000, 1, 6, 18, 14);
+  final days = t.toUtc().difference(newMoon).inMinutes / 1440.0;
+  final age = days % synodic;
+  return (age / synodic * 30).round() % 30;
 }

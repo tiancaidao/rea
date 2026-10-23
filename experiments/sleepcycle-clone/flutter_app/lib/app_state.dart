@@ -210,12 +210,32 @@ class AppState extends ChangeNotifier {
 
   // ── local audio ───────────────────────────────────────────────────────────
   /// Audio files present in assets/audio/ (the extracted comparison
-  /// placeholders). Empty in a clean checkout, where our own synthesised
-  /// clips in assets/audio/own/ (tools/generate_media.py) play instead.
+  /// placeholders). Empty in a clean checkout, where the real recordings in
+  /// assets/free/audio/ (tools/fetch_free_media.py) play instead, and our
+  /// own synthesised clips in assets/audio/own/ fill any gap.
   List<String> ambienceAudio = [];
   List<String> alarmAudio = [];
 
   static const ownDir = 'assets/audio/own/';
+  static const freeDir = 'assets/free/audio/';
+
+  /// The recordings bundled under [freeDir] (public domain / Creative
+  /// Commons, see assets/free/CREDITS-audio.md).
+  static Set<String> freeAudio = {};
+
+  /// Free music for sleep-aid music, stories and guides without audio of
+  /// their own.
+  static const freeMusic = [
+    'soft_breeze',
+    'far_memories',
+    'stillness',
+    'dewdrops',
+    'riddle',
+    'morning_haze',
+    'winter_moon',
+    'slow_waltz',
+    'classical_morning',
+  ];
   static const ownAlarms = [
     'soft_breeze',
     'forest_clearing',
@@ -251,6 +271,7 @@ class AppState extends ChangeNotifier {
               !a.contains('silence'))
           .toList()
         ..sort();
+      freeAudio = manifest.listAssets().where((a) => a.startsWith(freeDir)).toSet();
       alarmAudio = audio.where((a) => a.contains('alarm_sound')).toList();
       ambienceAudio = audio.where((a) => !a.contains('alarm_sound')).toList();
     } catch (_) {}
@@ -279,18 +300,33 @@ class AppState extends ChangeNotifier {
       'pink': 'pink_noise',
       'white': 'white_noise',
       'drop': 'droplets',
-      'dawn': 'droplets',
     };
-    for (final e in keys.entries) {
-      if (t.contains(e.key)) return '${ownDir}amb_${e.value}.mp3';
+    final i = item.id.codeUnits.fold(0, (a, b) => a + b);
+    // birdsong for dawn, real music for anything with a duration
+    if (t.contains('dawn') && freeAudio.contains('${freeDir}alarm_forest_clearing.mp3')) {
+      return '${freeDir}alarm_forest_clearing.mp3';
     }
-    final i = item.id.codeUnits.fold(0, (a, b) => a + b) % ownAmbiences.length;
-    return '${ownDir}amb_${ownAmbiences[i]}.mp3';
+    if (item.minutes > 0) {
+      final m = '${freeDir}alarm_${freeMusic[i % freeMusic.length]}.mp3';
+      if (freeAudio.contains(m)) return m;
+    }
+    for (final e in keys.entries) {
+      if (t.contains(e.key)) return _ambience(e.value);
+    }
+    return _ambience(ownAmbiences[i % ownAmbiences.length]);
   }
 
-  /// Our own alarm melody for an alarm-sound name (premium names reuse the
-  /// free melodies in turn).
+  /// A recorded ambience when we have one, else our synthesised loop.
+  static String _ambience(String key) {
+    final free = '${freeDir}amb_$key.mp3';
+    return freeAudio.contains(free) ? free : '${ownDir}amb_$key.mp3';
+  }
+
+  /// The recording for an alarm-sound name, else our own synthesised melody
+  /// (premium names reuse the free melodies in turn).
   static String ownAlarmFor(String name, List<String> allNames) {
+    final free = '${freeDir}alarm_${name.toLowerCase().replaceAll(' ', '_')}.mp3';
+    if (freeAudio.contains(free)) return free;
     final i = math.max(0, allNames.indexOf(name));
     return '${ownDir}alarm_${ownAlarms[i % ownAlarms.length]}.mp3';
   }

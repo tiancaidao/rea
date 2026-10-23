@@ -47,6 +47,8 @@ flutter:
     - assets/lottie/
     - assets/audio/
     - assets/audio/own/
+    - assets/free/audio/
+    - assets/free/images/
     - assets/icon/
     - assets/models/
     - assets/images/
