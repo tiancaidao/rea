@@ -18,12 +18,17 @@ flutter_app/.flutter-plugins*
 # Run tools/extract_placeholders.sh against the APK to repopulate for a demo.
 flutter_app/assets/audio/*
 !flutter_app/assets/audio/.gitkeep
+# our own synthesised alarm + ambience audio (tools/generate_media.py): committed
+!flutter_app/assets/audio/own/
 flutter_app/assets/video/*
 !flutter_app/assets/video/.gitkeep
 flutter_app/assets/images/*
 !flutter_app/assets/images/.gitkeep
 flutter_app/assets/fonts/*
 !flutter_app/assets/fonts/.gitkeep
+# DM Sans is SIL OFL 1.1 (our theme font, not APK material): committed
+!flutter_app/assets/fonts/DMSans-*.ttf
+!flutter_app/assets/fonts/DMSans-OFL.txt
 flutter_app/assets/lottie/*
 !flutter_app/assets/lottie/.gitkeep
 flutter_app/assets/icon/*
@@ -38,3 +43,9 @@ flutter_app/assets/data/strings.en.json
 # project config for --dart-define-from-file (keep out of the public repo)
 flutter_app/config/*.json
 !flutter_app/config/backend.example.json
+
+# Flutter-generated iOS files (machine-specific)
+flutter_app/ios/Flutter/Generated.xcconfig
+flutter_app/ios/Flutter/ephemeral/
+flutter_app/ios/Flutter/flutter_export_environment.sh
+flutter_app/ios/Runner/GeneratedPluginRegistrant.*

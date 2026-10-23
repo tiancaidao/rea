@@ -4,6 +4,7 @@ import '../theme.dart';
 import 'sleep_aid_sheet.dart';
 import 'tracking_screen.dart';
 import 'widgets/common.dart';
+import 'widgets/illustrations.dart';
 import 'widgets/looping_video.dart';
 import 'widgets/time_wheel.dart';
 
@@ -19,11 +20,9 @@ class SleepTab extends StatefulWidget {
 class _SleepTabState extends State<SleepTab> {
   late final _pager = PageController(initialPage: AppState.I.alarmMode);
 
-
   String _describe(AppState s, int mode) {
     final end = fmtTime(s.alarmHour, s.alarmMinute);
-    final startT = DateTime(2000, 1, 1, s.alarmHour, s.alarmMinute)
-        .subtract(Duration(minutes: s.windowMinutes));
+    final startT = DateTime(2000, 1, 1, s.alarmHour, s.alarmMinute).subtract(Duration(minutes: s.windowMinutes));
     switch (mode) {
       case 0:
         return 'Wake up easy between\n${fmtDt(startT).split(' ').first} - $end';
@@ -63,8 +62,7 @@ class _SleepTabState extends State<SleepTab> {
                   onPageChanged: s.setAlarmMode,
                   itemBuilder: (context, i) => Column(children: [
                     Text(_describe(s, i),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 16, height: 1.35)),
+                        textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, height: 1.35)),
                     const SizedBox(height: 22),
                     PillButton('Start',
                         width: 150,
@@ -122,19 +120,14 @@ class _RememberSheetState extends State<_RememberSheet> {
     final mic = AppState.I.pref('motion_detection').startsWith('Microphone');
     final steps = [
       (
-        mic ? 'assets/images/mic_placement_reminder.jpg' : 'assets/images/acc_placement_reminder.jpg',
+        mic ? Art.placementMic : Art.placementBed,
         Icons.phone_android,
         mic
             ? 'Put the phone by your bed, screen down, and keep it charging.'
             : 'Put the phone on the mattress near your pillow and keep it charging.',
         'Next'
       ),
-      (
-        'assets/images/acc_snooze_reminder.jpg',
-        Icons.touch_app,
-        'To snooze, tap the phone twice\nor lift it up.',
-        'OK'
-      ),
+      (Art.snooze, Icons.touch_app, 'To snooze, tap the phone twice\nor lift it up.', 'OK'),
     ];
     final st = steps[_step];
     return Column(children: [
@@ -142,13 +135,11 @@ class _RememberSheetState extends State<_RememberSheet> {
         IconButton(
           icon: Icon(_step == 0 ? Icons.keyboard_arrow_down : Icons.chevron_left,
               color: context.palette.accent, size: 30),
-          onPressed: () =>
-              _step == 0 ? Navigator.pop(context, false) : setState(() => _step = 0),
+          onPressed: () => _step == 0 ? Navigator.pop(context, false) : setState(() => _step = 0),
         ),
         const Expanded(
             child: Text('Remember',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600))),
+                textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600))),
         const SizedBox(width: 48),
       ]),
       const Divider(height: 1),
@@ -160,12 +151,12 @@ class _RememberSheetState extends State<_RememberSheet> {
           child: ClipOval(
             child: LoopingVideo(
               asset: 'assets/video/mic_snooze_reminder.mp4',
-              fallback: CircleArt(asset: st.$1, icon: st.$2, size: 260),
+              fallback: CircleArt(art: st.$1, icon: st.$2, size: 260),
             ),
           ),
         )
       else
-        CircleArt(asset: st.$1, icon: st.$2, size: 260),
+        CircleArt(art: st.$1, icon: st.$2, size: 260),
       const Spacer(),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),

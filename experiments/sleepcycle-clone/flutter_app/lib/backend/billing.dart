@@ -24,6 +24,19 @@ class Billing {
     });
   }
 
+  /// The store's localized price for the yearly plan (e.g. "€29.99"), or
+  /// null until the product exists in Play Console / App Store Connect.
+  Future<String?> price() async {
+    try {
+      final iap = InAppPurchase.instance;
+      if (!await iap.isAvailable()) return null;
+      final r = await iap.queryProductDetails({productId});
+      return r.productDetails.isEmpty ? null : r.productDetails.first.price;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Returns null on success, or a message explaining why premium wasn't granted.
   Future<String?> startTrial() async {
     final iap = InAppPurchase.instance;

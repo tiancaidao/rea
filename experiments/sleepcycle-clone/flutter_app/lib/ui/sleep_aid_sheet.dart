@@ -1,9 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import '../app_state.dart';
 import '../data/sleep_aid_catalog.dart';
 import '../theme.dart';
+import 'welcome_screen.dart' show TrialScreen;
 import 'widgets/common.dart';
+import 'widgets/illustrations.dart';
 
 /// The pill at the top of the Sleep and tracking screens. Shows "Sleep aid"
 /// (or the chosen track with its art); tapping opens the catalog sheet, the
@@ -21,9 +26,8 @@ class SleepAidPill extends StatelessWidget {
           color: context.palette.surface,
           border: Border.all(color: context.palette.stroke),
           borderRadius: BorderRadius.circular(28),
-          gradient: item == null
-              ? null
-              : LinearGradient(colors: [context.palette.surface, item.art.first.withOpacity(0.7)]),
+          gradient:
+              item == null ? null : LinearGradient(colors: [context.palette.surface, item.art.first.withOpacity(0.7)]),
         ),
         child: Row(children: [
           Expanded(
@@ -31,15 +35,24 @@ class SleepAidPill extends StatelessWidget {
               borderRadius: const BorderRadius.horizontal(left: Radius.circular(28)),
               onTap: () => showSleepAidCatalog(context),
               child: Padding(
-                padding: const EdgeInsets.only(left: 24),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(item?.title ?? 'Sleep aid',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: context.palette.accent, fontSize: 17, fontWeight: FontWeight.w600)),
-                ),
+                padding: EdgeInsets.only(left: item == null ? 24 : 6),
+                child: Row(children: [
+                  if (item != null) ...[
+                    SizedBox(
+                        width: 44, height: 44, child: ArtBox(colors: item.art, radius: 22, seed: item.id.hashCode)),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: Text(item?.title ?? 'Sleep aid',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: context.palette.accent, fontSize: 17, fontWeight: FontWeight.w600)),
+                  ),
+                  if (item != null && s.sleepAidPlaying) ...[
+                    EqBars(color: context.palette.accent),
+                    const SizedBox(width: 12),
+                  ],
+                ]),
               ),
             ),
           ),
@@ -55,6 +68,30 @@ class SleepAidPill extends StatelessWidget {
       );
     });
   }
+}
+
+/// Opens a track, or the paywall for Premium content on a free account.
+void openItem(BuildContext context, SleepAidItem it) {
+  if (it.premium && !AppState.I.premium) {
+    push(context, const TrialScreen());
+    return;
+  }
+  showTrackSheet(context, it);
+}
+
+/// The small "Premium" badge on catalog art (a check once unlocked).
+class PremiumBadge extends StatelessWidget {
+  const PremiumBadge({super.key});
+  @override
+  Widget build(BuildContext context) => Watch((context, s) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(10)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(s.premium ? Icons.check : Icons.lock, size: 12, color: Colors.white),
+          const SizedBox(width: 3),
+          const Text('PREMIUM', style: TextStyle(fontSize: 9, letterSpacing: 0.8, color: Colors.white)),
+        ]),
+      ));
 }
 
 Future<void> showSleepAidCatalog(BuildContext context) => showModalBottomSheet(
@@ -85,9 +122,7 @@ class _CatalogSheetState extends State<_CatalogSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final sections = _chip == 0
-        ? SleepAidCatalog.current
-        : [SleepAidCatalog.current[_chip - 1]];
+    final sections = _chip == 0 ? SleepAidCatalog.current : [SleepAidCatalog.current[_chip - 1]];
     return Column(children: [
       const _SheetHeader(title: 'Sleep aid'),
       SizedBox(
@@ -133,11 +168,9 @@ class _SheetHeader extends StatelessWidget {
             icon: Icon(Icons.keyboard_arrow_down, color: context.palette.accent, size: 32),
             onPressed: () => Navigator.pop(context),
           ),
-          Expanded(
-              child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600))),
+          Expanded(child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600))),
           IconButton(
-            icon: Icon(s.sleepAidPlaying ? Icons.pause : Icons.play_arrow,
-                color: context.palette.accent, size: 30),
+            icon: Icon(s.sleepAidPlaying ? Icons.pause : Icons.play_arrow, color: context.palette.accent, size: 30),
             onPressed: s.sleepAid == null ? null : s.toggleSleepAid,
           ),
         ]));
@@ -150,28 +183,23 @@ class _Featured extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => showTrackSheet(context, item),
+      onTap: () => openItem(context, item),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-                color: context.palette.surfaceHi, borderRadius: BorderRadius.circular(4)),
-            child: const Text('FEATURED',
-                style: TextStyle(fontSize: 12, letterSpacing: 1.2, fontWeight: FontWeight.w600)),
+            decoration: BoxDecoration(color: context.palette.surfaceHi, borderRadius: BorderRadius.circular(4)),
+            child:
+                const Text('FEATURED', style: TextStyle(fontSize: 12, letterSpacing: 1.2, fontWeight: FontWeight.w600)),
           ),
           const SizedBox(width: 10),
-          Expanded(
-              child: Text(item.title,
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700))),
+          Expanded(child: Text(item.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700))),
         ]),
         const SizedBox(height: 12),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: 150, height: 96, child: ArtBox(colors: item.art, icon: Icons.air)),
+          SizedBox(width: 150, height: 96, child: ArtBox(colors: item.art, seed: item.id.hashCode)),
           const SizedBox(width: 12),
-          Expanded(
-              child: Text(item.description,
-                  style: TextStyle(color: context.palette.textMuted, height: 1.35))),
+          Expanded(child: Text(item.description, style: TextStyle(color: context.palette.textMuted, height: 1.35))),
         ]),
       ]),
     );
@@ -183,9 +211,8 @@ class _Section extends StatelessWidget {
   const _Section({required this.section});
   @override
   Widget build(BuildContext context) {
-    final preview = section.layout == SectionLayout.grid
-        ? section.items.take(4).toList()
-        : section.items.take(2).toList();
+    final preview =
+        section.layout == SectionLayout.grid ? section.items.take(4).toList() : section.items.take(2).toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const SizedBox(height: 28),
       Text(section.title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
@@ -223,14 +250,17 @@ class _Grid extends StatelessWidget {
       children: [
         for (final it in items)
           InkWell(
-            onTap: () => showTrackSheet(context, it),
+            onTap: () => openItem(context, it),
             child: Stack(children: [
-              Positioned.fill(child: ArtBox(colors: it.art, label: it.title)),
+              Positioned.fill(child: ArtBox(colors: it.art, label: it.title, seed: it.id.hashCode)),
+              if (it.premium) const Positioned(left: 8, top: 8, child: PremiumBadge()),
               Positioned(
                 right: 8,
                 top: 8,
                 child: Watch((c, s) => s.sleepAid?.id == it.id
-                    ? const Icon(Icons.check_circle, size: 20, color: Colors.white)
+                    ? (s.sleepAidPlaying
+                        ? const EqBars(color: Colors.white)
+                        : const Icon(Icons.check_circle, size: 20, color: Colors.white))
                     : const SizedBox()),
               ),
             ]),
@@ -246,11 +276,17 @@ class HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => showTrackSheet(context, item),
+      onTap: () => openItem(context, item),
       child: Padding(
         padding: const EdgeInsets.only(bottom: 18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          AspectRatio(aspectRatio: 2.3, child: ArtBox(colors: item.art, radius: 16)),
+          AspectRatio(
+            aspectRatio: 2.3,
+            child: Stack(children: [
+              Positioned.fill(child: ArtBox(colors: item.art, radius: 16, seed: item.id.hashCode)),
+              if (item.premium) const Positioned(left: 10, top: 10, child: PremiumBadge()),
+            ]),
+          ),
           const SizedBox(height: 10),
           Text(item.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
           const SizedBox(height: 2),
@@ -299,22 +335,71 @@ class _TrackSheet extends StatefulWidget {
 class _TrackSheetState extends State<_TrackSheet> {
   double? _progress = 0;
   Timer? _t;
+  http.Client? _client;
+  bool _cancelled = false;
 
   @override
   void initState() {
     super.initState();
-    if (AppState.I.sleepAid?.id == widget.item.id) {
+    final s = AppState.I;
+    final it = widget.item;
+    if (s.sleepAid?.id == it.id || s.sleepAidCache.containsKey(it.id)) {
       _progress = null; // already downloaded
+      if (s.sleepAid?.id != it.id) s.chooseSleepAid(it);
+    } else if (it.url != null) {
+      _download(it);
     } else {
-      _t = Timer.periodic(const Duration(milliseconds: 60), (t) {
-        setState(() => _progress = (_progress ?? 0) + 0.04);
+      // bundled audio: a short "preparing" ring, then play
+      _t = Timer.periodic(const Duration(milliseconds: 40), (t) {
+        setState(() => _progress = (_progress ?? 0) + 0.08);
         if ((_progress ?? 0) >= 1) {
           t.cancel();
           setState(() => _progress = null);
-          AppState.I.chooseSleepAid(widget.item);
+          s.chooseSleepAid(it);
         }
       });
     }
+  }
+
+  /// Streamed tracks are downloaded to the cache before playing, with real
+  /// progress and a working Cancel (as the original's sleep-aid downloads).
+  Future<void> _download(SleepAidItem it) async {
+    final client = _client = http.Client();
+    try {
+      final res = await client.send(http.Request('GET', Uri.parse(it.url!)));
+      if (res.statusCode >= 400) throw HttpException('HTTP ${res.statusCode}');
+      final total = res.contentLength ?? 0;
+      final dir = await getApplicationCacheDirectory();
+      final f = File('${dir.path}/sleepaid_${it.id}');
+      final sink = f.openWrite();
+      var got = 0;
+      await for (final chunk in res.stream) {
+        if (_cancelled) break;
+        sink.add(chunk);
+        got += chunk.length;
+        if (total > 0 && mounted) setState(() => _progress = got / total);
+      }
+      await sink.close();
+      if (_cancelled) {
+        await f.delete();
+        return;
+      }
+      AppState.I.sleepAidCache[it.id] = f.path;
+    } catch (_) {
+      // download failed: stream it instead
+    } finally {
+      client.close();
+    }
+    if (_cancelled || !mounted) return;
+    setState(() => _progress = null);
+    AppState.I.chooseSleepAid(it);
+  }
+
+  void _cancel() {
+    _cancelled = true;
+    _t?.cancel();
+    _client?.close();
+    Navigator.pop(context);
   }
 
   @override
@@ -332,7 +417,20 @@ class _TrackSheetState extends State<_TrackSheet> {
       SizedBox(
         height: 400,
         child: Stack(children: [
-          Positioned.fill(child: ArtBox(colors: it.art, radius: 0)),
+          Positioned.fill(child: ArtBox(colors: it.art, radius: 0, seed: it.id.hashCode)),
+          // scrim so the title and credits stay readable over the art
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x33000000), Color(0x99000000), Color(0x33000000)],
+                  stops: [0.1, 0.35, 0.7],
+                ),
+              ),
+            ),
+          ),
           Positioned(
             left: 4,
             top: 4,
@@ -345,8 +443,7 @@ class _TrackSheetState extends State<_TrackSheet> {
             top: 90,
             child: Column(children: [
               Text(it.title,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700)),
+                  textAlign: TextAlign.center, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700)),
               const SizedBox(height: 14),
               Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
                 _credit('Author', it.author),
@@ -358,14 +455,12 @@ class _TrackSheetState extends State<_TrackSheet> {
                   SizedBox(
                     width: 52,
                     height: 52,
-                    child: CircularProgressIndicator(
-                        value: _progress, strokeWidth: 4, color: context.palette.accent),
+                    child: CircularProgressIndicator(value: _progress, strokeWidth: 4, color: context.palette.accent),
                   ),
                   const SizedBox(width: 16),
                   TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text('Cancel download',
-                        style: TextStyle(color: context.palette.accent, fontSize: 16)),
+                    onPressed: _cancel,
+                    child: Text('Cancel download', style: TextStyle(color: context.palette.accent, fontSize: 16)),
                   ),
                 ])
               else
@@ -386,11 +481,12 @@ class _TrackSheetState extends State<_TrackSheet> {
             section.layout == SectionLayout.grid
                 ? ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: SizedBox(width: 72, child: ArtBox(colors: other.art, radius: 8)),
+                    leading: SizedBox(width: 72, child: ArtBox(colors: other.art, radius: 8, seed: other.id.hashCode)),
                     title: Text(other.title),
+                    trailing: other.premium ? const PremiumBadge() : null,
                     onTap: () {
                       Navigator.pop(context);
-                      showTrackSheet(context, other);
+                      openItem(context, other);
                     },
                   )
                 : HeroCard(item: other),

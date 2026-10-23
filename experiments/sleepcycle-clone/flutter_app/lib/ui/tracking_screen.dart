@@ -1,21 +1,32 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../alarm/alarm_plan.dart';
 import '../app_state.dart';
 import '../data/night.dart';
 import '../backend/backend.dart';
 import '../data/recorded_night.dart';
+import '../device/device_sensors.dart';
 import '../device/health_connect.dart';
 import '../device/location.dart';
+import '../device/notifications.dart';
+import '../device/tracking_service.dart';
 import '../sensing/live_tracker.dart';
 import '../sensing/sleep_tracker.dart';
 import '../theme.dart';
+import 'alarm_screen.dart';
 import 'sleep_aid_sheet.dart';
 import 'widgets/common.dart';
 import 'widgets/time_wheel.dart';
 
 /// The overnight screen: sleep-aid pill, tonight's moon, a large dimmed
 /// clock, the alarm window (tap to change it), and a slide-up "Stop".
+///
+/// The alarm lives here: a foreground service keeps the app running with the
+/// screen off, the smart alarm watches the night's movement inside the wake
+/// window and rings at the lightest moment (or at the alarm time), and an OS
+/// alarm-clock notification is scheduled as a backup in case the app is
+/// killed. A low battery warns, then rings early before the phone dies.
 ///
 /// While open, [LiveTracker] records accelerometer movement and (in
 /// microphone mode) sound levels. Stopping analyses the recording into a
@@ -30,35 +41,115 @@ class TrackingScreen extends StatefulWidget {
 
 class _TrackingScreenState extends State<TrackingScreen> {
   static const minMinutes = 20;
-  final _tracker =
-      LiveTracker(useMicrophone: AppState.I.pref('motion_detection').startsWith('Microphone'));
+  final _tracker = LiveTracker(
+      useMicrophone: AppState.I.pref('motion_detection').startsWith('Microphone'),
+      clipDir: AppState.I.clipDirForTonight());
   late Timer _clock;
+  Timer? _alarmTick, _batteryTick;
+  late AlarmPlan _plan;
   DateTime _now = DateTime.now();
   double _drag = 0;
   bool _stopping = false;
+  bool _ringing = false;
+  bool _onsetSeen = false;
+  bool _batteryWarned = false;
+  String? _banner;
 
   @override
   void initState() {
     super.initState();
     _clock = Timer.periodic(const Duration(seconds: 15), (_) => setState(() => _now = DateTime.now()));
+    _tracker.onEpoch = (_) {
+      if (!_onsetSeen && _tracker.seemsAsleep) {
+        _onsetSeen = true;
+        AppState.I.sleepOnsetDetected();
+      }
+    };
     _tracker.start();
+    _plan = _makePlan();
+    _armAlarm();
+    _batteryTick = Timer.periodic(const Duration(minutes: 5), (_) => _checkBattery());
+    _checkBattery();
   }
 
   @override
   void dispose() {
     _clock.cancel();
-    if (!_stopping) _tracker.stop();
+    _alarmTick?.cancel();
+    _batteryTick?.cancel();
+    if (!_stopping) {
+      _tracker.stop();
+      Notifications.I.cancel(Notifications.alarmId);
+      TrackingService.stop();
+    }
     super.dispose();
   }
 
-  String get _alarmLabel {
+  AlarmPlan _makePlan() {
     final s = AppState.I;
-    final end = fmtTime(s.alarmHour, s.alarmMinute);
-    if (s.alarmMode == 2) return 'Off';
-    if (s.alarmMode == 1) return end;
-    final start = DateTime(2000, 1, 1, s.alarmHour, s.alarmMinute)
-        .subtract(Duration(minutes: s.windowMinutes));
-    return '${fmtDt(start).split(' ').first} - $end';
+    final test = s.takeTestAlarm();
+    if (test != null) {
+      return AlarmPlan(mode: 1, end: test, windowMinutes: 0, snooze: s.pref('snooze'));
+    }
+    return AlarmPlan.next(DateTime.now(),
+        hour: s.alarmHour,
+        minute: s.alarmMinute,
+        mode: s.alarmMode,
+        windowMinutes: s.windowMinutes,
+        snooze: s.pref('snooze'));
+  }
+
+  Future<void> _armAlarm() async {
+    _alarmTick?.cancel();
+    await Notifications.I.cancel(Notifications.alarmId);
+    final text = _plan.enabled ? 'Alarm $_alarmLabel' : 'No alarm set. Swipe up in the app to stop.';
+    await TrackingService.start(text, microphone: _tracker.useMicrophone);
+    if (!_plan.enabled) return;
+    await Notifications.I.requestPermission(alarm: true);
+    // the OS rings at the latest time if this app isn't around to do it
+    await Notifications.I.scheduleAlarmBackup(_plan.end.add(const Duration(seconds: 30)));
+    _alarmTick = Timer.periodic(const Duration(seconds: 5), (_) => _checkAlarm());
+  }
+
+  void _checkAlarm() {
+    if (_ringing || _stopping) return;
+    final m = _tracker.movementSoFar();
+    final recent = m.isEmpty ? 0.0 : m.sublist(math.max(0, m.length - 2)).reduce(math.max);
+    if (_plan.shouldRing(DateTime.now(), recentMovement: recent, nightMovement: m)) _ringAlarm();
+  }
+
+  Future<void> _ringAlarm() async {
+    if (_ringing || _stopping || !mounted) return;
+    _ringing = true;
+    _alarmTick?.cancel();
+    await Notifications.I.cancel(Notifications.alarmId);
+    if (!mounted) return;
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => AlarmScreen(plan: _plan)));
+    _stop(fromAlarm: true);
+  }
+
+  Future<void> _checkBattery() async {
+    if (AppState.I.pref('battery_warning') != 'On' || _stopping) return;
+    final b = await DeviceSensors.battery();
+    if (b == null || b.$2) {
+      if (mounted && _banner != null) setState(() => _banner = null);
+      return;
+    }
+    final level = b.$1;
+    if (level <= 15 && !_batteryWarned) {
+      _batteryWarned = true;
+      Notifications.I.showBatteryWarning(level);
+      if (mounted) setState(() => _banner = 'Battery $level%. Plug in your phone to keep tracking.');
+    }
+    // ring before the phone dies rather than not at all
+    if (level <= 5 && _plan.enabled && !_ringing) _ringAlarm();
+  }
+
+  String get _alarmLabel {
+    if (!_plan.enabled) return 'Off';
+    final end = fmtDt(_plan.end);
+    if (!_plan.smart) return end;
+    return '${fmtDt(_plan.windowStart).split(' ').first} - $end';
   }
 
   Future<void> _changeAlarm() async {
@@ -74,8 +165,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
               child: Text('Cancel', style: TextStyle(color: context.palette.accent, fontSize: 16))),
           const Expanded(
               child: Text('Change alarm',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600))),
+                  textAlign: TextAlign.center, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600))),
           TextButton(
               onPressed: () => Navigator.pop(c, true),
               child: Text('Done', style: TextStyle(color: context.palette.accent, fontSize: 16))),
@@ -83,28 +173,38 @@ class _TrackingScreenState extends State<TrackingScreen> {
         const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
-          child: TimeWheel(hour: h, minute: m, onChanged: (hh, mm) {
-            h = hh;
-            m = mm;
-          }),
+          child: TimeWheel(
+              hour: h,
+              minute: m,
+              onChanged: (hh, mm) {
+                h = hh;
+                m = mm;
+              }),
         ),
       ]),
     );
     if (ok == true) {
       s.setAlarm(h, m);
-      setState(() {});
+      setState(() => _plan = _makePlan());
+      _armAlarm();
     }
   }
 
-  Future<void> _stop() async {
+  Future<void> _stop({bool fromAlarm = false}) async {
     if (_stopping) return;
     setState(() => _stopping = true);
+    _alarmTick?.cancel();
+    await Notifications.I.cancel(Notifications.alarmId);
+    await TrackingService.stop();
     await _tracker.stop();
     final seed = DateTime.now().millisecondsSinceEpoch & 0x7fffffff;
     late final Night night;
     if (_tracker.elapsed.inMinutes >= minMinutes) {
-      night = Night.fromResult(_tracker.analyze(),
-          snoreMinutes: _tracker.soundMinutes, coughs: _tracker.coughs, real: true);
+      night =
+          Night.fromResult(_tracker.analyze(), snoreMinutes: _tracker.soundMinutes, coughs: _tracker.coughs, real: true)
+            ..clips.addAll(_tracker.clips)
+            ..snoreSpans = _tracker.snoreSpans
+            ..lightLux = _tracker.medianLux;
     } else {
       if (!mounted) return;
       final sample = await showDialog<bool>(
@@ -131,10 +231,17 @@ class _TrackingScreenState extends State<TrackingScreen> {
       night.steps = await HealthConnect.I.stepsBefore(night.wokeUp) ?? night.steps;
       await HealthConnect.I.writeSleep(night.session);
     }
+    // nights away from the saved home location get the Travel note
+    final home = AppState.I.pref('home_location');
+    (double, double)? loc;
+    if (home.isNotEmpty || Backend.I.user != null) loc = await coarseLocation();
+    if (home.isNotEmpty && loc != null) {
+      final h = home.split(',').map(double.parse).toList();
+      if (_km(h[0], h[1], loc.$1, loc.$2) > 50) night.notes.add('Travel');
+    }
     // real morning weather via the API when signed in and location is allowed
     if (Backend.I.user != null) {
       night.weatherF = null;
-      final loc = await coarseLocation();
       if (loc != null) {
         try {
           final w = await Backend.I.weather(loc.$1, loc.$2);
@@ -145,8 +252,20 @@ class _TrackingScreenState extends State<TrackingScreen> {
     AppState.I
       ..addNight(night)
       ..pauseSleepAid()
-      ..goTab(2); // Journal
+      ..goTab(2) // Journal
+      ..pruneClips();
+    // morning flow (wake-up mood, alertness test) runs on the tabs
+    if (fromAlarm) AppState.I.morning.value = night;
     if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
+  }
+
+  static double _km(double lat1, double lon1, double lat2, double lon2) {
+    const r = 6371.0;
+    double rad(double d) => d * math.pi / 180;
+    final dLat = rad(lat2 - lat1), dLon = rad(lon2 - lon1);
+    final a =
+        math.pow(math.sin(dLat / 2), 2) + math.cos(rad(lat1)) * math.cos(rad(lat2)) * math.pow(math.sin(dLon / 2), 2);
+    return 2 * r * math.asin(math.sqrt(a));
   }
 
   /// Replay of the bundled recorded night, or the simulated accelerometer
@@ -171,6 +290,15 @@ class _TrackingScreenState extends State<TrackingScreen> {
           child: Column(children: [
             const SizedBox(height: 12),
             const SleepAidPill(),
+            if (_banner != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: Row(children: [
+                  Icon(Icons.battery_alert, color: context.palette.warn),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(_banner!, style: TextStyle(color: context.palette.warn))),
+                ]),
+              ),
             const SizedBox(height: 40),
             Padding(
               padding: const EdgeInsets.only(right: 140),
@@ -185,13 +313,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
             Text(fmtDt(_now),
                 style: TextStyle(fontSize: 64, fontWeight: FontWeight.w300, color: context.palette.textMuted)),
             GestureDetector(
-              onTap: AppState.I.alarmMode == 2 ? null : _changeAlarm,
-              child: Text.rich(TextSpan(children: [
-                const TextSpan(text: 'Alarm  '),
-                TextSpan(
-                    text: _alarmLabel,
-                    style: const TextStyle(decoration: TextDecoration.underline)),
-              ]), style: TextStyle(fontSize: 18, color: context.palette.textMuted)),
+              onTap: _plan.enabled ? _changeAlarm : null,
+              child: Text.rich(
+                  TextSpan(children: [
+                    const TextSpan(text: 'Alarm  '),
+                    TextSpan(text: _alarmLabel, style: const TextStyle(decoration: TextDecoration.underline)),
+                  ]),
+                  style: TextStyle(fontSize: 18, color: context.palette.textMuted)),
             ),
             const Spacer(),
             if (_stopping)

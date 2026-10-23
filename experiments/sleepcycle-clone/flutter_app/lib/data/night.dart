@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'models.dart';
+import 'sound_clips.dart';
 import '../sensing/sleep_tracker.dart';
 
 /// One tracked night as the Journal shows it: the analysed session plus the
@@ -17,6 +18,10 @@ class Night {
   final int coughs;
   final double breathingPerHour;
   final int regularity; // 0..100, consistency of bed/wake times
+  final List<SoundClip> clips; // the night's kept recordings
+  List<(int, int)> snoreSpans; // snoring, seconds from the start
+  double? lightLux; // median overnight illuminance, null without a light sensor
+  AlertnessResult? alertness; // the morning alertness test, if taken
 
   Night({
     required this.session,
@@ -28,7 +33,13 @@ class Night {
     required this.coughs,
     required this.breathingPerHour,
     required this.regularity,
-  }) : notes = notes ?? {};
+    List<SoundClip>? clips,
+    List<(int, int)>? snoreSpans,
+    this.lightLux,
+    this.alertness,
+  })  : notes = notes ?? {},
+        clips = clips ?? [],
+        snoreSpans = snoreSpans ?? [];
 
   DateTime get wentToBed => session.startedAt;
   DateTime get wokeUp => session.endedAt;
@@ -54,6 +65,12 @@ class Night {
         'coughs': coughs,
         'breathingPerHour': breathingPerHour,
         'regularity': regularity,
+        'clips': [for (final c in clips) c.toJson()],
+        'snoreSpans': [
+          for (final s in snoreSpans) [s.$1, s.$2]
+        ],
+        'lightLux': lightLux,
+        'alertness': alertness?.toJson(),
       };
 
   factory Night.fromJson(Map<String, dynamic> j) {
@@ -62,9 +79,7 @@ class Night {
       session: SleepSession(
         startedAt: DateTime.fromMillisecondsSinceEpoch(s['startedAt'] as int),
         endedAt: DateTime.fromMillisecondsSinceEpoch(s['endedAt'] as int),
-        phases: [
-          for (final p in s['phases'] as List) PhasePoint.fromJson((p as Map).cast<String, dynamic>())
-        ],
+        phases: [for (final p in s['phases'] as List) PhasePoint.fromJson((p as Map).cast<String, dynamic>())],
         snoreEvents: s['snoreEvents'] as int,
         snorePercent: (s['snorePercent'] as num).toDouble(),
         sleepScore: s['sleepScore'] as int,
@@ -77,7 +92,29 @@ class Night {
       coughs: j['coughs'] as int,
       breathingPerHour: (j['breathingPerHour'] as num).toDouble(),
       regularity: j['regularity'] as int,
+      clips: [for (final c in j['clips'] as List? ?? const []) SoundClip.fromJson((c as Map).cast<String, dynamic>())],
+      snoreSpans: [for (final s in j['snoreSpans'] as List? ?? const []) ((s as List)[0] as int, s[1] as int)],
+      lightLux: (j['lightLux'] as num?)?.toDouble(),
+      alertness:
+          j['alertness'] == null ? null : AlertnessResult.fromJson((j['alertness'] as Map).cast<String, dynamic>()),
     );
+  }
+
+  /// Snoring spans for the snore track: measured ones, else spread from the
+  /// snore minutes (sample and older nights) so the track still shows them.
+  List<(int, int)> get snoreTrack {
+    if (snoreSpans.isNotEmpty || snoreMinutes == 0) return snoreSpans;
+    final rng = math.Random(wentToBed.millisecondsSinceEpoch);
+    final total = math.max(1, session.timeInBed.inSeconds);
+    var left = snoreMinutes * 60;
+    final out = <(int, int)>[];
+    while (left > 0) {
+      final len = math.min(left, 60 + rng.nextInt(240));
+      final at = (total * (0.15 + 0.75 * rng.nextDouble())).round();
+      out.add((at, math.min(total, at + len)));
+      left -= len;
+    }
+    return out..sort((a, b) => a.$1.compareTo(b.$1));
   }
 
   /// Build a night from a finished tracking run, filling the mocked extras.
@@ -145,6 +182,31 @@ class Night {
       coughs: rng.nextInt(4),
       breathingPerHour: 5 + rng.nextDouble() * 15,
       regularity: 60 + rng.nextInt(40),
+      lightLux: rng.nextDouble() < 0.7 ? rng.nextDouble() * 4 : 5 + rng.nextDouble() * 20,
+      alertness: rng.nextDouble() < 0.5
+          ? AlertnessResult(
+              reactionMs: 330 + rng.nextInt(140),
+              accuracy: 0.8 + rng.nextDouble() * 0.2,
+              at: end.add(const Duration(minutes: 20)))
+          : null,
     );
   }
+}
+
+/// One morning alertness test (the "Awake" game): median reaction time to
+/// the targets and the share of correct taps.
+class AlertnessResult {
+  final int reactionMs;
+  final double accuracy; // 0..1
+  final DateTime at;
+  const AlertnessResult({required this.reactionMs, required this.accuracy, required this.at});
+
+  /// 0..100: fast and accurate is high. 250 ms → 100, 650 ms → 0, scaled by accuracy.
+  int get score => (((650 - reactionMs) / 4).clamp(0, 100) * accuracy).round();
+
+  Map<String, dynamic> toJson() => {'rt': reactionMs, 'acc': accuracy, 'at': at.millisecondsSinceEpoch};
+  factory AlertnessResult.fromJson(Map<String, dynamic> j) => AlertnessResult(
+      reactionMs: j['rt'] as int,
+      accuracy: (j['acc'] as num).toDouble(),
+      at: DateTime.fromMillisecondsSinceEpoch(j['at'] as int));
 }

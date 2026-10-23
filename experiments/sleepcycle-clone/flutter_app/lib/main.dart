@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'app_state.dart';
 import 'backend/backend.dart';
+import 'device/notifications.dart';
 import 'theme.dart';
 import 'strings.dart';
 import 'ui/main_shell.dart';
@@ -11,8 +12,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await S.load();
   await Backend.I.init();
+  await Notifications.I.init();
   await AppState.I.load();
   if (Backend.I.user != null) await AppState.I.syncFromCloud();
+  await AppState.I.rescheduleReminders();
   runApp(const SleepApp());
 }
 
@@ -39,8 +42,7 @@ class SleepApp extends StatelessWidget {
       ? const MainShell()
       : Builder(
           builder: (context) => OnboardingScreen(
-            onDone: () => Navigator.pushReplacement(
-                context, MaterialPageRoute(builder: (_) => const WelcomeScreen())),
+            onDone: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const WelcomeScreen())),
           ),
         );
 }

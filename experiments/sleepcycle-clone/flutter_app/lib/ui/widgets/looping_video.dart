@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 /// Plays a bundled video on loop (muted unless [muted] is false), covering its
@@ -20,6 +21,17 @@ class _LoopingVideoState extends State<LoopingVideo> {
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  // skip the player when the asset wasn't extracted, so it doesn't log errors
+  Future<void> _load() async {
+    try {
+      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+      if (!manifest.listAssets().contains(widget.asset) || !mounted) return;
+    } catch (_) {
+      return;
+    }
     final c = VideoPlayerController.asset(widget.asset);
     _c = c;
     c.initialize().then((_) {

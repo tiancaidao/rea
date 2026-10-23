@@ -7,7 +7,7 @@ Replaces `../mock-api` with real services.
 | Sign-in | **Firebase Auth** | email/password (Google sign-in once the app's SHA-1 is registered) |
 | User data | **Firestore** | `users/{uid}` profile + settings, `users/{uid}/nights/{id}` one doc per night, `users/{uid}/reports/{week}`; owner-only rules, `premium` server-written |
 | Media | **Cloud Storage** | `sleep-aid/audio/*`, signed-in read only; the API hands out 1-h signed URLs |
-| API | **Cloud Run** (`api/`, Node/Express) | `/v1/config` (remote config + paywall), `/v1/sleep-aid/catalog`, `/v1/insights/weekly`, `/v1/weather` (Open-Meteo, coords rounded to ~10 km), `/v1/billing/verify` (Google Play subscriptions v2), `/v1/account/erase-data`, `/v1/account/delete` |
+| API | **Cloud Run** (`api/`, Node/Express) | `/v1/config` (remote config + paywall), `/v1/sleep-aid/catalog`, `/v1/insights/weekly`, `/v1/weather` (Open-Meteo, coords rounded to ~10 km), `/v1/billing/verify` (Google Play subscriptions v2), `/v1/trial/start`, `/v1/giftcards/redeem`, `/v1/insights/recommendations`, `/v1/consent`, `/v1/user/properties`, `/v1/devices/register`, `/v1/account/erase-data`, `/v1/account/delete` |
 
 Every `/v1` route except config verifies a Firebase ID token. The app reads/writes
 its own data directly in Firestore; the API does what needs a server (signing,
