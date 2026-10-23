@@ -30,3 +30,12 @@ Excerpts trimmed, faded and loudness-normalised by tools/fetch_free_media.py.
 | amb_night_forest.mp3 | [Audio Hörbild Grillenzirpen - nachts um 3 im Föhrenwald Mödling.wav](https://commons.wikimedia.org/wiki/File%3AAudio_H%C3%B6rbild_Grillenzirpen_-_nachts_um_3_im_F%C3%B6hrenwald_M%C3%B6dling.wav) | DrTrumpet | CC BY-SA 4.0 | 0-40 s |
 | amb_stream.mp3 | [433589 jackthemurray stream-river-water-up-close.wav](https://commons.wikimedia.org/wiki/File%3A433589_jackthemurray_stream-river-water-up-close.wav) | jackthemurray | CC0 | 0-60 s |
 | amb_droplets.mp3 | [Listening to Raindrops (1035382 - heavy loop).mp3](https://commons.wikimedia.org/wiki/File%3AListening_to_Raindrops_%281035382_-_heavy_loop%29.mp3) | NASA | Public domain | 0-30 s |
+| amb_calm_rain.mp3 | [Calm rain.wav](https://commons.wikimedia.org/wiki/File%3ACalm_rain.wav) | Zuvji | CC BY-SA 4.0 | 60-150 s |
+| amb_night_rain.mp3 | [Chuva da noite (rain version) - Felipe RuizBRX11.wav](https://commons.wikimedia.org/wiki/File%3AChuva_da_noite_%28rain_version%29_-_Felipe_RuizBRX11.wav) | Felipe Ruiz P. | CC BY-SA 4.0 | 30-120 s |
+| amb_thunder.mp3 | [Gewittergeräusche in Hof 20250521 C1332Gewitter.wav](https://commons.wikimedia.org/wiki/File%3AGewitterger%C3%A4usche_in_Hof_20250521_C1332Gewitter.wav) | PantheraLeo1359531 | CC BY 4.0 | 0-36 s |
+| amb_rain_birds.mp3 | [Bourne woods Birdsong and rain 2020-06-17 0742.mp3](https://commons.wikimedia.org/wiki/File%3ABourne_woods_Birdsong_and_rain_2020-06-17_0742.mp3) | Robert EA Harvey | CC BY-SA 4.0 | 2-72 s |
+| amb_waves.mp3 | [Sea waves.wav](https://commons.wikimedia.org/wiki/File%3ASea_waves.wav) | Ganesh Mohan T | CC BY-SA 4.0 | 0-19 s |
+| amb_waterfall.mp3 | [Waterfall and birds sounds.wav](https://commons.wikimedia.org/wiki/File%3AWaterfall_and_birds_sounds.wav) | Blight55 | CC BY-SA 4.0 | 0-39 s |
+| amb_river.mp3 | [20221127 - Céret - Le Tech - Audio.wav](https://commons.wikimedia.org/wiki/File%3A20221127_-_C%C3%A9ret_-_Le_Tech_-_Audio.wav) | Fabricio Cardenas | CC BY-SA 4.0 | 5-95 s |
+| amb_forest_birds.mp3 | [Birds in mixed forest.wav](https://commons.wikimedia.org/wiki/File%3ABirds_in_mixed_forest.wav) | De Auditieve Dienst | CC BY-SA 3.0 nl | 10-100 s |
+| amb_heartbeat.mp3 | [Athletic bradycardia wav.wav](https://commons.wikimedia.org/wiki/File%3AAthletic_bradycardia_wav.wav) | Athletearrhythmia | CC0 | 0-18 s |
