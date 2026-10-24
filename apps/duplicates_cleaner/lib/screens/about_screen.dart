@@ -27,7 +27,7 @@ class AboutScreen extends StatelessWidget {
             const SizedBox(height: 20),
             Center(
               child: Text(
-                'Duplicates Cleaner${premium.isPremium ? ' Prime' : ''}',
+                'Duplicate Sweep${premium.isPremium ? ' Prime' : ''}',
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,

@@ -45,7 +45,7 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester, const OnboardingScreen());
-    expect(find.text('Duplicates Cleaner'), findsOneWidget);
+    expect(find.text('Duplicate Sweep'), findsOneWidget);
     for (var i = 0; i < 3; i++) {
       await tester.tap(find.text('Continue'));
       await frames(tester);

@@ -1,8 +1,8 @@
 /// Values recovered from the original app (`Constants`, `StaticDataStore`,
 /// `FilesScanner.FileCanBeProcessed`). See analysis/ANALYSIS.md.
 class AppConstants {
-  static const freeAppName = 'Duplicates Cleaner';
-  static const premiumAppName = 'Duplicates Cleaner Prime';
+  static const freeAppName = 'Duplicate Sweep';
+  static const premiumAppName = 'Duplicate Sweep Prime';
 
   /// Free users cannot delete a selection totalling this size or more (500 MB).
   static const freeFileSizeLimit = 524288000;

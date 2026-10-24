@@ -47,7 +47,7 @@ class DuplicatesCleanerApp extends StatelessWidget {
       premium: premium,
       storage: StorageService(),
       child: MaterialApp(
-        title: 'Duplicates Cleaner',
+        title: 'Duplicate Sweep',
         debugShowCheckedModeBanner: false,
         theme: buildAppTheme(),
         home: settings.firstLaunch

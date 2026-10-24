@@ -563,7 +563,7 @@ class FeatureGraphic extends StatelessWidget {
                 ),
                 const SizedBox(height: 26),
                 const Text(
-                  'Duplicates Cleaner',
+                  'Duplicate Sweep',
                   style: TextStyle(
                     fontFamily: _display,
                     fontVariations: [ui.FontVariation('wght', 800)],
