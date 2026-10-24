@@ -15,7 +15,8 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.matchlab.duplicatesweep"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android needs API 37 to compile against.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
