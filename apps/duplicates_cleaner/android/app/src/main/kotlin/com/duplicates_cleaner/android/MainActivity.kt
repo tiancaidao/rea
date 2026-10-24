@@ -1,4 +1,4 @@
-package com.example.duplicates_cleaner
+package com.duplicates_cleaner.android
 
 import android.app.Activity
 import android.content.Intent
