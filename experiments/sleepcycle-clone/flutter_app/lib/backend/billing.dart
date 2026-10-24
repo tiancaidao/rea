@@ -26,22 +26,28 @@ class Billing {
 
   /// The store's localized price for the yearly plan (e.g. "€29.99"), or
   /// null until the product exists in Play Console / App Store Connect.
-  Future<String?> price() async {
+  Future<String?> price() async => (await products({productId}))[productId]?.price;
+
+  /// Store details for [ids]; products not set up in the store are missing.
+  Future<Map<String, ProductDetails>> products(Set<String> ids) async {
     try {
       final iap = InAppPurchase.instance;
-      if (!await iap.isAvailable()) return null;
-      final r = await iap.queryProductDetails({productId});
-      return r.productDetails.isEmpty ? null : r.productDetails.first.price;
+      if (!await iap.isAvailable()) return {};
+      final r = await iap.queryProductDetails(ids);
+      return {for (final d in r.productDetails) d.id: d};
     } catch (_) {
-      return null;
+      return {};
     }
   }
 
   /// Returns null on success, or a message explaining why premium wasn't granted.
-  Future<String?> startTrial() async {
+  Future<String?> startTrial() => buy(productId);
+
+  /// Buy the subscription [id] (yearly or monthly); null on success.
+  Future<String?> buy(String id) async {
     final iap = InAppPurchase.instance;
     if (!await iap.isAvailable()) return 'Google Play billing isn\'t available on this device.';
-    final r = await iap.queryProductDetails({productId});
+    final r = await iap.queryProductDetails({id});
     if (r.productDetails.isEmpty) {
       return 'The subscription isn\'t set up in Play Console yet.';
     }

@@ -5,6 +5,8 @@ import 'package:quick_actions/quick_actions.dart';
 import '../alarm/alarm_plan.dart';
 import '../app_state.dart';
 import '../device/notifications.dart';
+import '../paywall/paywall_config.dart';
+import '../paywall/paywall_screen.dart';
 import 'alarm_screen.dart';
 import 'alertness_game.dart';
 import 'journal_tab.dart';
@@ -13,7 +15,6 @@ import 'profile_tab.dart';
 import 'programs_tab.dart';
 import 'sleep_tab.dart';
 import 'statistics_tab.dart';
-import 'welcome_screen.dart';
 import 'whats_new.dart';
 import 'widgets/common.dart';
 
@@ -52,6 +53,7 @@ class _MainShellState extends State<MainShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _onNotification();
       if (mounted) maybeShowWhatsNew(context);
+      _maybeAppOpenPaywall();
     });
   }
 
@@ -61,6 +63,14 @@ class _MainShellState extends State<MainShell> {
     Notifications.I.tapped.removeListener(_onNotification);
     _links?.cancel();
     super.dispose();
+  }
+
+  /// The app-open paywall (e.g. a campaign), when the server sends one and
+  /// its re-show interval has passed.
+  Future<void> _maybeAppOpenPaywall() async {
+    if (AppState.I.premium) return;
+    final c = await Paywalls.I.dueOnAppOpen();
+    if (c != null && mounted) await showPaywall(context, Placement.appOpen, variant: c.variant);
   }
 
   void _initShortcuts() {
@@ -114,7 +124,11 @@ class _MainShellState extends State<MainShell> {
         s.goTab(0);
       case 'premium':
         s.goTab(4);
-        push(context, const TrialScreen());
+        await showPaywall(context, Placement.inApp);
+      case 'campaign':
+        await showPaywall(context, Placement.campaign);
+      case 'gift':
+        await showPaywall(context, Placement.giftCards);
       case 'start_alarm' || 'start':
         s.goTab(0);
         if (s.alarmMode == 2) s.setAlarmMode(0);

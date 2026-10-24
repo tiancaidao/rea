@@ -105,3 +105,59 @@ test('new routes require a token', async (t) => {
     assert.equal((await fetch(base + p, { method: 'POST' })).status, 401, p);
   }
 });
+
+test('paywall: sticky weighted variant per placement, previews and overrides', async (t) => {
+  const { server, call } = await start({
+    'users/old': { premium: { active: false, source: 'play' } },
+    'config/paywalls': { variants: { campaign: { name: 'Spring', modules: [{ type: 'hero', title: 'Spring sale' }],
+      offers: [{ product: 'premium_yearly' }], displayInterval: 'everyWeek' } } },
+  });
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const get = async (q) => (await fetch(`${base}/v1/paywall?${q}`)).json();
+  const a = await get('placement=onboarding&installId=i1');
+  const b = await get('placement=onboarding&installId=i1');
+  assert.equal(a.variant, b.variant);
+  assert.ok(['trial_journey', 'trial_journey_tracking', 'standard', 'opt_in_feature_list', 'two_plan'].includes(a.variant));
+  assert.ok(a.config.modules.some((m) => m.type === 'pricing'));
+  assert.ok(a.products.premium_yearly);
+  // every variant shows up for some users
+  const seen = new Set();
+  for (let i = 0; i < 400; i++) seen.add((await get(`placement=onboarding&installId=x${i}`)).variant);
+  assert.equal(seen.size, 5);
+  assert.ok(['dynamic', 'standard'].includes((await get('placement=locked_feature')).variant));
+  const lapsed = await (await call('GET', '/v1/paywall?placement=locked_feature', null, 'old')).json();
+  assert.equal(lapsed.variant, 'early_adopter');
+  assert.equal((await get('placement=in_app&variant=gift_cards')).config.modules[0].type, 'gift_cards');
+  const c = await get('placement=campaign');
+  assert.equal(c.config.modules[0].title, 'Spring sale');
+  assert.equal(c.config.displayInterval, 'everyWeek');
+  assert.equal((await get('placement=app_open')).variant, null);
+  // signed in, the account id decides (same on every device)
+  const u = await (await call('GET', '/v1/paywall?placement=onboarding&installId=i1', null, 'u9')).json();
+  const v = await (await call('GET', '/v1/paywall?placement=onboarding&installId=i2', null, 'u9')).json();
+  assert.equal(u.variant, v.variant);
+  assert.equal((await call('GET', '/v1/paywall?placement=nope')).status, 404);
+  assert.equal((await call('GET', '/v1/paywall?variant=nope')).status, 404);
+});
+
+test('paywall defaults match the app\'s offline copy', () => {
+  const path = require('path');
+  const fs = require('fs');
+  const app = path.join(__dirname, '../../../flutter_app/assets/paywalls.json');
+  if (!fs.existsSync(app)) return;
+  assert.deepStrictEqual(JSON.parse(fs.readFileSync(app, 'utf8')), require('../src/paywalls.json'));
+});
+
+test('gift cards: a subscriber gets two codes once, and a friend can redeem one', async (t) => {
+  const { db, server, call } = await start({ 'users/u1': { premium: { active: true, source: 'play' } } });
+  t.after(() => server.close());
+  assert.equal((await call('POST', '/v1/giftcards/issue', {}, 'u2')).status, 403);
+  const a = await (await call('POST', '/v1/giftcards/issue', {})).json();
+  assert.equal(a.codes.length, 2);
+  assert.match(a.codes[0], /^[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/);
+  assert.deepStrictEqual((await (await call('POST', '/v1/giftcards/issue', {})).json()).codes, a.codes);
+  assert.equal((await call('POST', '/v1/giftcards/redeem', { code: a.codes[0] }, 'friend')).status, 200);
+  assert.equal(db.docs.get('users/friend').premium.source, 'giftcard');
+  assert.equal((await call('POST', '/v1/giftcards/issue', {}, 'friend')).status, 403);
+});

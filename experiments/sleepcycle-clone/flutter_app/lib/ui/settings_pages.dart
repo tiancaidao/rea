@@ -10,8 +10,10 @@ import '../device/health_connect.dart';
 import '../device/location.dart';
 import '../device/notifications.dart';
 import '../theme.dart';
+import '../paywall/paywall_config.dart';
+import '../paywall/paywall_screen.dart';
 import 'sleep_aid_sheet.dart' show PremiumBadge;
-import 'welcome_screen.dart';
+import 'welcome_screen.dart' show WelcomeScreen;
 import 'widgets/common.dart';
 import 'widgets/illustrations.dart';
 
@@ -212,7 +214,7 @@ class AlarmSoundPage extends StatelessWidget {
           trailing: s.premium ? null : const PremiumBadge(),
           onTap: () async {
             if (!s.premium) {
-              push(context, const TrialScreen());
+              showPaywall(context, Placement.lockedFeature);
               return;
             }
             if (CustomSong.path != null && !picked) {
@@ -546,6 +548,7 @@ class DatabasePage extends StatelessWidget {
             s.testAlarmArmed = true;
             toast(context, 'Start tracking on the Sleep tab: the alarm rings after 10 seconds');
           }),
+      NavRow(icon: Icons.storefront, title: 'Preview paywalls', onTap: () => push(context, const PaywallPreviewPage())),
       // Prototype helper: populate every screen without tracking for real.
       NavRow(
           icon: Icons.science,
@@ -763,6 +766,33 @@ class BenefitsPage extends StatelessWidget {
         Center(
           child: PillButton('Redeem a gift card', width: 240, onPressed: () => redeemGiftCard(context)),
         ),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton(
+            onPressed: () => showPaywall(context, Placement.giftCards),
+            child: Text('Give Premium to two friends', style: TextStyle(color: context.palette.accent)),
+          ),
+        ),
+      ]);
+}
+
+/// Every paywall variant the server can send, to open one directly
+/// (Profile › More › Database). The live choice per placement is the
+/// server's; this skips the experiment.
+class PaywallPreviewPage extends StatelessWidget {
+  const PaywallPreviewPage({super.key});
+  @override
+  Widget build(BuildContext context) => SettingsPage(title: 'Preview paywalls', children: [
+        FutureBuilder(
+          future: Paywalls.I.variants(),
+          builder: (context, snap) => Column(children: [
+            for (final (id, name) in snap.data ?? const <(String, String)>[])
+              NavRow(title: name, value: id, onTap: () => showPaywall(context, Placement.inApp, variant: id)),
+          ]),
+        ),
+        const AboutBlock('Which paywall a person sees is decided by the server for each placement '
+            '(onboarding, in-app, locked feature, gift cards, campaign, app open), as a sticky A/B split. '
+            'Change the split or the copy in Firestore at config/paywalls without a release.'),
       ]);
 }
 

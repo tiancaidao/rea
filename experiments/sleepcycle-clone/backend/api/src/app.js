@@ -11,6 +11,7 @@ const express = require('express');
 const { weeklyReport, DAY } = require('./insights');
 const { currentWeather } = require('./weather');
 const { recommendations } = require('./recommendations');
+const paywalls = require('./paywalls');
 
 const DEFAULT_CONFIG = {
   minAppVersion: '0.1.0',
@@ -67,6 +68,38 @@ function createApp({ db, auth, bucket, publisher = null, packageName = null, fet
     const snap = await db.doc('config/app').get();
     res.set('cache-control', 'public, max-age=300');
     res.json({ ...DEFAULT_CONFIG, ...(snap.exists ? snap.data() : {}) });
+  }));
+
+  // Server-driven paywall for a placement (onboarding, in_app, locked_feature,
+  // gift_cards, campaign, app_open). Public, because onboarding shows it
+  // before sign-in: the subject is the uid when a valid token is sent, else
+  // the app's install id. ?variant= previews a specific variant.
+  app.get('/v1/paywall', asyncRoute(async (req, res) => {
+    const placement = String(req.query.placement || 'in_app');
+    let subject = String(req.query.installId || '').slice(0, 64) || null;
+    let uid = null;
+    const m = /^Bearer (.+)$/.exec(req.get('authorization') || '');
+    if (m) {
+      try {
+        uid = subject = (await auth.verifyIdToken(m[1])).uid;
+      } catch {
+        // fall back to the install id
+      }
+    }
+    const snap = await db.doc('config/paywalls').get();
+    const cfg = paywalls.merge(paywalls.DEFAULTS, snap.exists ? snap.data() : null);
+    let forced = req.query.variant ? String(req.query.variant) : null;
+    // past subscribers whose Premium lapsed get the placement's returning
+    // variant (the early-adopter discount) instead of the experiment
+    const returning = cfg.placements[placement] && cfg.placements[placement].returningVariant;
+    if (!forced && returning && uid) {
+      const u = await db.doc(`users/${uid}`).get();
+      const prem = u.exists ? u.data().premium : null;
+      if (prem && !prem.active) forced = returning;
+    }
+    const chosen = paywalls.choosePaywall(cfg, placement, subject, forced);
+    res.set('cache-control', 'private, max-age=300');
+    res.json(chosen || { placement, variant: null });
   }));
 
   // Sleep-aid catalog with short-lived media URLs.
@@ -216,6 +249,25 @@ function createApp({ db, auth, bucket, publisher = null, packageName = null, fet
     if (result.status === 200) {
       await auth.setCustomUserClaims(req.user.uid, { ...(req.user.claims || {}), premium: true });
     }
+    res.status(result.status).json(result.body);
+  }));
+
+  // Gift-card paywall ("one for you, two for your friends"): a paying
+  // subscriber gets two one-year codes to share, once per account.
+  app.post('/v1/giftcards/issue', requireUser, asyncRoute(async (req, res) => {
+    const userRef = db.doc(`users/${req.user.uid}`);
+    const result = await db.runTransaction(async (tx) => {
+      const user = await tx.get(userRef);
+      const data = user.exists ? user.data() : {};
+      const p = data.premium;
+      if (!p || !p.active || p.source === 'giftcard') return { status: 403, body: { error: 'needs a paid subscription' } };
+      if (data.giftcardsIssued) return { status: 200, body: { codes: data.giftcardsIssued } };
+      const codes = [0, 1].map(() => require('crypto').randomBytes(6).toString('hex').toUpperCase().replace(/(.{4})(.{4})(.{4})/, '$1-$2-$3'));
+      const now = Date.now();
+      for (const code of codes) tx.set(db.doc(`giftcards/${code}`), { months: 12, issuedBy: req.user.uid, createdAt: now, newUsersOnly: true });
+      tx.set(userRef, { giftcardsIssued: codes }, { merge: true });
+      return { status: 200, body: { codes } };
+    });
     res.status(result.status).json(result.body);
   }));
 

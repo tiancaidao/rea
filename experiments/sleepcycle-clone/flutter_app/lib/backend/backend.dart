@@ -209,6 +209,17 @@ class Backend {
   Future<Map<String, dynamic>?> startTrial(String productId) async =>
       (await _api('POST', '/v1/trial/start', body: {'productId': productId})) as Map<String, dynamic>?;
 
+  /// The paywall for [placement] (see backend /v1/paywall); null offline.
+  Future<Map<String, dynamic>?> paywall(String placement, String installId, {String? variant}) async =>
+      (await _api(
+              'GET',
+              '/v1/paywall?placement=$placement&installId=$installId${variant == null ? '' : '&variant=$variant'}',
+              auth: user != null)) as Map<String, dynamic>?;
+
+  /// Two gift codes to share after buying from the gift-card paywall.
+  Future<List<String>> issueGiftCards() async =>
+      [for (final c in ((await _api('POST', '/v1/giftcards/issue')) as Map?)?['codes'] ?? const []) c as String];
+
   Future<Map<String, dynamic>?> redeemGiftCard(String code) async =>
       (await _api('POST', '/v1/giftcards/redeem', body: {'code': code})) as Map<String, dynamic>?;
 

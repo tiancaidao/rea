@@ -6,7 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import '../app_state.dart';
 import '../data/sleep_aid_catalog.dart';
 import '../theme.dart';
-import 'welcome_screen.dart' show TrialScreen;
+import '../paywall/paywall_config.dart';
+import '../paywall/paywall_screen.dart';
 import 'widgets/common.dart';
 import 'widgets/illustrations.dart';
 
@@ -73,7 +74,7 @@ class SleepAidPill extends StatelessWidget {
 /// Opens a track, or the paywall for Premium content on a free account.
 void openItem(BuildContext context, SleepAidItem it) {
   if (it.premium && !AppState.I.premium) {
-    push(context, const TrialScreen());
+    showPaywall(context, Placement.lockedFeature);
     return;
   }
   showTrackSheet(context, it);

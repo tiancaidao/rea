@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../app_state.dart';
 import '../backend/backend.dart';
-import '../backend/billing.dart';
-import '../device/notifications.dart';
 import '../theme.dart';
 import 'login_screen.dart';
-import 'main_shell.dart';
+import '../paywall/paywall_config.dart';
+import '../paywall/paywall_screen.dart';
 import 'widgets/common.dart';
 
 /// After onboarding: account choice (continue with a provider, sign up, or
@@ -17,7 +15,7 @@ class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   Future<void> _signedIn(BuildContext context) async {
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TrialScreen()));
+    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TrialScreen(placement: Placement.onboarding)));
   }
 
   @override
@@ -164,152 +162,11 @@ class _SocialProofState extends State<_SocialProof> {
       ]);
 }
 
-/// "How your free trial works": a three-step timeline and the plan card with
-/// the store's price, Terms and Privacy. The close button skips straight into
-/// the free app.
-class TrialScreen extends StatefulWidget {
-  const TrialScreen({super.key});
+/// The paywall: which variant shows is decided by the server per placement
+/// (see lib/paywall). From onboarding, closing or buying enters the app.
+class TrialScreen extends StatelessWidget {
+  final String placement;
+  const TrialScreen({super.key, this.placement = Placement.inApp});
   @override
-  State<TrialScreen> createState() => _TrialScreenState();
-}
-
-class _TrialScreenState extends State<TrialScreen> {
-  String? _price;
-
-  @override
-  void initState() {
-    super.initState();
-    Billing.I.price().then((p) {
-      if (mounted && p != null) setState(() => _price = p);
-    });
-  }
-
-  Future<void> _trialStarted() async {
-    final now = DateTime.now();
-    await Notifications.I.requestPermission();
-    await Notifications.I.scheduleTrialReminder(now);
-    if (Backend.I.user != null) {
-      try {
-        await Backend.I.startTrial(Billing.productId);
-      } catch (_) {
-        // already used on this account, or offline: the store is the source of truth
-      }
-    }
-  }
-
-  static const _terms = 'The subscription renews automatically each year unless you cancel at least 24 hours '
-      'before the end of the current period. Cancel any time in your app store account settings. During the free '
-      'trial you are not charged; if you cancel before it ends, you keep the free version.';
-  static const _privacy = 'Your nights are analysed on your phone. With Online backup on, nights and settings are '
-      'stored in your account so you can restore them. Sound clips stay on your phone unless you agree to share '
-      'them in Consent and privacy. You can erase your data or your account at any time in Profile › More › Account.';
-
-  void _legal(BuildContext context, String title, String body) => showModalBottomSheet(
-        context: context,
-        builder: (c) => Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            Text(body, style: TextStyle(color: c.palette.textMuted, height: 1.45)),
-          ]),
-        ),
-      );
-
-  void _enter(BuildContext context) {
-    AppState.I.finishOnboarding();
-    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const MainShell()), (_) => false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Widget step(IconData icon, String title, String body, {bool last = false}) => IntrinsicHeight(
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Column(children: [
-              CircleAvatar(radius: 20, backgroundColor: context.palette.light, child: Icon(icon, color: Colors.white)),
-              if (!last) Expanded(child: Container(width: 10, color: context.palette.light)),
-            ]),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 24),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 2),
-                  Text(body, style: TextStyle(color: context.palette.textMuted)),
-                ]),
-              ),
-            ),
-          ]),
-        );
-    return Scaffold(
-      body: StarryBackground(
-        child: SafeArea(
-          child: ListView(padding: const EdgeInsets.fromLTRB(24, 8, 24, 24), children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: IconButton(icon: const Icon(Icons.close), onPressed: () => _enter(context)),
-            ),
-            const Text('How your free trial works',
-                textAlign: TextAlign.center, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 28),
-            step(Icons.lock_open, 'Today: full access',
-                'Every feature unlocked: smart alarm, sleep aid, programs and statistics.'),
-            step(Icons.notifications, 'Day 5: reminder', 'We remind you two days before the trial ends.'),
-            step(Icons.star, 'Day 7: trial ends', 'Cancel before then and keep using the free version.', last: true),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: context.palette.accent),
-                color: context.palette.surface,
-              ),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('PREMIUM · YEARLY', style: const TextStyle(letterSpacing: 1.1, fontSize: 13)),
-                const SizedBox(height: 8),
-                const Text('7-day free trial', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 8),
-                Text(_price == null ? 'then billed yearly · price set by the store' : 'then $_price per year',
-                    style: TextStyle(color: context.palette.textMuted)),
-              ]),
-            ),
-            const SizedBox(height: 40),
-            PillButton('Try it free', onPressed: () async {
-              // Real Play Billing + server verification when the backend is on;
-              // until the subscription exists in Play Console, a local trial.
-              if (Backend.I.user != null) {
-                final err = await Billing.I.startTrial();
-                if (err == null) {
-                  await _trialStarted();
-                  if (context.mounted) _enter(context);
-                  return;
-                }
-                if (context.mounted) toast(context, '$err Starting a local trial.');
-              }
-              AppState.I.premium = true;
-              await _trialStarted();
-              if (context.mounted) _enter(context);
-            }),
-            const SizedBox(height: 12),
-            Text('Cancel anytime in your app store subscriptions.',
-                textAlign: TextAlign.center, style: TextStyle(color: context.palette.textMuted)),
-            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              TextButton(
-                  onPressed: () => _legal(context, 'Terms of use', _terms),
-                  child: Text('Terms', style: TextStyle(color: context.palette.accent))),
-              Text('·', style: TextStyle(color: context.palette.textMuted)),
-              TextButton(
-                  onPressed: () => _legal(context, 'Privacy policy', _privacy),
-                  child: Text('Privacy', style: TextStyle(color: context.palette.accent))),
-              Text('·', style: TextStyle(color: context.palette.textMuted)),
-              TextButton(
-                  onPressed: () => toast(context, 'Restoring purchases happens automatically when you sign in.'),
-                  child: Text('Restore', style: TextStyle(color: context.palette.accent))),
-            ]),
-          ]),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => PaywallScreen(placement: placement);
 }

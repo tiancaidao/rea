@@ -50,6 +50,7 @@ flutter:
   assets:
     - assets/data/
     - assets/lottie/
+    - assets/paywalls.json
     - assets/audio/
     - assets/audio/own/
     - assets/free/
