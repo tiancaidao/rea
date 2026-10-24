@@ -25,7 +25,9 @@ import products
 SCOPES = ["https://www.googleapis.com/auth/androidpublisher"]
 PROJECT_ROOT = os.path.dirname(products.SCRIPT_DIR)
 DEFAULT_KEY_FILE = os.path.join(PROJECT_ROOT, "google_play", "google-play-credentials.json")
-# Play's pricing regions version; see the monetization.subscriptions.create docs.
+# Play's pricing regions version, used only if convertRegionPrices doesn't
+# report one. Prices must match the version they're sent with: under an old
+# version some regions (Argentina, for one) must be priced in USD.
 REGIONS_VERSION = "2022/02"
 
 
@@ -81,6 +83,10 @@ class Play:
             self._prices[usd] = self.api.convertRegionPrices(
                 packageName=self.package, body={"price": money(usd)}).execute()
         return self._prices[usd]
+
+    def regions_version(self, usd: Decimal) -> str:
+        """The regions version Play converted [usd] for, to send with those prices."""
+        return self.converted(usd).get("regionVersion", {}).get("version", REGIONS_VERSION)
 
     def base_plan(self, sub: dict) -> dict:
         prices = self.converted(sub["price_usd"])
@@ -164,7 +170,7 @@ def cmd_sync(play: Play, args) -> None:
         if existing is None:
             play.run(f"create subscription with base plan {plan_id} at ${sub['price_usd']}",
                      subs_api.create(packageName=play.package, productId=pid,
-                                     regionsVersion_version=REGIONS_VERSION,
+                                     regionsVersion_version=play.regions_version(sub["price_usd"]),
                                      body={"packageName": play.package, "productId": pid,
                                            "listings": listings(sub), "basePlans": [play.base_plan(sub)]}))
             plan_state = "DRAFT"
@@ -196,7 +202,7 @@ def cmd_sync(play: Play, args) -> None:
                 play.run("update " + ", ".join(changes),
                          subs_api.patch(packageName=play.package, productId=pid,
                                         updateMask="listings,basePlans",
-                                        regionsVersion_version=REGIONS_VERSION, body=body))
+                                        regionsVersion_version=play.regions_version(sub["price_usd"]), body=body))
             else:
                 print("  listings and price already match")
             plan_state = plans[plan_id].get("state", "DRAFT")
@@ -220,7 +226,7 @@ def cmd_sync(play: Play, args) -> None:
             play.run(f"create intro offer {offer_id}: ${intro['price_usd']} for {intro['periods']} period(s)",
                      subs_api.basePlans().offers().create(
                          packageName=play.package, productId=pid, basePlanId=plan_id, offerId=offer_id,
-                         regionsVersion_version=REGIONS_VERSION, body=play.offer(sub)))
+                         regionsVersion_version=play.regions_version(intro["price_usd"]), body=play.offer(sub)))
         else:
             # Changing a live offer's price changes it for everyone mid-offer, so leave that to Play Console.
             print(f"  intro offer {offer_id} exists ({offer.get('state')}); edit its price in Play Console")
