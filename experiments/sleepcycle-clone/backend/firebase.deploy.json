@@ -1,5 +1,9 @@
 {
   "firestore": [
-    { "database": "sleep-tracker", "rules": "firestore.rules", "indexes": "firestore.indexes.json" }
+    {
+      "database": "sleep-tracker",
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.json"
+    }
   ]
 }

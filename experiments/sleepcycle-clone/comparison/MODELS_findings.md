@@ -11,8 +11,8 @@ models, or build our own models that match their performance?
    their client to fetch them, or distilling their outputs are all off the
    table — they defeat a technical protection measure and copy proprietary
    weights, barred by Sleep Cycle's terms and by anti-circumvention law
-   (US DMCA §1201; Singapore Copyright Act 2021). A paid trial licenses *use of
-   the app*, not the models.
+   (US DMCA §1201; Singapore Copyright Act 2021). A paid trial licenses _use of
+   the app_, not the models.
 2. **Matching their performance — yes, and the bar is lower than it looks.**
    Independent polysomnography (PSG) studies show phone sleep trackers,
    Sleep Cycle included, are **not** accurate against the medical gold standard.
@@ -52,7 +52,7 @@ This is where we can get genuinely close, legitimately:
   value only 70%, i.e. **false alarms are the real challenge**, not raw
   accuracy. [arXiv/ResearchGate](https://www.researchgate.net/publication/355903330)
 
-These match the *shape* of Sleep Cycle's own chain, which REA already revealed.
+These match the _shape_ of Sleep Cycle's own chain, which REA already revealed.
 
 ## What REA legitimately gave us (the architecture, for free)
 
@@ -71,12 +71,13 @@ Staging: sleep_staging / realtime_sleep_staging / staging_inputs (encrypted)
 Extras: breathing_rate, gcc_phat_fft (2-sleeper direction), auroracle (general sound)
 ```
 
-Knowing the *architecture and I/O shapes* is lawful interface-level RE and is
+Knowing the _architecture and I/O shapes_ is lawful interface-level RE and is
 all we need to build our own. We do **not** read the encrypted weights.
 
 ## The plan to reach parity, legitimately
 
 **A. Snore model (start here — testable in days).**
+
 - Rebuild the exact architecture above (our own CNN, same 64×86 mel input,
   128-D embedding) in `ml/training/snore_*.py` (scaffolding already present).
 - Train on openly-licensed data: ESC-50 (snoring/cough classes, CC-BY-NC),
@@ -85,6 +86,7 @@ all we need to build our own. We do **not** read the encrypted weights.
   loudness proxy. Report sensitivity / specificity / PPV on a held-out set.
 
 **B. Sleep staging model.**
+
 - Small sequence model (TCN/BiLSTM) over per-30-s movement + sound features —
   the same inputs `staging_inputs` consumes.
 - Train on public motion+PSG datasets: **Walch 2019** Apple Watch + PSG on
@@ -93,17 +95,20 @@ all we need to build our own. We do **not** read the encrypted weights.
   that's parity with the whole category.
 
 **C. Per-user snore signature (their "Who's snoring").**
-- Reuse *our* snore CNN's embeddings + a per-user profile built from clips the
+
+- Reuse _our_ snore CNN's embeddings + a per-user profile built from clips the
   user confirms/rejects in the Journal. Same idea as snoracle + snore_signature,
   our weights.
 
 **D. Our own data flywheel (the real moat).**
+
 - The backend already has a `consent_sounds` ("Share sounds") field. Add opt-in
   upload of short, user-confirmed snore clips → Cloud Storage → labelled
   training set. This is exactly how Sleep Cycle built its edge: millions of
   consented nights, not a cleverer network.
 
 **E. Benchmark harness (how we prove "as good as").**
+
 - Track the same nights with both apps side by side (phone next to phone).
 - Compare our hypnogram / snore-minutes / quality vs the real app's **CSV
   export** (Profile › More › Database). Their outputs grade ours; we never
@@ -114,13 +119,14 @@ all we need to build our own. We do **not** read the encrypted weights.
 ## Bottom line for the REA question
 
 "Can we recreate the app from reverse engineering?" — **Almost all of it, yes:**
-UX, navigation, backend, and the model *architecture* are all reproducible from
+UX, navigation, backend, and the model _architecture_ are all reproducible from
 REA (we've done the first three and captured the fourth). The one thing that
 can't be copied lawfully is the **trained weights + labelled data** — and the
-evidence says that intelligence, while it's their moat, is only *moderately*
+evidence says that intelligence, while it's their moat, is only _moderately_
 accurate, so we can reach the same league with our own legitimate training.
 
 ## Sources
+
 - [Smart sleep tracking through the phone: PSG reliability of four apps (incl. Sleep Cycle)](https://pubmed.ncbi.nlm.nih.gov/31674096)
 - [Six wrist wearables vs PSG for sleep staging](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12038347/)
 - [Apple — Estimating Sleep Stages from Apple Watch (Oct 2025)](https://www.apple.com/health/pdf/Estimating_Sleep_Stages_from_Apple_Watch_Oct_2025.pdf)

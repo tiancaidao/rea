@@ -7,28 +7,28 @@ reconstructing an app's architecture — **not** to copy Northcube's code, train
 models, or brand assets.
 
 > **Scope / ethics.** Everything here is our own implementation of a
-> *re-derived design*. No decompiled source, trained weights, or encrypted
+> _re-derived design_. No decompiled source, trained weights, or encrypted
 > models from the original are included. Two of the original's ML models are
 > AES-GCM encrypted (keys in a native lib) specifically to prevent lifting; we
 > don't touch them. You train your own weights and run your own backend.
 
 ## What's here
 
-| Path | What it is |
-|---|---|
-| `flutter_app/` | **The app.** Original Flutter sleep tracker (iOS + Android): tracking, hypnogram + score, smart-alarm settings, sign-in, sleep-aid, paywall; native accelerometer platform channel (Kotlin + Swift). Runs on a simulated night out of the box. |
-| `flutter_app/android/wear/` | **Wear OS companion** (Kotlin + Compose for Wear): start/stop the night, snooze/stop the alarm, Automatic/Melody/Vibrate alarm type (silent wake-up), Snore Alert buzz. Talks to the phone app over the Wearable Data Layer (`WearPlugin.kt` on the phone). Build with `cd flutter_app/android && ./gradlew :wear:assembleDebug`, install on a paired watch with `adb -s <watch> install`. |
-| `backend/api/src/paywalls.json` | **Server-driven paywalls**: ten variants as module lists and the per-placement A/B split, served by `GET /v1/paywall`; override in Firestore at `config/paywalls`. The app bundles the same file as its offline fallback. |
-| `sleep_core/` | **Original** sleep-tracking algorithms (movement, staging, smart alarm, snore events) from standard techniques — not ported. Plain Python with tests. |
-| `ml/training/` | Trains your **own** models (sleep stager, snore classifier, 16-D snore-signature embedder) in PyTorch → ONNX, on synthetic or your own data. Runnable. |
-| `mock-api/` | Zero-dependency mock backend (token auth, persisted sessions, computed insights, paywall, sleep-aid catalog). |
-| `ml/audio_pipeline.py` | Reference audio front-end (PCM → FFT → mel → CNN tensor) at the **exact shapes** read from the app's unencrypted TFLite models. Runnable. |
-| `mock-api/server.js` | Zero-dependency Node mock backend mirroring the app's endpoint shape (Ory-style auth, session upload, insights, remote config/paywall). Runnable. |
-| `android/.../net/SleepCloudApi.kt` | Retrofit interface mapped to the mock API. |
-| `android/.../data/SleepModels.kt` | DTOs + sleep-phase model. |
-| `android/.../sensing/MovementDetector.kt` | Accelerometer detector with calibration, modelled on `logic.detector.MovementDetector`. |
-| `android/.../ml/SnoreEmbedder.kt` | On-device embedder interface at the RE'd tensor contract. |
-| `android/.../domain/SleepPhaseEstimator.kt` | Transparent movement+snore → phase + smart-alarm heuristic. |
+| Path                                        | What it is                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `flutter_app/`                              | **The app.** Original Flutter sleep tracker (iOS + Android): tracking, hypnogram + score, smart-alarm settings, sign-in, sleep-aid, paywall; native accelerometer platform channel (Kotlin + Swift). Runs on a simulated night out of the box.                                                                                                                                             |
+| `flutter_app/android/wear/`                 | **Wear OS companion** (Kotlin + Compose for Wear): start/stop the night, snooze/stop the alarm, Automatic/Melody/Vibrate alarm type (silent wake-up), Snore Alert buzz. Talks to the phone app over the Wearable Data Layer (`WearPlugin.kt` on the phone). Build with `cd flutter_app/android && ./gradlew :wear:assembleDebug`, install on a paired watch with `adb -s <watch> install`. |
+| `backend/api/src/paywalls.json`             | **Server-driven paywalls**: ten variants as module lists and the per-placement A/B split, served by `GET /v1/paywall`; override in Firestore at `config/paywalls`. The app bundles the same file as its offline fallback.                                                                                                                                                                  |
+| `sleep_core/`                               | **Original** sleep-tracking algorithms (movement, staging, smart alarm, snore events) from standard techniques — not ported. Plain Python with tests.                                                                                                                                                                                                                                      |
+| `ml/training/`                              | Trains your **own** models (sleep stager, snore classifier, 16-D snore-signature embedder) in PyTorch → ONNX, on synthetic or your own data. Runnable.                                                                                                                                                                                                                                     |
+| `mock-api/`                                 | Zero-dependency mock backend (token auth, persisted sessions, computed insights, paywall, sleep-aid catalog).                                                                                                                                                                                                                                                                              |
+| `ml/audio_pipeline.py`                      | Reference audio front-end (PCM → FFT → mel → CNN tensor) at the **exact shapes** read from the app's unencrypted TFLite models. Runnable.                                                                                                                                                                                                                                                  |
+| `mock-api/server.js`                        | Zero-dependency Node mock backend mirroring the app's endpoint shape (Ory-style auth, session upload, insights, remote config/paywall). Runnable.                                                                                                                                                                                                                                          |
+| `android/.../net/SleepCloudApi.kt`          | Retrofit interface mapped to the mock API.                                                                                                                                                                                                                                                                                                                                                 |
+| `android/.../data/SleepModels.kt`           | DTOs + sleep-phase model.                                                                                                                                                                                                                                                                                                                                                                  |
+| `android/.../sensing/MovementDetector.kt`   | Accelerometer detector with calibration, modelled on `logic.detector.MovementDetector`.                                                                                                                                                                                                                                                                                                    |
+| `android/.../ml/SnoreEmbedder.kt`           | On-device embedder interface at the RE'd tensor contract.                                                                                                                                                                                                                                                                                                                                  |
+| `android/.../domain/SleepPhaseEstimator.kt` | Transparent movement+snore → phase + smart-alarm heuristic.                                                                                                                                                                                                                                                                                                                                |
 
 The `android/` Kotlin files are a **skeleton** to drop into an Android Studio
 Compose project — they encode the reconstructed contracts, not a full app.
@@ -44,6 +44,7 @@ PCM @ 44100 Hz
   → snoracle-*.tflite         in [1,1,86,64]   → out [1,1,128]  (triplet-loss embedding)
   → snore_signature.ort.enc   (ENCRYPTED; reproduced as cosine match vs. a per-user signature)
 ```
+
 The middle `.tflite` is a **PyTorch CNN** (7× Conv2d+BatchNorm+Dropout) exported via MLIR.
 
 **Sensing** (from `logic.detector`, `sleepanalysis`, confirmed `SensorManager` usage):
@@ -60,7 +61,7 @@ Full analysis: `/mnt/project-files/SleepCycle-analysis/` (blueprint + reports).
 
 ## Building your own (not a clone)
 
-`sleep_core/` is an **original, clean-room** implementation of the *category's*
+`sleep_core/` is an **original, clean-room** implementation of the _category's_
 standard algorithms, with our own parameters — informed by the reverse-engineered
 architecture, but written from scratch, not copied. It is the foundation you build
 a real product on; you supply your own trained ML models for the stages below.
@@ -75,12 +76,12 @@ a real product on; you supply your own trained ML models for the stages below.
 The sensing + on-device ML is inherently native on each platform and cannot be
 shared by any framework:
 
-| Concern | iOS | Android |
-|---|---|---|
-| Motion | CoreMotion (`CMMotionManager`) | `SensorManager` accelerometer |
-| Audio | AVAudioEngine + background `AVAudioSession` | `AudioRecord` + mic foreground service |
-| On-device ML | CoreML (or ONNX/TFLite iOS) | TFLite / ONNX Runtime |
-| Health | HealthKit (`sleepAnalysis`) | Health Connect |
+| Concern      | iOS                                         | Android                                |
+| ------------ | ------------------------------------------- | -------------------------------------- |
+| Motion       | CoreMotion (`CMMotionManager`)              | `SensorManager` accelerometer          |
+| Audio        | AVAudioEngine + background `AVAudioSession` | `AudioRecord` + mic foreground service |
+| On-device ML | CoreML (or ONNX/TFLite iOS)                 | TFLite / ONNX Runtime                  |
+| Health       | HealthKit (`sleepAnalysis`)                 | Health Connect                         |
 
 Recommended shape: **Flutter** for the shared app (UI, onboarding, stats, journal,
 paywall, networking) + a thin native sensing/ML module per platform. The

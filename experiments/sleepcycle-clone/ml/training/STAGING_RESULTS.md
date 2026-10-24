@@ -6,23 +6,23 @@
 
 Per-epoch probabilities are smoothed with Viterbi decoding over stage transitions estimated from the train PSG labels (picked on val, see IMPROVEMENTS.md).
 
-**Conditions:** *wrist* = the sensor as recorded. *phone-like* = the same nights with motion attenuated 10×, smoothed and given phone sensor noise. That's a stand-in for a phone on the mattress, which we can't get with PSG labels from open data.
+**Conditions:** _wrist_ = the sensor as recorded. _phone-like_ = the same nights with motion attenuated 10×, smoothed and given phone sensor noise. That's a stand-in for a phone on the mattress, which we can't get with PSG labels from open data.
 
-| stager | condition | accuracy | κ 4-stage | κ sleep/wake | κ 4-stage (mean per night) | recall wake / light / deep / REM |
-|---|---|---|---|---|---|---|
-| our model, no smoothing | wrist | 0.499 | 0.272 | 0.427 | 0.272 | 0.67 / 0.52 / 0.55 / 0.26 |
-| our model (+ Viterbi, shipped) | wrist | 0.527 | 0.284 | 0.465 | 0.283 | 0.62 / 0.59 / 0.52 / 0.26 |
-| current heuristic | wrist | 0.400 | 0.016 | 0.031 | 0.022 | 0.02 / 0.62 / 0.18 / 0.26 |
-| our model, no smoothing | phone-like | 0.439 | 0.177 | 0.266 | 0.173 | 0.22 / 0.48 / 0.64 / 0.30 |
-| our model (+ Viterbi, shipped) | phone-like | 0.434 | 0.177 | 0.264 | 0.172 | 0.21 / 0.46 / 0.65 / 0.32 |
-| current heuristic | phone-like | 0.400 | -0.033 | -0.008 | -0.022 | 0.08 / 0.70 / 0.01 / 0.16 |
+| stager                         | condition  | accuracy | κ 4-stage | κ sleep/wake | κ 4-stage (mean per night) | recall wake / light / deep / REM |
+| ------------------------------ | ---------- | -------- | --------- | ------------ | -------------------------- | -------------------------------- |
+| our model, no smoothing        | wrist      | 0.499    | 0.272     | 0.427        | 0.272                      | 0.67 / 0.52 / 0.55 / 0.26        |
+| our model (+ Viterbi, shipped) | wrist      | 0.527    | 0.284     | 0.465        | 0.283                      | 0.62 / 0.59 / 0.52 / 0.26        |
+| current heuristic              | wrist      | 0.400    | 0.016     | 0.031        | 0.022                      | 0.02 / 0.62 / 0.18 / 0.26        |
+| our model, no smoothing        | phone-like | 0.439    | 0.177     | 0.266        | 0.173                      | 0.22 / 0.48 / 0.64 / 0.30        |
+| our model (+ Viterbi, shipped) | phone-like | 0.434    | 0.177     | 0.264        | 0.172                      | 0.21 / 0.46 / 0.65 / 0.32        |
+| current heuristic              | phone-like | 0.400    | -0.033    | -0.008       | -0.022                     | 0.08 / 0.70 / 0.01 / 0.16        |
 
 **By test source** (κ 4-stage / κ sleep-wake):
 
-| source | test nights | our model, wrist | our model, phone-like | heuristic, wrist |
-|---|---|---|---|---|
-| newcastle | 5 | 0.26 / 0.43 | 0.18 / 0.25 | -0.00 / 0.03 |
-| walch | 6 | 0.29 / 0.49 | 0.17 / 0.30 | 0.04 / 0.04 |
+| source    | test nights | our model, wrist | our model, phone-like | heuristic, wrist |
+| --------- | ----------- | ---------------- | --------------------- | ---------------- |
+| newcastle | 5           | 0.26 / 0.43      | 0.18 / 0.25           | -0.00 / 0.03     |
+| walch     | 6           | 0.29 / 0.49      | 0.17 / 0.30           | 0.04 / 0.04      |
 
 **Confusion matrix, our model, wrist** (rows = PSG, cols = predicted; wake, light, deep, REM):
 
@@ -42,9 +42,10 @@ Per-epoch probabilities are smoothed with Viterbi decoding over stage transition
      0    871    350    583
 ```
 
-**Published reference points** (MODELS_findings.md): phone apps incl. Sleep Cycle do not reliably separate sleep from wake vs PSG. Wrist wearables *with heart rate* reach κ ≈ 0.5 for 4 stages (Apple Watch S8 κ 0.53; Apple's own κ ≈ 0.63; Google accel+PPG κ 0.66). Experts agree at κ ≈ 0.70–0.75. Motion-only staging cannot see REM vs deep directly, so a 4-stage κ well below the heart-rate wearables is expected. Sleep/wake is where motion carries the signal.
+**Published reference points** (MODELS_findings.md): phone apps incl. Sleep Cycle do not reliably separate sleep from wake vs PSG. Wrist wearables _with heart rate_ reach κ ≈ 0.5 for 4 stages (Apple Watch S8 κ 0.53; Apple's own κ ≈ 0.63; Google accel+PPG κ 0.66). Experts agree at κ ≈ 0.70–0.75. Motion-only staging cannot see REM vs deep directly, so a 4-stage κ well below the heart-rate wearables is expected. Sleep/wake is where motion carries the signal.
 
 <!-- below this line is maintained by hand; train_stage.py keeps it -->
+
 ## In the app
 
 `flutter_app/lib/sensing/stage_model.dart` runs the stager in pure Dart.
@@ -53,9 +54,9 @@ the model asset is bundled, and the night is at least 10 minutes long. It reads
 the accelerometer epochs only, as trained. Otherwise the app keeps the
 heuristic `estimateStages`.
 
-| check (Android emulator `sc_test`, 2026-10-22) | result |
-|---|---|
-| Dart vs PyTorch logits (`test/stage_model_test.dart`) | max abs diff < 2e-3 |
+| check (Android emulator `sc_test`, 2026-10-22)                                                                             | result                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Dart vs PyTorch logits (`test/stage_model_test.dart`)                                                                      | max abs diff < 2e-3                                                                                     |
 | Held-out test night (8.0 h, phone-like rendering) replayed through `LiveTracker.addAccelEpoch` → `analyze()` on the device | 958 / 958 epochs agree with PyTorch incl. Viterbi decoding, staged in **201 ms** (28 ms before Viterbi) |
 
 ## Caveats

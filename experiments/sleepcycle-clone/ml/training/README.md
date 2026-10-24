@@ -5,12 +5,12 @@ own (or synthetic/public) data** — not the app's encrypted weights, which can'
 be used. Each script trains on built-in synthetic data so the pipeline runs and
 exports a working model today; swap in real data via `datasets.py` for quality.
 
-| Script | Model | Input → Output | Export |
-|---|---|---|---|
-| `stage_model.py` | sleep stager | 3 features/epoch → 4 stages | `stage_model.onnx` |
-| `snore_classifier.py` | sound classifier (model definition) | log-mel (1,86,64) → class probs | — |
-| `prepare_data.py` + `train_snore.py` | **snore / cough / speech / other on open data** | log-mel (1,86,64) → 4 classes | `snore_classifier.onnx`, `flutter_app/assets/models/snore_cnn.json` |
-| `snore_embedding.py` | snore signature | log-mel (1,64,86) → 16-D embedding | `snore_embedding.onnx` |
+| Script                               | Model                                           | Input → Output                     | Export                                                              |
+| ------------------------------------ | ----------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------- |
+| `stage_model.py`                     | sleep stager                                    | 3 features/epoch → 4 stages        | `stage_model.onnx`                                                  |
+| `snore_classifier.py`                | sound classifier (model definition)             | log-mel (1,86,64) → class probs    | —                                                                   |
+| `prepare_data.py` + `train_snore.py` | **snore / cough / speech / other on open data** | log-mel (1,86,64) → 4 classes      | `snore_classifier.onnx`, `flutter_app/assets/models/snore_cnn.json` |
+| `snore_embedding.py`                 | snore signature                                 | log-mel (1,64,86) → 16-D embedding | `snore_embedding.onnx`                                              |
 
 ```bash
 pip install torch onnx numpy          # on your machine

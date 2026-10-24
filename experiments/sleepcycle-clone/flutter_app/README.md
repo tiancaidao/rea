@@ -79,11 +79,11 @@ tool/theme_screenshots_test.dart  # renders each theme to build/theme_screenshot
 
 Pick one in **Profile › Theme** (saved with the other settings; Midnight is the default).
 
-| Theme | Look |
-|---|---|
+| Theme        | Look                                                                                                                                                                    |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Midnight** | Near-black glass cards, DM Sans, blue stage gradient (royal blue deep, mid-blue light, pale cyan REM, pink-red awake), a stage ring report and pill segmented controls. |
-| **Mist** | The light counterpart: misty sage-grey air, frosted white cards, forest-ink text and a forest → sage → mint stage scale with terracotta for awake. |
-| **Classic** | The original teal night sky with the orange call to action. |
+| **Mist**     | The light counterpart: misty sage-grey air, frosted white cards, forest-ink text and a forest → sage → mint stage scale with terracotta for awake.                      |
+| **Classic**  | The original teal night sky with the orange call to action.                                                                                                             |
 
 Screens never hard-code colors: they read `context.palette`, so a new theme is
 one new `SleepPalette` file plus an `AppThemeId` entry. Regenerate the previews
@@ -129,6 +129,7 @@ saved with shared_preferences, so later launches open straight on the tabs.
 
 **Realistic test data with the local placeholders.** When
 `extract_placeholders.sh` has been run:
+
 - sample, demo and "stopped" nights replay the APK's recorded night
   (`dummy_sleep_events.csv`: movement + snore events) through our staging,
   jittered per night, instead of the synthetic generator;
@@ -186,34 +187,34 @@ shortcuts or Quick Settings tile, so there are none to match.
 Honest, feature-by-feature. "Design parity" = same approach, our own code/params.
 "Gap" = real product work still needed.
 
-| Area | Sleep Cycle | This app | Status |
-|---|---|---|---|
-| Primary navigation | Sleep / Programs / Journal / Statistics / Profile bottom bar | **same five tabs, same order and screen tree** | **Parity** |
-| UI text | full string table, 13 locales | **runtime string table** (loads real copy locally, ships original) | **Parity** (one locale) |
-| App icon / branding | custom mark | real icon wired as placeholder; original mark in theme | Functional (own brand = gap) |
-| Onboarding | full-screen animated Lottie intro + consent perks + wake-time step | **full-bleed Lottie intro**, large headline, real perks, **wake-time step** | **Parity** (placeholder assets) |
-| Visual identity | navy/teal palette, rounded font, warm buttons | **own navy + teal palette, warm "sunrise" CTA buttons** (not default-Flutter purple) | Close; **gap**: custom font |
-| Hypnogram | smooth depth "waves" | **smooth gradient depth curve** (was stepped bars) | Functional |
-| Sample night realism | learned cyclic staging | **cyclic deep-early / REM-late architecture prior**; realistic stage mix + score (fixed all-deep/score-100 bug) | Functional |
-| Movement tracking | accelerometer, calibrated, per-minute events | accelerometer aggregator, calibration, 30 s epochs | **Design parity** (needs real sensor feed) |
-| Sleep staging | learned model (breathing+movement) → 4 stages, smoothed | transparent movement→depth heuristic, Gaussian-smoothed, 4 stages | Baseline; **gap**: train a real model |
-| Smart alarm | per-night learned thresholds, eased window; rings, snooze, vibration | per-night percentile thresholds, eased window; **rings in-app + OS backup**, smart/regular snooze, tap/pick-up snooze, vibration modes | **Parity** |
-| Notifications | bedtime / set-alarm reminder, alertness reminder, weekly report, trial, tracking, battery | **same channels**, all local | **Parity** (no push server) |
-| Morning flow | wake-up mood sheet, Awake alertness game | **mood sheet + our own alertness game** with baseline | **Parity** |
-| Night sounds | clips per night, playback, kept N nights | **clips recorded while tracking, Journal player, pruning** | **Parity** (who's snoring: label only) |
-| Light | ambient light metric + chart | **light sensor per epoch, Light chart** | **Parity** |
-| Snore detection | sound-event model + event rules | event rules ready; **you plug in the model** | Rules parity; **gap**: your sound model |
-| Hypnogram + score | polished native charts | Flutter hypnogram + score + trends screen | Functional |
-| Tracking visuals | live animated night view | animated night view (breathing moon, stars) | Functional |
-| Sleep aid | ExoPlayer library + streamed content | **real catalog (16 tracks) + just_audio playback** of bundled tracks, premium lock | **Parity** for free tracks; **gap**: streamed content |
-| Sleep notes | tag set, each with a tip, correlated with quality | **real tag set + tips** (snackbar), from string table | **Parity** (needs correlation) |
-| Wake-up mood | 5-point morning mood log | **5-point mood row** on results | **Parity** (needs logging/correlation) |
-| Statistics | trends over time | trends screen (score line, stage bars) | Functional |
-| Accounts / cloud sync | Ory + GCP backend | mock API only | **gap**: real backend |
-| Wear OS / HealthKit | yes | Health Connect only | **gap**: Wear OS companion |
-| Paywall / billing | dynamic server-driven | server-driven mock paywall (no billing) | Partial; **gap**: StoreKit/Billing |
+| Area                  | Sleep Cycle                                                                               | This app                                                                                                                               | Status                                                |
+| --------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Primary navigation    | Sleep / Programs / Journal / Statistics / Profile bottom bar                              | **same five tabs, same order and screen tree**                                                                                         | **Parity**                                            |
+| UI text               | full string table, 13 locales                                                             | **runtime string table** (loads real copy locally, ships original)                                                                     | **Parity** (one locale)                               |
+| App icon / branding   | custom mark                                                                               | real icon wired as placeholder; original mark in theme                                                                                 | Functional (own brand = gap)                          |
+| Onboarding            | full-screen animated Lottie intro + consent perks + wake-time step                        | **full-bleed Lottie intro**, large headline, real perks, **wake-time step**                                                            | **Parity** (placeholder assets)                       |
+| Visual identity       | navy/teal palette, rounded font, warm buttons                                             | **own navy + teal palette, warm "sunrise" CTA buttons** (not default-Flutter purple)                                                   | Close; **gap**: custom font                           |
+| Hypnogram             | smooth depth "waves"                                                                      | **smooth gradient depth curve** (was stepped bars)                                                                                     | Functional                                            |
+| Sample night realism  | learned cyclic staging                                                                    | **cyclic deep-early / REM-late architecture prior**; realistic stage mix + score (fixed all-deep/score-100 bug)                        | Functional                                            |
+| Movement tracking     | accelerometer, calibrated, per-minute events                                              | accelerometer aggregator, calibration, 30 s epochs                                                                                     | **Design parity** (needs real sensor feed)            |
+| Sleep staging         | learned model (breathing+movement) → 4 stages, smoothed                                   | transparent movement→depth heuristic, Gaussian-smoothed, 4 stages                                                                      | Baseline; **gap**: train a real model                 |
+| Smart alarm           | per-night learned thresholds, eased window; rings, snooze, vibration                      | per-night percentile thresholds, eased window; **rings in-app + OS backup**, smart/regular snooze, tap/pick-up snooze, vibration modes | **Parity**                                            |
+| Notifications         | bedtime / set-alarm reminder, alertness reminder, weekly report, trial, tracking, battery | **same channels**, all local                                                                                                           | **Parity** (no push server)                           |
+| Morning flow          | wake-up mood sheet, Awake alertness game                                                  | **mood sheet + our own alertness game** with baseline                                                                                  | **Parity**                                            |
+| Night sounds          | clips per night, playback, kept N nights                                                  | **clips recorded while tracking, Journal player, pruning**                                                                             | **Parity** (who's snoring: label only)                |
+| Light                 | ambient light metric + chart                                                              | **light sensor per epoch, Light chart**                                                                                                | **Parity**                                            |
+| Snore detection       | sound-event model + event rules                                                           | event rules ready; **you plug in the model**                                                                                           | Rules parity; **gap**: your sound model               |
+| Hypnogram + score     | polished native charts                                                                    | Flutter hypnogram + score + trends screen                                                                                              | Functional                                            |
+| Tracking visuals      | live animated night view                                                                  | animated night view (breathing moon, stars)                                                                                            | Functional                                            |
+| Sleep aid             | ExoPlayer library + streamed content                                                      | **real catalog (16 tracks) + just_audio playback** of bundled tracks, premium lock                                                     | **Parity** for free tracks; **gap**: streamed content |
+| Sleep notes           | tag set, each with a tip, correlated with quality                                         | **real tag set + tips** (snackbar), from string table                                                                                  | **Parity** (needs correlation)                        |
+| Wake-up mood          | 5-point morning mood log                                                                  | **5-point mood row** on results                                                                                                        | **Parity** (needs logging/correlation)                |
+| Statistics            | trends over time                                                                          | trends screen (score line, stage bars)                                                                                                 | Functional                                            |
+| Accounts / cloud sync | Ory + GCP backend                                                                         | mock API only                                                                                                                          | **gap**: real backend                                 |
+| Wear OS / HealthKit   | yes                                                                                       | Health Connect only                                                                                                                    | **gap**: Wear OS companion                            |
+| Paywall / billing     | dynamic server-driven                                                                     | server-driven mock paywall (no billing)                                                                                                | Partial; **gap**: StoreKit/Billing                    |
 
-**Summary:** with the APK assets wired in as local placeholders, the *surface*
+**Summary:** with the APK assets wired in as local placeholders, the _surface_
 (navigation, onboarding, sleep aid, sleep notes, mood, text) now reads very
 close to the original. The remaining substance gaps are the same two as before —
 (1) your own trained ML models for staging and snore, and (2) native sensing +

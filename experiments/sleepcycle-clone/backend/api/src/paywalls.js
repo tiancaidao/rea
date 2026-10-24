@@ -3,10 +3,17 @@
 // Firestore doc config/paywalls can override products, placements or single
 // variants without a release.
 
-const crypto = require('crypto');
-const DEFAULTS = require('./paywalls.json');
+const crypto = require("crypto");
+const DEFAULTS = require("./paywalls.json");
 
-const INTERVALS = ['never', 'everyAppOpening', 'everyDay', 'everySecondDay', 'everyThirdDay', 'everyWeek'];
+const INTERVALS = [
+  "never",
+  "everyAppOpening",
+  "everyDay",
+  "everySecondDay",
+  "everyThirdDay",
+  "everyWeek",
+];
 
 function merge(base, override) {
   if (!override) return base;
@@ -19,7 +26,10 @@ function merge(base, override) {
 
 // Sticky bucket 0..99 for a subject in an experiment.
 function bucket(experiment, subject) {
-  const h = crypto.createHash('sha256').update(`${experiment}:${subject}`).digest();
+  const h = crypto
+    .createHash("sha256")
+    .update(`${experiment}:${subject}`)
+    .digest();
   return h.readUInt32BE(0) % 100;
 }
 
@@ -45,19 +55,26 @@ function choosePaywall(cfg, placement, subject, forced) {
     }
     id = forced;
   } else {
-    const variants = (p.variants || []).filter((v) => cfg.variants[v.id] && v.weight > 0);
+    const variants = (p.variants || []).filter(
+      (v) => cfg.variants[v.id] && v.weight > 0,
+    );
     const total = variants.reduce((s, v) => s + v.weight, 0);
     if (total === 0) return null;
-    b = bucket(p.experiment || placement, subject || 'anonymous');
+    b = bucket(p.experiment || placement, subject || "anonymous");
     let at = (b / 100) * total;
     for (const v of variants) {
-      if (at < v.weight) { id = v.id; break; }
+      if (at < v.weight) {
+        id = v.id;
+        break;
+      }
       at -= v.weight;
     }
     id = id || variants[variants.length - 1].id;
   }
   const variant = cfg.variants[id];
-  const displayInterval = INTERVALS.includes(variant.displayInterval) ? variant.displayInterval : 'never';
+  const displayInterval = INTERVALS.includes(variant.displayInterval)
+    ? variant.displayInterval
+    : "never";
   const products = {};
   for (const o of variant.offers || []) {
     if (cfg.products[o.product]) products[o.product] = cfg.products[o.product];

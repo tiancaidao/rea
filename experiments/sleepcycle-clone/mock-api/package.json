@@ -3,5 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Mock backend for the Sleep Cycle-style client rebuild experiment",
-  "scripts": { "start": "node server.js" }
+  "scripts": {
+    "start": "node server.js"
+  }
 }
