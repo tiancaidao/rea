@@ -1,3 +1,4 @@
+import { JavaScriptJsonDocuments } from "../../src/application/javascript/JavaScriptJsonDocuments.js";
 import { buildJavaScriptSemanticGraph } from "../../src/application/javascript/JavaScriptSemanticGraphBuilder.js";
 import type { JavaScriptArtifactAnalysis } from "../../src/application/javascript/JavaScriptArtifactAnalysisTypes.js";
 import type { JavaScriptArtifactFile } from "../../src/domain/javascript/javascriptArtifactFiles.js";
@@ -22,10 +23,12 @@ export const graphForJavaScript = (
     text: { included: true, value: source },
   };
   const analysis: JavaScriptArtifactAnalysis = {
+    jsonDocuments: new JavaScriptJsonDocuments(),
     files: [{ file, javascript: null, semantic: { ir } }],
     packages: [],
     json_modules: [],
     html_scripts: [],
+    html_inline_scripts: [],
     source_maps: [],
     visited_ast_nodes: 0,
     findings: 0,

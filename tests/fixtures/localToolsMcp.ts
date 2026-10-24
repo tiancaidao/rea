@@ -34,7 +34,10 @@ const compileValidator = (schema: unknown): ValidateFunction<unknown> => {
 };
 
 /** Start the built production server without configuring deep binary providers. */
-export async function connectLocalToolsMcp() {
+export async function connectLocalToolsMcp(
+  environment: Readonly<Record<string, string>> = {},
+  registerCleanup: (cleanup: () => Promise<void>) => void = onTestFinished,
+) {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [
@@ -45,11 +48,12 @@ export async function connectLocalToolsMcp() {
       PATH: process.env.PATH ?? "/usr/bin:/bin",
       REA_LOG_LEVEL: "silent",
       HOPPER_LAUNCHER_PATH: "/rea-unconfigured-deep-provider/hopper",
+      ...environment,
     },
     stderr: "pipe",
   });
   const client = new Client({ name: "local-tools-e2e", version: "1" });
-  onTestFinished(async () => {
+  registerCleanup(async () => {
     await client.close();
     await transport.close();
   });

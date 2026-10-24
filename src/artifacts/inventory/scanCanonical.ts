@@ -10,6 +10,7 @@ import type { RootInventorySource } from "./classify.js";
 import {
   ArtifactReaderFailure,
   type ArtifactReader,
+  type ArtifactReaderTraversal,
 } from "../ArtifactReader.js";
 import type { ArtifactResourceOwner } from "../ArtifactResourceScope.js";
 import {
@@ -22,7 +23,6 @@ import {
 import {
   createArtifactEdges,
   createRootNode,
-  indexOccurrencesByPath,
   materializeDirectoryNodes,
   rekeyOccurrences,
   rootOccurrenceFor,
@@ -40,7 +40,7 @@ import {
   hashStableRootArtifact,
   hashStableRootArtifactHandle,
 } from "./hashStableRootArtifact.js";
-import { createReader, inventoryLimitations } from "./reader.js";
+import { createReader, inventoryCoverage } from "./reader.js";
 import {
   scanReader,
   type PendingIntegrityContradiction,
@@ -49,15 +49,6 @@ import {
   STRICT_INTEGRITY_POLICY,
   type ArtifactInventoryOptions,
 } from "./types.js";
-
-export const scanCanonicalArtifactInventory = async (
-  path: string,
-  options: ArtifactInventoryOptions,
-  readerFactory: typeof createReader = createReader,
-): Promise<ArtifactInventorySnapshot> =>
-  options.resourceScope.run(() =>
-    scanCanonicalArtifactInventoryInScope(path, options, readerFactory),
-  );
 
 export const scanCanonicalArtifactInventoryInScope = async (
   path: string,
@@ -84,6 +75,7 @@ export const scanCanonicalArtifactInventoryInScope = async (
       rootFormat,
       options.environment ?? {},
       rootSource,
+      options.asarHeaderAdmission,
     );
   } catch (cause: unknown) {
     readerCreationFailure = { cause };
@@ -99,7 +91,15 @@ export const scanCanonicalArtifactInventoryInScope = async (
       occurrences,
       pendingContradictions,
       caseCollisionLimitation,
-    } = await scanReader(reader, ownedReaders, options.signal, integrity);
+      unknownParentOccurrences,
+      traversal,
+    } = await scanReader(
+      reader,
+      ownedReaders,
+      options.signal,
+      integrity,
+      options.asarHeaderAdmission,
+    );
     outcome = {
       kind: "completed",
       snapshot: await buildInventorySnapshot({
@@ -115,10 +115,79 @@ export const scanCanonicalArtifactInventoryInScope = async (
         occurrences,
         pendingContradictions,
         caseCollisionLimitation,
+        unknownParentOccurrences,
+        traversal,
       }),
     };
   } catch (cause: unknown) {
     outcome = { kind: "failed", cause };
+    // A mount refusal does not erase the independently classified, hashed
+    // carrier. Retain only that root, with explicitly unexamined children.
+    if (
+      rootFormat === "dmg" &&
+      cause instanceof ArtifactReaderFailure &&
+      cause.reason === "unavailable" &&
+      cause.partialObservation === undefined &&
+      options.signal?.aborted !== true
+    ) {
+      let retained: ArtifactInventorySnapshot | undefined;
+      let rootFailure: unknown;
+      try {
+        retained = await buildInventorySnapshot({
+          path,
+          metadata,
+          rootFormat,
+          rootDigest,
+          rootSource,
+          resourceScope: options.resourceScope,
+          reader,
+          signal: options.signal,
+          nodes: new Map(),
+          occurrences: [],
+          pendingContradictions: [],
+          caseCollisionLimitation: undefined,
+          unknownParentOccurrences: new Set(),
+          traversal: {
+            status: "unknown",
+            limitations: [
+              `DMG child traversal was unavailable: ${cause.message}`,
+            ],
+          },
+        });
+      } catch (failure: unknown) {
+        rootFailure = failure;
+      }
+      outcome = {
+        kind: "failed",
+        cause: new ArtifactReaderFailure(
+          cause.reason,
+          rootFailure === undefined
+            ? cause.message
+            : `${cause.message}; root observations could not be revalidated: ${rootFailure instanceof Error ? rootFailure.message : String(rootFailure)}`,
+          {
+            cause:
+              rootFailure === undefined
+                ? cause
+                : new AggregateError(
+                    [cause, rootFailure],
+                    "DMG traversal and root revalidation failed",
+                    { cause },
+                  ),
+            cleanup: cause.cleanup,
+            cleanupLeases: cause.cleanupLeases,
+            ...(retained === undefined
+              ? {}
+              : {
+                  partialObservation: {
+                    kind: "artifact-inventory",
+                    inventory: retained,
+                  },
+                }),
+          },
+          cause.details,
+        ),
+      };
+    }
   }
   const cleanupFailure = await cleanupInventoryOwners({
     path,
@@ -169,12 +238,11 @@ const cleanupInventoryOwners = async ({
   for (const owner of owners) {
     const attempt = await options.resourceScope.release(owner);
     if (attempt.kind === "released") continue;
-    const primary =
-      cleanupFailure ??
-      (outcome.kind === "failed" ? outcome.cause : attempt.cause);
-    cleanupFailure = ArtifactReaderFailure.withCleanup(
-      primary,
-      ArtifactReaderFailure.cleanupObservation(attempt.cause, owner.resource),
+    cleanupFailure = options.resourceScope.cleanupFailure(
+      cleanupFailure === undefined
+        ? outcome
+        : { kind: "failed", cause: cleanupFailure },
+      [attempt],
       outcome.kind === "completed"
         ? { kind: "artifact-inventory", inventory: outcome.snapshot }
         : undefined,
@@ -196,6 +264,8 @@ interface SnapshotBuildInput {
   readonly occurrences: MutableOccurrence[];
   readonly pendingContradictions: PendingIntegrityContradiction[];
   readonly caseCollisionLimitation: string | undefined;
+  readonly unknownParentOccurrences: ReadonlySet<MutableOccurrence>;
+  readonly traversal: ArtifactReaderTraversal;
 }
 
 const buildInventorySnapshot = async (
@@ -215,9 +285,13 @@ const buildInventorySnapshot = async (
     executable: hostExecutableMarking(path, metadata),
     format: rootFormat,
     path,
+    formatMetadata: reader?.formatMetadata?.(),
   });
   for (const occurrence of input.occurrences)
-    if (occurrence.parent_occurrence_id === null)
+    if (
+      occurrence.parent_occurrence_id === null &&
+      !input.unknownParentOccurrences.has(occurrence)
+    )
       occurrence.parent_occurrence_id = rootOccurrence.occurrence_id;
   input.occurrences.unshift(rootOccurrence);
 
@@ -227,18 +301,17 @@ const buildInventorySnapshot = async (
       occurrence,
     ]),
   );
-  const occurrenceByPath = indexOccurrencesByPath(input.occurrences);
   const integrityContradictions = buildIntegrityContradictions(
     input.pendingContradictions,
-    occurrenceByPath,
     occurrenceById,
     rootNode,
   );
-  const edges = createArtifactEdges(
+  const edgeResult = createArtifactEdges(
     rootNode.artifact_id,
     input.occurrences,
     reader?.provenance()[0],
   );
+  const { edges } = edgeResult;
   const orderedNodes = sortNodes([...input.nodes.values()]);
   const orderedOccurrences = sortOccurrences(input.occurrences);
   const orderedEdges = sortEdges(edges).map((edge, ordinal) => ({
@@ -268,6 +341,11 @@ const buildInventorySnapshot = async (
     orderedOccurrences,
     orderedEdges,
   });
+  const traversal = inventoryCoverage(rootFormat, reader, input.traversal);
+  const coverage =
+    edgeResult.limitations.length === 0
+      ? traversal.coverage
+      : { ...traversal.coverage, status: "unknown" as const };
   return {
     manifest,
     nodes: orderedNodes,
@@ -275,9 +353,9 @@ const buildInventorySnapshot = async (
     edges: orderedEdges,
     provenance: reader?.provenance() ?? [],
     integrity_contradictions: integrityContradictions,
+    coverage,
     limitations: buildLimitations(
-      rootFormat,
-      reader,
+      [...traversal.limitations, ...edgeResult.limitations],
       integrityContradictions,
       input.caseCollisionLimitation,
     ),
@@ -286,17 +364,11 @@ const buildInventorySnapshot = async (
 
 const buildIntegrityContradictions = (
   pending: readonly PendingIntegrityContradiction[],
-  occurrenceByPath: ReadonlyMap<string, MutableOccurrence>,
   occurrenceById: ReadonlyMap<string, MutableOccurrence>,
   rootNode: ArtifactNode,
 ): IntegrityContradiction[] =>
   pending.map((contradiction): IntegrityContradiction => {
-    const occurrence = occurrenceByPath.get(contradiction.logicalPath);
-    if (occurrence === undefined)
-      throw new ArtifactReaderFailure(
-        "integrity",
-        "Integrity contradiction lost its graph occurrence",
-      );
+    const occurrence = contradiction.occurrence;
     const parent =
       occurrence.parent_occurrence_id === null
         ? undefined
@@ -305,15 +377,13 @@ const buildIntegrityContradictions = (
     return {
       contradiction_id: artifactContradictionId({
         rootArtifactId: rootNode.artifact_id,
-        logicalPath: contradiction.logicalPath,
-        declaredSha256: contradiction.declaredSha256,
-        observedSha256: contradiction.observedSha256,
+        logicalPath: occurrence.logical_path,
+        integrity: contradiction.integrity,
       }),
       occurrence_id: occurrence.occurrence_id,
       parent_artifact_id: parentArtifactId,
-      logical_path: contradiction.logicalPath,
-      declared_sha256: contradiction.declaredSha256,
-      observed_sha256: contradiction.observedSha256,
+      logical_path: occurrence.logical_path,
+      ...contradiction.integrity,
       entry_kind: contradiction.entryKind,
       unpacked: contradiction.unpacked,
       trust: "observed-untrusted",
@@ -395,12 +465,11 @@ const buildManifest = ({
   });
 
 const buildLimitations = (
-  rootFormat: ArtifactOccurrence["artifact_format"],
-  reader: ArtifactReader | undefined,
+  scopeLimitations: readonly string[],
   integrityContradictions: readonly IntegrityContradiction[],
   caseCollisionLimitation: string | undefined,
 ): string[] => [
-  ...inventoryLimitations(rootFormat, reader),
+  ...scopeLimitations,
   ...(caseCollisionLimitation === undefined ? [] : [caseCollisionLimitation]),
   ...(integrityContradictions.length === 0
     ? []

@@ -13,6 +13,8 @@ import { rebindEvidenceSubjectTargetPath } from "../../domain/evidence.js";
 import { err, ok, type Result } from "../../domain/result.js";
 import {
   analysisQueryId,
+  evidenceMatchesEntry,
+  evidenceMatchesWorkflowEntry,
   createAnalysisSnapshotEntry,
   createAnalysisSnapshotWorkflowEntry,
   snapshotBinding,
@@ -34,6 +36,8 @@ import type {
 } from "../AnalysisProvider.js";
 import { OFFICIAL_TOOL_CONTRACTS } from "../../contracts/officialToolContracts.js";
 import { compareUnicodeCodePoints } from "../../domain/unicodeCodePointOrder.js";
+
+import type { EvidenceDisplayReplacement } from "../investigation/EvidenceLedger.js";
 
 const RELATIONSHIP_OPERATIONS: ReadonlySet<AnalysisOperation> = new Set([
   "procedure_callers",
@@ -83,6 +87,11 @@ export const isSnapshotCacheable = (
   (descriptor.cachePolicy === "snapshot" ||
     descriptor.effects.mayWriteFilesystem === false) &&
   descriptor.effects.changesPermissions === false;
+
+/** Windows Ghidra must admit the selected source through its native snapshot owner. */
+export const requiresNativeSourceAdmissionBeforeReplay = (
+  providerId: string | undefined,
+): boolean => process.platform === "win32" && providerId === "ghidra";
 
 /** Bounded in-memory cache for one immutable binary identity. */
 export class AnalysisSnapshotCache {
@@ -137,9 +146,63 @@ export class AnalysisSnapshotCache {
     for (const entry of snapshot.workflow_entries) {
       if (!this.#workflowEntries.has(entry.query_id) && !this.#hasCapacity())
         continue;
+      if (!this.#workflowEntries.has(entry.query_id)) imported += 1;
       this.#workflowEntries.set(entry.query_id, entry);
     }
     return imported;
+  }
+
+  /** Refresh only display bindings backed by the replaced authenticated records. */
+  refreshEvidenceDisplay(
+    replacements: readonly EvidenceDisplayReplacement[],
+  ): void {
+    if (this.#target === undefined || this.#binding === undefined) return;
+    const header = { target: this.#target, binding: this.#binding };
+    for (const { previous, current } of replacements) {
+      if (
+        current.subject === null ||
+        previous.subject?.local_path === current.subject.local_path
+      )
+        continue;
+      const queryId = analysisQueryId(
+        header.target,
+        header.binding,
+        previous.operation,
+        previous.parameters,
+      );
+      const entry = this.#entries.get(queryId);
+      if (
+        entry !== undefined &&
+        entry.execution.subject !== null &&
+        evidenceMatchesEntry(previous, entry, header)
+      )
+        this.#entries.set(queryId, {
+          ...entry,
+          execution: {
+            ...entry.execution,
+            subject: {
+              ...entry.execution.subject,
+              path: current.subject.local_path,
+            },
+          },
+        });
+      const workflow = this.#workflowEntries.get(queryId);
+      if (
+        workflow !== undefined &&
+        workflow.execution.subject !== null &&
+        evidenceMatchesWorkflowEntry(previous, workflow, header)
+      )
+        this.#workflowEntries.set(queryId, {
+          ...workflow,
+          execution: {
+            ...workflow.execution,
+            subject: {
+              ...workflow.execution.subject,
+              path: current.subject.local_path,
+            },
+          },
+        });
+    }
   }
 
   /** Build a complete snapshot for an active target. */
@@ -249,7 +312,7 @@ export class AnalysisSnapshotCache {
       readonly limitations: readonly string[];
       readonly relationshipCoverage?: AnalysisExecution["relationshipCoverage"];
       readonly locations: AnalysisExecution["locations"];
-      readonly subject: AnalysisExecution["subject"];
+      readonly subject: NonNullable<AnalysisExecution["subject"]> | null;
     };
   }): void {
     this.select(input.target, input.profile);
@@ -287,7 +350,7 @@ export class AnalysisSnapshotCache {
     if (cached === undefined) return undefined;
     const cachedSubject = cached.execution.subject;
     const subject =
-      cachedSubject === null
+      cachedSubject == null
         ? null
         : rebindEvidenceSubjectTargetPath(
             {
@@ -323,7 +386,7 @@ export class AnalysisSnapshotCache {
               relationshipCoverage: cached.execution.relationship_coverage,
             }),
       locations: cached.execution.locations,
-      subject,
+      subject: subject ?? null,
     });
   }
 
@@ -337,6 +400,9 @@ export class AnalysisSnapshotCache {
   }): void {
     const { target, profile, operation, parameters, execution } = input;
     this.select(target, profile);
+    // The snapshot format does not carry reference truncation; a replay would
+    // present a capped read as complete, so it is not recorded.
+    if (execution.referencesTruncated === true) return;
     const queryId = analysisQueryId(
       snapshotTarget(target),
       snapshotBinding(profile),
@@ -349,7 +415,20 @@ export class AnalysisSnapshotCache {
       binding: snapshotBinding(profile),
       operation,
       parameters,
-      execution,
+      execution: {
+        ...execution,
+        subject:
+          execution.subject === undefined
+            ? {
+                path: target.path,
+                sha256: target.sha256,
+                format: target.format,
+                ...(target.architecture === undefined
+                  ? {}
+                  : { architecture: target.architecture }),
+              }
+            : execution.subject,
+      },
     });
     this.#entries.set(entry.query_id, entry);
   }

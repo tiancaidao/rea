@@ -1,25 +1,25 @@
 import { z } from "zod";
+import { RegularFileCleanupFailure } from "../filesystem/OwnedRegularFile.js";
 
-import { PRODUCT_IDENTITY } from "../identity.js";
-import { isOwnedClientRegistrationCommand } from "./ClientRegistrationIdentity.js";
-import { readClientRegistrationStatuses } from "./ClientRegistrationStatus.js";
+import { classifyClientRegistrationCommand } from "./ClientRegistrationIdentity.js";
 import {
-  clientServerForcedEnabled,
-  clientServerListedDisabled,
-  effectiveClientServer,
-  parseClientConfiguration,
-} from "./ClientConfigurationDocument.js";
-import { supportedClients } from "./SupportedClients.js";
-import { existingSkillDestinations } from "./SetupSkill.js";
+  readClientRegistrationInspections,
+  type ClientRegistrationStatus,
+} from "./ClientRegistrationStatus.js";
+import {
+  existingSkillDestinations,
+  type SkillPathIssue,
+} from "./SetupSkill.js";
 import type { SetupAction } from "./SetupTypes.js";
 import type { Result } from "../domain/result.js";
-import { readRegularFileText } from "./RegularFileRead.js";
 import type { ArtifactResourceScope } from "../artifacts/ArtifactResourceScope.js";
 
 /** Existing REA integrations selected for maintenance, without discovering new targets. */
 export interface MaintenanceScope {
   readonly clients: readonly string[];
   readonly skill: boolean;
+  readonly unresolved?: readonly ClientRegistrationStatus[];
+  readonly skillIssues?: readonly SkillPathIssue[];
   readonly skillDestinations?: readonly {
     readonly client: string;
     readonly path: string;
@@ -35,7 +35,11 @@ export type IntegrationMaintenance =
       readonly command: readonly string[];
       readonly plannedActions: readonly SetupAction[];
     }
-  | { readonly status: "unavailable"; readonly remediation: string };
+  | {
+      readonly status: "unavailable";
+      readonly remediation: string;
+      readonly scope?: MaintenanceScope;
+    };
 
 const setupPlanSchema = z.object({
   status: z.literal("planned"),
@@ -61,43 +65,31 @@ export const existingMaintenanceScope = async (
   environment: Readonly<NodeJS.ProcessEnv>,
   resources?: ArtifactResourceScope,
 ): Promise<MaintenanceScope> => {
-  const registrations = await readClientRegistrationStatuses(home, entryPoint, {
-    environment,
-    ...(resources === undefined ? {} : { resources }),
-  });
-  const supported = supportedClients(home, process.platform, environment);
+  const registrations = await readClientRegistrationInspections(
+    home,
+    entryPoint,
+    {
+      environment,
+      ...(resources === undefined ? {} : { resources }),
+    },
+  );
   const clients: string[] = [];
-  for (const registration of registrations) {
+  const unresolved: ClientRegistrationStatus[] = [];
+  for (const { status: registration, activation } of registrations) {
+    if (registration.state === "unknown" || registration.state === "invalid") {
+      unresolved.push(registration);
+      continue;
+    }
     if (
+      activation !== "enabled" ||
       (registration.state !== "aligned" && registration.state !== "stale") ||
-      !isOwnedClientRegistrationCommand(registration.command, entryPoint)
+      classifyClientRegistrationCommand(registration.command, entryPoint) !==
+        "owned"
     )
       continue;
-    const client = supported.find(({ name }) => name === registration.client);
-    if (client === undefined) continue;
-    const parsed = parseClientConfiguration(
-      await readRegularFileText(
-        client.configPath,
-        resources === undefined ? {} : { resources },
-      ),
-      client.format,
-    );
-    const enabled = z
-      .object({
-        enabled: z.boolean().optional(),
-        disabled: z.boolean().optional(),
-      })
-      .parse(effectiveClientServer(parsed, PRODUCT_IDENTITY.mcpServerKey));
-    // Root disable lists override enabled entries and OMP's force-on allowlist.
-    if (
-      (enabled.enabled !== false ||
-        clientServerForcedEnabled(parsed, PRODUCT_IDENTITY.mcpServerKey)) &&
-      enabled.disabled !== true &&
-      !clientServerListedDisabled(parsed, PRODUCT_IDENTITY.mcpServerKey)
-    )
-      clients.push(client.name);
+    clients.push(registration.client);
   }
-  const skillDestinations = await existingSkillDestinations(
+  const skills = await existingSkillDestinations(
     home,
     environment,
     process.platform,
@@ -105,8 +97,10 @@ export const existingMaintenanceScope = async (
   );
   return {
     clients,
-    skill: skillDestinations.length > 0,
-    skillDestinations,
+    skill: skills.destinations.length > 0,
+    skillDestinations: skills.destinations,
+    ...(skills.issues.length === 0 ? {} : { skillIssues: skills.issues }),
+    ...(unresolved.length === 0 ? {} : { unresolved }),
   };
 };
 
@@ -125,6 +119,24 @@ export const planIntegrationMaintenance = async (
       environment,
       resources,
     );
+    if (
+      (scope.unresolved?.length ?? 0) > 0 ||
+      (scope.skillIssues?.length ?? 0) > 0
+    )
+      return {
+        status: "unavailable",
+        scope,
+        remediation: `Integration maintenance is unresolved: ${[
+          ...(scope.unresolved ?? []).map(
+            ({ client, config_path, remediation }) =>
+              `${client} (${config_path}): ${remediation ?? "Registration identity is unresolved"}`,
+          ),
+          ...(scope.skillIssues ?? []).map(
+            ({ client, path, detail }) =>
+              `${client ?? "skill"} (${path}): ${detail}`,
+          ),
+        ].join(" ")}`,
+      };
     const skillDestinations = scope.skillDestinations ?? [];
     if (scope.clients.length === 0 && !scope.skill)
       return { status: "current", plannedActions: [] };
@@ -176,6 +188,9 @@ export const planIntegrationMaintenance = async (
       ),
     };
   } catch (cause: unknown) {
+    // Without a supplied scope, the typed failure is the caller's cleanup capability.
+    if (resources === undefined && cause instanceof RegularFileCleanupFailure)
+      throw cause;
     return {
       status: "unavailable",
       remediation: cause instanceof Error ? cause.message : String(cause),

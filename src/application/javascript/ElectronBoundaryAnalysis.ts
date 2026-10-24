@@ -1,9 +1,13 @@
+import type { JavaScriptJsonDocuments } from "./JavaScriptJsonDocuments.js";
 import { compareUnicodeCodePoints } from "../../domain/unicodeCodePointOrder.js";
 import type { ElectronIpcFinding } from "../../domain/javascript/electronStaticAnalysisTypes.js";
 import type { ElectronBoundarySummary } from "../../domain/javascript/javascriptApplicationAnalysis.js";
 import type { JavaScriptModuleArtifactAnalysis } from "./JavaScriptArtifactAnalysisTypes.js";
 import type { JavaScriptArtifactFile } from "../../domain/javascript/javascriptArtifactFiles.js";
-import { resolveArtifactPathByContext } from "./JavaScriptArtifactPathResolution.js";
+import {
+  resolveArtifactPathByContext,
+  type ResolveArtifactPathInput,
+} from "./JavaScriptArtifactPathResolution.js";
 
 /** One IPC fact retaining its exact owning artifact for graph projection. */
 export interface ElectronIpcRecord {
@@ -80,6 +84,7 @@ export const unambiguousElectronIpcPairings = (
 /** Summarize static Electron findings without treating gaps as absence. */
 export const summarizeElectronBoundaries = (
   analysis: JavaScriptModuleArtifactAnalysis,
+  directoryPaths?: ReadonlySet<string>,
 ): ElectronBoundarySummary => {
   const files = new Map(analysis.files.map(({ file }) => [file.path, file]));
   const javascript = analysis.files.flatMap(({ javascript: value }) =>
@@ -160,6 +165,9 @@ export const summarizeElectronBoundaries = (
           specifier: finding.module_path,
           context: finding.module_resolution_context,
           files,
+          jsonDocuments: analysis.jsonDocuments,
+          directoryPaths,
+          runtimePathKind: "node-entrypoint",
         }),
     ).length,
     native_addon_bindings: nativeBindings.length,
@@ -169,6 +177,8 @@ export const summarizeElectronBoundaries = (
         specifier: finding.specifier,
         context: "module-specifier",
         files,
+        jsonDocuments: analysis.jsonDocuments,
+        directoryPaths,
         kind: "native-addon",
         moduleKind: finding.module_kind,
       }),
@@ -202,8 +212,11 @@ interface ResolveToFileInput {
   readonly specifier: string;
   readonly context: "module-specifier" | "filesystem-expression";
   readonly files: ReadonlyMap<string, JavaScriptArtifactFile>;
+  readonly jsonDocuments: JavaScriptJsonDocuments;
+  readonly directoryPaths?: ReadonlySet<string> | undefined;
   readonly kind?: JavaScriptArtifactFile["kind"];
   readonly moduleKind?: "import" | "require";
+  readonly runtimePathKind?: ResolveArtifactPathInput["runtimePathKind"];
 }
 
 const resolvesToFile = (input: ResolveToFileInput): boolean => {
@@ -212,6 +225,13 @@ const resolvesToFile = (input: ResolveToFileInput): boolean => {
     sourcePath: input.file.path,
     context: input.context,
     files: input.files,
+    jsonDocuments: input.jsonDocuments,
+    ...(input.directoryPaths === undefined
+      ? {}
+      : { directoryPaths: input.directoryPaths }),
+    ...(input.runtimePathKind === undefined
+      ? {}
+      : { runtimePathKind: input.runtimePathKind }),
     ...(input.moduleKind === undefined ? {} : { moduleKind: input.moduleKind }),
   }).resolved_path;
   return (
