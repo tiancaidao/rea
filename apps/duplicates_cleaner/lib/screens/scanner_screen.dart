@@ -170,7 +170,12 @@ class _ScannerScreenState extends State<ScannerScreen> {
     try {
       var groups = await scan.result;
       if (algorithm == ScanAlgorithm.sameAppearance && photoItems.isNotEmpty) {
-        groups = await photos.withOriginalSizes(groups);
+        groups = await photos.withOriginalSizes(
+          groups,
+          onProgress: (p) {
+            if (mounted) setState(() => _progress = p);
+          },
+        );
       }
       AppLog.info(
         'Scan finished: ${groups.length} sets, '
@@ -504,9 +509,14 @@ class _ResultsView extends StatelessWidget {
         }
         final rows = <Object>[];
         for (final (i, g) in results.groups.indexed) {
-          rows
-            ..add(('header', i + 1, g))
-            ..addAll(g.items);
+          rows.add(('header', i + 1, g));
+          // Similar photos differ in details a small round thumbnail hides,
+          // so photo sets show as a grid of larger squares.
+          if (g.items.every(_isPhoto)) {
+            rows.add(g);
+          } else {
+            rows.addAll(g.items);
+          }
         }
         return Column(
           children: [
@@ -555,6 +565,10 @@ class _ResultsView extends StatelessWidget {
                     item: item,
                     onToggle: () => results.toggle(item),
                   ),
+                  DuplicateGroup g => _PhotoGrid(
+                    group: g,
+                    onToggle: results.toggle,
+                  ),
                   _ => const SizedBox.shrink(),
                 },
               ),
@@ -562,6 +576,205 @@ class _ResultsView extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+bool _isPhoto(DuplicateItem item) =>
+    item.assetId != null ||
+    AppConstants.decodableImageExtensions.contains(
+      p.extension(item.name).replaceFirst('.', '').toLowerCase(),
+    );
+
+/// `DupesAdapter_ViewButtonClick`: open the file in another app, or say
+/// which file type has no app to open it. A Photos item opens its full-size
+/// original, not the copy that was scanned.
+Future<void> _viewFile(BuildContext context, DuplicateItem item) async {
+  final assetId = item.assetId;
+  var path = item.path;
+  if (assetId != null) {
+    final original = await AppScope.of(context).storage.photos
+        .original(assetId)
+        .catchError((_) => null);
+    if (original != null) path = original.path;
+  }
+  final result = await OpenFilex.open(path);
+  if (result.type == ResultType.done || !context.mounted) return;
+  final ext = p.extension(item.name).replaceFirst('.', '');
+  await showMessage(
+    context,
+    'File Launch Failed!',
+    "Make sure you have an app installed that can open '.$ext' file type",
+  );
+}
+
+/// A photo's thumbnail, from the Photos library or the file itself.
+Widget _photoThumbnail(
+  BuildContext context,
+  DuplicateItem item, {
+  required double size,
+  required int cacheWidth,
+}) {
+  final assetId = item.assetId;
+  Widget placeholder(IconData icon) =>
+      IconBadge(icon: icon, size: size, solid: true);
+  if (assetId != null) {
+    return FutureBuilder(
+      future: AppScope.of(context).storage.photos.thumbnail(assetId),
+      builder: (_, snap) => snap.data == null
+          ? placeholder(Icons.photo_outlined)
+          : Image.memory(
+              snap.data!,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+            ),
+    );
+  }
+  return Image.file(
+    File(item.path),
+    width: size,
+    height: size,
+    fit: BoxFit.cover,
+    cacheWidth: cacheWidth,
+    errorBuilder: (_, _, _) => placeholder(Icons.broken_image_outlined),
+  );
+}
+
+/// A set of similar or identical photos as a grid: tap a photo to view it
+/// full size, tap its check to select it.
+class _PhotoGrid extends StatelessWidget {
+  const _PhotoGrid({required this.group, required this.onToggle});
+
+  final DuplicateGroup group;
+  final void Function(DuplicateItem) onToggle;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      const columns = 3, gap = 8.0;
+      final side = (box.maxWidth - gap * (columns - 1)) / columns;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final item in group.items)
+              _PhotoCell(
+                item: item,
+                side: side,
+                onToggle: () => onToggle(item),
+              ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class _PhotoCell extends StatelessWidget {
+  const _PhotoCell({
+    required this.item,
+    required this.side,
+    required this.onToggle,
+  });
+
+  final DuplicateItem item;
+  final double side;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    const label = TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      color: Colors.white,
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox.square(
+        dimension: side,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            GestureDetector(
+              onTap: () => _viewFile(context, item),
+              child: _photoThumbnail(
+                context,
+                item,
+                size: side,
+                cacheWidth: 360,
+              ),
+            ),
+            if (item.checked)
+              IgnorePointer(
+                child: ColoredBox(
+                  color: AppColors.primary.withValues(alpha: 0.18),
+                ),
+              ),
+            // A dark band keeps the labels legible on bright photos.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(8, 14, 8, 6),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Colors.black54],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      if (item.isMainFile)
+                        const Expanded(child: Text('Original', style: label))
+                      else
+                        const Spacer(),
+                      Text(formatBytes(item.size), style: label),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Semantics(
+                checked: item.checked,
+                label: 'Select ${item.name}',
+                child: InkWell(
+                  onTap: onToggle,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: item.checked
+                            ? AppColors.primary
+                            : Colors.black26,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: item.checked
+                          ? const Icon(
+                              Icons.check,
+                              size: 16,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -575,28 +788,6 @@ class _DuplicateTile extends StatelessWidget {
   bool get _isImage => AppConstants.decodableImageExtensions.contains(
     p.extension(item.name).replaceFirst('.', '').toLowerCase(),
   );
-
-  /// `DupesAdapter_ViewButtonClick`: open the file in another app, or say
-  /// which file type has no app to open it. A Photos item opens its
-  /// full-size original, not the copy that was scanned.
-  Future<void> _view(BuildContext context) async {
-    final assetId = item.assetId;
-    var path = item.path;
-    if (assetId != null) {
-      final original = await AppScope.of(context).storage.photos
-          .original(assetId)
-          .catchError((_) => null);
-      if (original != null) path = original.path;
-    }
-    final result = await OpenFilex.open(path);
-    if (result.type == ResultType.done || !context.mounted) return;
-    final ext = p.extension(item.name).replaceFirst('.', '');
-    await showMessage(
-      context,
-      'File Launch Failed!',
-      "Make sure you have an app installed that can open '.$ext' file type",
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -654,7 +845,7 @@ class _DuplicateTile extends StatelessWidget {
               message: 'Open file',
               child: InkWell(
                 customBorder: const CircleBorder(),
-                onTap: () => _view(context),
+                onTap: () => _viewFile(context, item),
                 child: thumb,
               ),
             ),
