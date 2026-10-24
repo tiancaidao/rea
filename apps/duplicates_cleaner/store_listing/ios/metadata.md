@@ -86,7 +86,7 @@ The free version cleans up to 100 files and up to 500 MB per clean. Duplicate Sw
 Payment is charged to your Apple Account at confirmation of purchase. The subscription renews automatically unless it is cancelled at least 24 hours before the end of the current period, and your account is charged for renewal within 24 hours before the period ends. You can manage or cancel the subscription in your App Store account settings.
 
 Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
-Privacy Policy: <https://yourdomain.com/duplicates-cleaner/privacy>
+Privacy Policy: https://www.matchlab.sg/privacy.html
 ```
 
 (about 2,600 characters)
@@ -103,7 +103,7 @@ Welcome to Duplicate Sweep! Find and remove exact duplicate photos, music, video
 | --- | --- |
 | Support URL (required) | `<https://yourdomain.com/duplicates-cleaner/support>` |
 | Marketing URL (optional) | `<https://yourdomain.com/duplicates-cleaner>` |
-| Privacy Policy URL (required) | `<https://yourdomain.com/duplicates-cleaner/privacy>` (host the text in `../privacy-policy.md`) |
+| Privacy Policy URL (required) | `https://www.matchlab.sg/privacy.html` (host the text in `../privacy-policy.md`) |
 | Terms of Use (EULA) | Apple's standard EULA, linked in the description |
 
 ## Images

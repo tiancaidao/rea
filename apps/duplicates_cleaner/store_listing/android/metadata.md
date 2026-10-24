@@ -16,7 +16,7 @@ placeholder for you to fill.
 | Tags (up to 5) | Storage cleaner, File manager, Device optimization, Photo management, Utilities |
 | Contact email (required) | `<support@yourdomain.com>` |
 | Website | `<https://yourdomain.com/duplicates-cleaner>` |
-| Privacy policy (required) | `<https://yourdomain.com/duplicates-cleaner/privacy>` |
+| Privacy policy (required) | `https://www.matchlab.sg/privacy.html` |
 
 ### Short description (80)
 
@@ -96,7 +96,7 @@ same artwork, so the store icon and the home-screen icon match.
 ## App content
 
 ### Privacy policy
-`<https://yourdomain.com/duplicates-cleaner/privacy>` (host `../privacy-policy.md`).
+`https://www.matchlab.sg/privacy.html` (host `../privacy-policy.md`).
 
 ### Ads
 **No, my app does not contain ads.**
