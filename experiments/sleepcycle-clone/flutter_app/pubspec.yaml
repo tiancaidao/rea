@@ -1,7 +1,7 @@
 name: sleep_tracker
 description: An original sleep-tracking app (Flutter) built from standard techniques.
 publish_to: "none"
-version: 0.1.0
+version: 0.1.0+1
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

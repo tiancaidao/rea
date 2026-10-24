@@ -1,3 +1,5 @@
+import java.util.Properties
+
 // Wear OS companion: a remote for the phone app (start/stop the night,
 // snooze/stop the alarm, silent vibration wake-up, Snore Alert buzz).
 // Same applicationId and signing as the phone app, which the Data Layer
@@ -8,6 +10,12 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Release signing from android/key.properties (gitignored), see signingConfigs below.
+val keyProps = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
 android {
     namespace = "com.example.sleep_tracker.wear"
     compileSdk = 36
@@ -16,13 +24,30 @@ android {
         applicationId = "com.matchlab.lullwake"
         minSdk = 30
         targetSdk = 36
-        versionCode = 1
+        // Play needs a version code of its own per bundle under one package:
+        // the watch uses 1000 + the phone's (pubspec build number).
+        versionCode = 1001
         versionName = "0.1.0"
+    }
+
+    // Release signing from android/key.properties (gitignored):
+    //   storeFile=/path/to/upload-keystore.jks
+    //   storePassword=...  keyAlias=upload  keyPassword=...
+    // Without it, release builds fall back to the debug key (local testing only).
+    signingConfigs {
+        if (keyProps.getProperty("storeFile") != null) {
+            create("release") {
+                storeFile = file(keyProps.getProperty("storeFile"))
+                storePassword = keyProps.getProperty("storePassword")
+                keyAlias = keyProps.getProperty("keyAlias")
+                keyPassword = keyProps.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
