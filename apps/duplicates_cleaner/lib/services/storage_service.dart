@@ -58,6 +58,60 @@ class StorageService {
     }
   }
 
+  /// Internal storage images from the MediaStore index, which the original
+  /// reads instead of walking folders for an image scan of internal storage.
+  /// Null off Android or when the query fails, so the caller walks instead.
+  Future<List<String>?> internalImagePaths() async {
+    if (!Platform.isAndroid) return null;
+    try {
+      return await _volume.invokeListMethod<String>('internalImagePaths');
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  /// Tells Android's media scanner the files are gone, so galleries drop
+  /// them, as the original does after each internal storage delete.
+  Future<void> notifyDeleted(List<String> paths) async {
+    if (!Platform.isAndroid || paths.isEmpty) return;
+    try {
+      await _volume.invokeMethod<void>('scanFiles', {'paths': paths});
+    } on PlatformException {
+      // Only the gallery index is stale; the files are already deleted.
+    }
+  }
+
+  int? _sdkInt;
+
+  /// The original offers Internal + SD Card and USB only above Android 10
+  /// (`scan_location_array_android10AndBelow`).
+  Future<List<StorageSelection>> availableLocations() async {
+    if (Platform.isIOS) {
+      return const [StorageSelection.internal, StorageSelection.customFolder];
+    }
+    if (!Platform.isAndroid) return StorageSelection.values;
+    try {
+      _sdkInt ??= await _volume.invokeMethod<int>('sdkInt');
+    } on PlatformException {
+      // Unknown version: offer everything.
+    }
+    final sdk = _sdkInt;
+    if (sdk != null && sdk <= 29) {
+      return const [
+        StorageSelection.internal,
+        StorageSelection.sdCard,
+        StorageSelection.customFolder,
+        StorageSelection.parallel,
+      ];
+    }
+    return StorageSelection.values;
+  }
+
+  /// `SettingsActivity.CheckSDCardSupport`: more than one external files
+  /// directory means a removable volume is mounted.
+  Future<bool> hasSdCard() async =>
+      Platform.isAndroid && (await _removableVolumes()).isNotEmpty;
+
   Future<String?> pickFolder() =>
       FilePicker.getDirectoryPath(dialogTitle: 'Select a folder to scan');
 

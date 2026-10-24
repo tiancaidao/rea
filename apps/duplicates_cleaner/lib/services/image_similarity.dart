@@ -369,9 +369,14 @@ bool secondPassMatch(ImageFeatures a, ImageFeatures b) =>
     hammingDistance(a.pHash, b.pHash) <= SimilarityThresholds.pHashSecondPass;
 
 /// Breadth-first connected components over [linked], each in input order.
-List<List<int>> _components(int n, bool Function(int, int) linked) {
+List<List<int>> _components(
+  int n,
+  bool Function(int, int) linked, {
+  void Function(int done)? onRow,
+}) {
   final adj = List.generate(n, (_) => <int>[]);
   for (var i = 0; i < n; i++) {
+    onRow?.call(i);
     for (var j = i + 1; j < n; j++) {
       if (linked(i, j)) {
         adj[i].add(j);
@@ -405,17 +410,38 @@ List<List<int>> _components(int n, bool Function(int, int) linked) {
 /// height in ascending order. Returns groups of indexes into [items]. Unlike
 /// the original, groups with a single image are dropped since they hold
 /// nothing to delete.
-List<List<int>> groupSimilarImages(List<ImageFeatures> items) {
+///
+/// [onProgress] gets the share of pass 1 comparisons done so far, as a
+/// percentage, since a large library takes a while to compare.
+List<List<int>> groupSimilarImages(
+  List<ImageFeatures> items, {
+  void Function(int percent)? onProgress,
+}) {
   final buckets = <int, List<int>>{};
   for (var i = 0; i < items.length; i++) {
     buckets.putIfAbsent(items[i].height, () => []).add(i);
   }
   final groups = <List<int>>[];
   final singletons = <int>[];
+  // Comparisons are pairs within a bucket; row i of a bucket of n does n-1-i.
+  final total = buckets.values.fold(0, (t, b) => t + b.length * (b.length - 1));
+  var before = 0, lastPercent = -1;
   for (final bucket in buckets.values) {
+    final n = bucket.length;
     for (final comp in _components(
-      bucket.length,
+      n,
       (a, b) => firstPassMatch(items[bucket[a]], items[bucket[b]]),
+      onRow: onProgress == null || total == 0
+          ? null
+          : (i) {
+              // Pairs done after i rows: i*n - i*(i+1)/2, doubled like total.
+              final done = before + 2 * (i * n - i * (i + 1) ~/ 2);
+              final percent = done * 100 ~/ total;
+              if (percent != lastPercent) {
+                lastPercent = percent;
+                onProgress(percent);
+              }
+            },
     )) {
       final members = [for (final c in comp) bucket[c]];
       if (members.length == 1) {
@@ -424,7 +450,9 @@ List<List<int>> groupSimilarImages(List<ImageFeatures> items) {
         groups.add(members);
       }
     }
+    before += n * (n - 1);
   }
+  onProgress?.call(100);
   final byHeight = <int, List<int>>{};
   for (final s in singletons..sort()) {
     byHeight.putIfAbsent(items[s].height, () => []).add(s);

@@ -134,10 +134,16 @@ void main() {
     ];
     // Pass 1 groups come first; pass 2 then links 0 and 2 (same centre colour,
     // pHash 13 apart). Item 4 is the only pass 1 singleton of height 60.
-    expect(groupSimilarImages(items), [
+    final progress = <int>[];
+    expect(groupSimilarImages(items, onProgress: progress.add), [
       [3, 5],
       [0, 2],
     ]);
+    expect(progress, isNotEmpty);
+    expect(progress.last, 100);
+    for (var i = 1; i < progress.length; i++) {
+      expect(progress[i], greaterThanOrEqualTo(progress[i - 1]));
+    }
   });
 
   test('chroma distance ignores lightness', () {

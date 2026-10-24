@@ -77,15 +77,69 @@ void main() {
     );
   });
 
-  test('extension filter and hidden folders are respected', () async {
+  test('extension filter applies and hidden folders are scanned', () async {
     final data = randomBytes(10000, 4);
     write('keep1.bin', data);
     write('keep2.bin', data);
     write('skip.txt', data);
     write('.hidden/keep3.bin', data);
     expect(await scan(ScanAlgorithm.sameContent), [
-      ['keep1.bin', 'keep2.bin'],
+      ['.hidden/keep3.bin', 'keep1.bin', 'keep2.bin'],
     ]);
+  });
+
+  test('the walk is breadth first, so the shallowest copy is kept', () async {
+    final data = randomBytes(10000, 10);
+    write('a/b/c/deep.bin', data);
+    write('z/top.bin', data);
+    final groups = await ScanEngine(
+      ScanRequest(
+        roots: [root.path],
+        extensions: const {'bin'},
+        algorithm: ScanAlgorithm.sameContent,
+        sizeExclusion: FileSizeExclusion.none,
+      ),
+    ).run();
+    expect(p.basename(groups.single.items.first.path), 'top.bin');
+    expect(groups.single.items.first.isMainFile, isTrue);
+  });
+
+  test('content and size scans skip files the hash maps to 0', () async {
+    write('t1.bin', List.filled(1000, 1));
+    write('t2.bin', List.filled(1000, 2));
+    expect(
+      await scan(ScanAlgorithm.sameSize, ex: FileSizeExclusion.large),
+      isEmpty,
+    );
+    expect(
+      await scan(ScanAlgorithm.sameContent, ex: FileSizeExclusion.large),
+      isEmpty,
+    );
+    expect(
+      await scan(ScanAlgorithm.sameName, ex: FileSizeExclusion.large),
+      isEmpty,
+    );
+    write('d/t1.bin', List.filled(1000, 3));
+    expect(await scan(ScanAlgorithm.sameName, ex: FileSizeExclusion.large), [
+      ['d/t1.bin', 't1.bin'],
+    ]);
+  });
+
+  test('indexed paths are scanned without the extension filter', () async {
+    final data = randomBytes(10000, 11);
+    final a = write('pics/a.webp', data);
+    final b = write('pics/b.webp', data);
+    write('pics/c.webp', data); // not in the index
+    final groups = await ScanEngine(
+      ScanRequest(
+        roots: [root.path],
+        extensions: const {'jpg'},
+        algorithm: ScanAlgorithm.sameContent,
+        sizeExclusion: FileSizeExclusion.none,
+        listedPaths: [a.path, b.path, p.join(root.path, 'missing.jpg')],
+      ),
+    ).run();
+    expect(groups.single.items.map((i) => i.name), ['a.webp', 'b.webp']);
   });
 
   test(
