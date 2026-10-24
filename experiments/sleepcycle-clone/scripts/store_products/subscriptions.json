@@ -1,5 +1,5 @@
 {
-  "_comment": "Lullwake's auto-renewing subscriptions, read by play_subscriptions.py and asc_subscriptions.py. Prices are USD; each store converts them for other countries. Apple allows one introductory offer per subscription, so offers marked for ios are limited to one each. Product ids can never be reused or deleted on either store.",
+  "_comment": "Lullwake's auto-renewing subscriptions, read by play_subscriptions.py and asc_subscriptions.py. Prices are USD; each store converts them for other countries. Apple allows one introductory offer per subscription, so offers marked for ios are limited to one each. Product ids can never be reused or deleted on either store. revenuecat is read by revenuecat_products.py: the app checks entitlement lulu_wake_pro and reads the current offering's $rc_annual and $rc_monthly packages.",
   "android_package": "com.matchlab.lullwake",
   "ios_bundle_id": "com.matchlab.lullwake",
   "subscription_group": {
@@ -8,6 +8,17 @@
       "en-US": {
         "name": "Lullwake Premium"
       }
+    }
+  },
+  "revenuecat": {
+    "entitlement": {
+      "lookup_key": "lulu_wake_pro",
+      "display_name": "Lullwake Premium"
+    },
+    "offering": {
+      "lookup_key": "default",
+      "display_name": "Default",
+      "make_current": true
     }
   },
   "subscriptions": [
@@ -23,14 +34,19 @@
           "play_offer_id": "free-trial-7d",
           "type": "free_trial",
           "duration": "P1W",
-          "stores": ["play", "ios"]
+          "stores": [
+            "play",
+            "ios"
+          ]
         },
         {
           "play_offer_id": "campaign-first-year",
           "type": "pay_as_you_go",
           "price_usd": "19.99",
           "periods": 1,
-          "stores": ["play"]
+          "stores": [
+            "play"
+          ]
         }
       ],
       "localizations": {
@@ -45,7 +61,8 @@
         }
       },
       "review_note": "Unlocks Premium: sound recordings, full statistics, sleep aid library, sleep programs and extra alarm sounds. New subscribers get a 7-day free trial.",
-      "review_screenshot": "review_paywall.png"
+      "review_screenshot": "review_paywall.png",
+      "revenuecat_package": "$rc_annual"
     },
     {
       "product_id": "lullwake_premium_monthly",
@@ -66,7 +83,8 @@
         }
       },
       "review_note": "Unlocks Premium: sound recordings, full statistics, sleep aid library, sleep programs and extra alarm sounds.",
-      "review_screenshot": "review_paywall.png"
+      "review_screenshot": "review_paywall.png",
+      "revenuecat_package": "$rc_monthly"
     }
   ]
 }

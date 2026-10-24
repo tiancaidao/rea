@@ -1,20 +1,22 @@
 #!/bin/bash
-# Create or update Lullwake's subscriptions on Google Play or the App Store
-# from store_products/subscriptions.json.
+# Create or update Lullwake's subscriptions on Google Play, the App Store or
+# RevenueCat from store_products/subscriptions.json.
 #
 # Usage: scripts/store_subscriptions.sh plan
-#        scripts/store_subscriptions.sh <play|ios> <list|sync> [options]
+#        scripts/store_subscriptions.sh <play|ios|revenuecat> <list|sync> [options]
 #   plan   print what the file defines; reads no credentials, calls no store
 #   list   show the subscriptions the store has now
 #   sync   create or update them to match the file (dry run unless --apply)
 # Options: --apply, --only PRODUCT_ID, --update-prices (and for ios
-# --no-preserve-price). See store_products/README.md.
+# --no-preserve-price).
 #
 # Credentials are never stored here. store_products/.env (gitignored) may set
 #   ASC_ENV_FILE    a file with ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_PATH
 #                   (a relative ASC_KEY_PATH is read next to that file)
 #   PLAY_KEY_FILE   the Play service account JSON key
-# or export ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH and PLAY_KEY_FILE yourself.
+#   REVENUECAT_API_KEY, REVENUECAT_PROJECT_ID  a v2 secret key (sk_...) with
+#                   write access to project configuration, and its project id
+# or export them yourself.
 
 set -euo pipefail
 
@@ -23,8 +25,9 @@ case "$STORE" in
   plan) SCRIPT=products.py ;;
   play) SCRIPT=play_subscriptions.py ;;
   ios) SCRIPT=asc_subscriptions.py ;;
-  -h|--help|"") sed -n '2,17p' "$0"; exit 0 ;;
-  *) echo "Unknown command '$STORE'. Use plan, play or ios."; exit 1 ;;
+  revenuecat) SCRIPT=revenuecat_products.py ;;
+  -h|--help|"") sed -n '2,19p' "$0"; exit 0 ;;
+  *) echo "Unknown command '$STORE'. Use plan, play, ios or revenuecat."; exit 1 ;;
 esac
 shift
 
