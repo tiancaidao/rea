@@ -160,7 +160,7 @@ App price: **Free**, with in-app purchases. Prices match the paywall.
 | --- | --- | --- |
 | Type | Non-consumable | Auto-renewable subscription |
 | Reference name | Prime Lifetime | Prime Monthly |
-| Product ID | `com.duplicates-cleaner.ios.prime.lifetime` | `com.duplicates-cleaner.ios.prime.monthly` |
+| Product ID | `prime_lifetime` | `prime_monthly` |
 | Subscription group | | Duplicate Sweep Prime |
 | Duration | | 1 month |
 | Price | USD 9.99 | USD 1.99 / month |

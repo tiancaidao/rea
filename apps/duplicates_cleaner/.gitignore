@@ -54,3 +54,9 @@ tool/PlusJakartaSans.ttf
 /fastlane/README.md
 /vendor/bundle/
 /.bundle/
+
+# Store scripts: credentials and Python environments
+/google_play/google-play-credentials.json
+/google_play/.venv/
+/store_products/.venv/
+/store_products/.env
