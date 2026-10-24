@@ -7,6 +7,9 @@
     "localizations": {
       "en-US": {
         "name": "Duplicate Sweep Prime"
+      },
+      "en-GB": {
+        "name": "Duplicate Sweep Prime"
       }
     }
   },
@@ -38,6 +41,16 @@
       "price_usd": "1.99",
       "localizations": {
         "en-US": {
+          "name": "Prime Monthly",
+          "description": "Unlimited cleaning and every scan, monthly",
+          "benefits": [
+            "Unlimited files per clean",
+            "SD card, USB and custom folders",
+            "Similar images and APK scans",
+            "Sort and select filters"
+          ]
+        },
+        "en-GB": {
           "name": "Prime Monthly",
           "description": "Unlimited cleaning and every scan, monthly",
           "benefits": [
