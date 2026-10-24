@@ -29,6 +29,7 @@ const app = createApp({
   bucket: getStorage().bucket(),
   publisher,
   packageName,
+  appleBundleId: process.env.APPLE_BUNDLE_ID || 'com.matchlab.lullwake',
 });
 
 const port = Number(process.env.PORT || 8080);

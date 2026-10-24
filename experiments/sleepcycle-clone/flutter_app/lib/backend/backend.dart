@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -90,6 +91,10 @@ class Backend {
 
   Future<User> signUp(String email, String password) =>
       _authCall(() => _auth.createUserWithEmailAndPassword(email: email, password: password));
+
+  /// Sign in with Apple (iOS), through Firebase Auth's Apple provider.
+  Future<User> signInWithApple() =>
+      _authCall(() => _auth.signInWithProvider(AppleAuthProvider()..addScope('email')));
 
   Future<User> _authCall(Future<UserCredential> Function() f) async {
     try {
@@ -185,9 +190,12 @@ class Backend {
   Future<Map<String, dynamic>?> weather(double lat, double lon) async =>
       (await _api('GET', '/v1/weather?lat=$lat&lon=$lon')) as Map<String, dynamic>?;
 
-  Future<Map<String, dynamic>?> verifyPurchase(String productId, String purchaseToken) async =>
-      (await _api('POST', '/v1/billing/verify', body: {'productId': productId, 'purchaseToken': purchaseToken}))
-          as Map<String, dynamic>?;
+  /// Server check of a store purchase: a Play purchase token, or on iOS a
+  /// StoreKit 2 signed transaction.
+  Future<Map<String, dynamic>?> verifyPurchase(String productId, String purchaseToken) async => (await _api(
+          'POST', '/v1/billing/verify',
+          body: {'productId': productId, 'purchaseToken': purchaseToken, 'platform': Platform.isIOS ? 'ios' : 'android'}))
+      as Map<String, dynamic>?;
 
   Future<Map<String, dynamic>?> recommendations({int? goalMinutes}) async {
     final tz = DateTime.now().timeZoneOffset.inMinutes;

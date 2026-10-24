@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../app_state.dart';
 import '../backend/backend.dart';
 import '../backend/billing.dart';
@@ -200,9 +202,30 @@ class _PaywallScreenState extends State<PaywallScreen> {
   static const _terms = 'The subscription renews automatically at the end of each period unless you cancel at '
       'least 24 hours before it ends. Cancel any time in your app store account settings. During a free trial you '
       'are not charged; if you cancel before it ends, you keep the free version.';
-  static const _privacy = 'Your nights are analysed on your phone. With Online backup on, nights and settings are '
-      'stored in your account so you can restore them. Sound clips stay on your phone unless you agree to share '
-      'them in Consent and privacy. You can erase your data or your account at any time in Profile › More › Account.';
+  /// Apple's standard licence agreement (the app has no custom EULA) and
+  /// MatchLab's privacy policy.
+  static const termsUrl = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+  static const privacyUrl = 'https://www.matchlab.sg/privacy.html';
+
+  Future<void> _open(String url) async {
+    if (!await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication) && mounted) {
+      toast(context, 'Couldn\'t open $url');
+    }
+  }
+
+  Future<void> _restore() async {
+    if (_buying) return;
+    setState(() => _buying = true);
+    final err = await Billing.I.restore();
+    if (!mounted) return;
+    setState(() => _buying = false);
+    if (err == null && AppState.I.premium) {
+      toast(context, 'Premium restored');
+      _close();
+    } else {
+      toast(context, err ?? 'No active subscription found.');
+    }
+  }
 
   void _sheet(String title, Widget body) => showModalBottomSheet(
         context: context,
@@ -412,14 +435,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
           const SizedBox(height: 8),
           Wrap(alignment: WrapAlignment.center, children: [
             TextButton(
-                onPressed: () => _legal('Terms of use', _terms),
+                onPressed: () => Platform.isIOS ? _open(termsUrl) : _legal('Terms of use', _terms),
                 child: Text('Terms', style: TextStyle(color: p.accent))),
             TextButton(
-                onPressed: () => _legal('Privacy policy', _privacy),
-                child: Text('Privacy', style: TextStyle(color: p.accent))),
-            TextButton(
-                onPressed: () => toast(context, 'Restoring purchases happens automatically when you sign in.'),
-                child: Text('Restore', style: TextStyle(color: p.accent))),
+                onPressed: () => _open(privacyUrl), child: Text('Privacy', style: TextStyle(color: p.accent))),
+            TextButton(onPressed: _restore, child: Text('Restore', style: TextStyle(color: p.accent))),
             if (m['whatsInPremium'] == true)
               TextButton(
                   onPressed: () => _sheet(

@@ -118,7 +118,11 @@ class ProgramDetail extends StatelessWidget {
                       onTap: () => push(
                           context,
                           l.kind == LessonKind.video
-                              ? _VideoLesson(lesson: l, program: program)
+                              ? (lessonVideos
+                                  ? _VideoLesson(lesson: l, program: program)
+                                  : _CardsLesson(
+                                      lesson: Lesson(l.id, l.title, LessonKind.cards,
+                                          cards: [LessonCard(l.caption, program.icon, program.colors.first)])))
                               : _CardsLesson(lesson: l)),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Expanded(
@@ -127,7 +131,7 @@ class ProgramDetail extends StatelessWidget {
                                 child: ArtBox(
                                     image: program.image,
                                     colors: program.colors,
-                                    icon: l.kind == LessonKind.video ? Icons.play_circle : program.icon)),
+                                    icon: l.kind == LessonKind.video && lessonVideos ? Icons.play_circle : program.icon)),
                             if (s.completedLessons.contains(l.id))
                               Positioned(
                                   right: 6, top: 6, child: Icon(Icons.check_circle, color: context.palette.accent)),
@@ -147,6 +151,11 @@ class ProgramDetail extends StatelessWidget {
     );
   }
 }
+
+/// Lesson clips aren't bundled in store builds (the one local clip is a
+/// gitignored placeholder), so video lessons show their caption as a card
+/// unless built with --dart-define=LESSON_VIDEOS=true.
+const lessonVideos = bool.fromEnvironment('LESSON_VIDEOS');
 
 /// Video lesson: full-screen clip area with a caption and an Unmute pill.
 /// (No video is bundled; the clip area is a placeholder.)

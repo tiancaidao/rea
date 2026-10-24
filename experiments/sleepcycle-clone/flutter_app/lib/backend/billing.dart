@@ -57,6 +57,24 @@ class Billing {
     return _pending!.future;
   }
 
+  /// Restore purchases (App Review 3.1.1): the store replays past purchases,
+  /// which are verified like new ones. Null when Premium came back.
+  Future<String?> restore() async {
+    final iap = InAppPurchase.instance;
+    try {
+      if (!await iap.isAvailable()) return 'The store isn\'t available on this device.';
+    } catch (_) {
+      return 'The store isn\'t available on this device.';
+    }
+    _listen();
+    _pending = Completer<String?>();
+    await iap.restorePurchases();
+    return _pending!.future.timeout(const Duration(seconds: 20), onTimeout: () {
+      _pending = null;
+      return 'No purchases to restore for this store account.';
+    });
+  }
+
   Future<void> _onPurchases(List<PurchaseDetails> list) async {
     for (final p in list) {
       if (p.status == PurchaseStatus.pending) continue;

@@ -12,6 +12,7 @@ const { weeklyReport, DAY } = require('./insights');
 const { currentWeather } = require('./weather');
 const { recommendations } = require('./recommendations');
 const paywalls = require('./paywalls');
+const apple = require('./apple');
 
 const DEFAULT_CONFIG = {
   minAppVersion: '0.1.0',
@@ -31,9 +32,10 @@ const DEFAULT_CONFIG = {
  * @param deps.bucket    Cloud Storage bucket (sleep-aid media)
  * @param deps.publisher Google Play androidpublisher client, or null
  * @param deps.packageName Android package name for Play verification
+ * @param deps.appleBundleId iOS bundle id App Store transactions must carry
  * @param deps.fetchImpl fetch (injectable for tests)
  */
-function createApp({ db, auth, bucket, publisher = null, packageName = null, fetchImpl = fetch }) {
+function createApp({ db, auth, bucket, publisher = null, packageName = null, appleBundleId = 'com.matchlab.lullwake', fetchImpl = fetch }) {
   const app = express();
   app.use(express.json({ limit: '2mb' }));
   // one structured line per request (Cloud Logging parses JSON on stdout)
@@ -141,6 +143,14 @@ function createApp({ db, auth, bucket, publisher = null, packageName = null, fet
   app.post('/v1/billing/verify', requireUser, asyncRoute(async (req, res) => {
     const { purchaseToken, productId } = req.body || {};
     if (!purchaseToken) return res.status(400).json({ error: 'purchaseToken required' });
+    // App Store (StoreKit 2): the token is a signed transaction we verify ourselves
+    if ((req.body || {}).platform === 'ios' || purchaseToken.split('.').length === 3) {
+      const tx = apple.verifyTransaction(purchaseToken);
+      const premium = apple.premiumFrom(tx, { bundleId: appleBundleId });
+      await db.doc(`users/${req.user.uid}`).set({ premium }, { merge: true });
+      await auth.setCustomUserClaims(req.user.uid, { ...(req.user.claims || {}), premium: premium.active });
+      return res.json(premium);
+    }
     if (!publisher || !packageName) {
       return res.status(501).json({ error: 'Play verification not configured (set PLAY_PACKAGE_NAME and grant the service account Play Console access)' });
     }

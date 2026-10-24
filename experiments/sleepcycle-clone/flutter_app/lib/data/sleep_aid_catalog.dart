@@ -69,7 +69,7 @@ class SleepAidSection {
 class SleepAidCatalog {
   /// What the UI shows: the server catalog once fetched, else the built-in one.
   static List<SleepAidSection> current = sections;
-  static SleepAidItem currentFeatured = featured;
+  static SleepAidItem currentFeatured = sections.first.items.first;
 
   static Future<bool> refresh() async {
     final r = await fetchRemote();
@@ -130,7 +130,7 @@ class SleepAidCatalog {
   static const _violet = [Color(0xFF7C5CFF), Color(0xFF15122E)];
   static const _city = [Color(0xFFB65A3A), Color(0xFF1B1A2E)];
 
-  static const featured = SleepAidItem(
+  static const _slowExhale = SleepAidItem(
     id: 'slow-exhale',
     title: 'Slow Exhale',
     description: 'A short guided breath that lengthens each exhale to settle a busy mind.',
@@ -139,9 +139,20 @@ class SleepAidCatalog {
     art: _dusk,
   );
 
-  static const sections = <SleepAidSection>[
+  /// The built-in catalog without guided sessions that have no narration
+  /// recorded yet (they would play music in place of a voice, which App
+  /// Review treats as an unfinished feature). They come back once a
+  /// recording is bundled or the server catalog streams one.
+  static final sections = <SleepAidSection>[
+    for (final s in _builtIn)
+      if (s.items.any(_playable)) SleepAidSection(s.title, s.layout, s.items.where(_playable).toList()),
+  ];
+
+  static bool _playable(SleepAidItem it) => it.narrator.isEmpty || it.asset != null;
+
+  static const _builtIn = <SleepAidSection>[
     SleepAidSection('Breathing', SectionLayout.hero, [
-      featured,
+      _slowExhale,
       SleepAidItem(
           id: 'box-breath',
           title: 'Box Breathing for Bed',

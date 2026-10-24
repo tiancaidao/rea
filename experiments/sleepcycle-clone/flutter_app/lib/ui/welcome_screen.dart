@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import '../app_state.dart';
 import '../backend/backend.dart';
 import '../theme.dart';
 import 'login_screen.dart';
@@ -47,27 +49,22 @@ class WelcomeScreen extends StatelessWidget {
                 const Text('Create an account to keep your nights safe and synced.',
                     textAlign: TextAlign.center, style: TextStyle(fontSize: 16)),
                 const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white, foregroundColor: Colors.black, shape: const StadiumBorder()),
-                    onPressed: () {
-                      if (Backend.I.enabled) {
-                        // Google sign-in needs the app's SHA-1 registered in Firebase
-                        // (see backend/README.md); use email until then.
-                        toast(context, 'Google sign-in isn\'t set up for this build yet — use email.');
-                        _email(context, signUp: true);
-                      } else {
-                        _signedIn(context);
-                      }
-                    },
-                    icon: const Icon(Icons.account_circle),
-                    label: const Text('Continue with Google', style: TextStyle(fontSize: 17)),
+                // Sign in with Apple on iOS (App Review 4.8). Google sign-in
+                // stays hidden until its Firebase setup is done (backend/README.md).
+                if (Platform.isIOS) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                          backgroundColor: Colors.white, foregroundColor: Colors.black, shape: const StadiumBorder()),
+                      onPressed: () => _apple(context),
+                      icon: const Icon(Icons.apple),
+                      label: const Text('Continue with Apple', style: TextStyle(fontSize: 17)),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
+                ],
                 Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
                   TextButton(
                       onPressed: () => _email(context, signUp: true),
@@ -82,6 +79,18 @@ class WelcomeScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _apple(BuildContext context) async {
+    if (!Backend.I.enabled) return _signedIn(context);
+    try {
+      final u = await Backend.I.signInWithApple();
+      await AppState.I.syncFromCloud();
+      if (u.email != null) AppState.I.email = u.email!;
+      if (context.mounted) _signedIn(context);
+    } catch (e) {
+      if (context.mounted) toast(context, 'Sign in with Apple didn\'t work: $e');
+    }
   }
 
   Future<void> _email(BuildContext context, {bool signUp = false}) async {
@@ -100,9 +109,9 @@ class _SocialProof extends StatefulWidget {
 
 class _SocialProofState extends State<_SocialProof> {
   static const quotes = [
-    ('"I finally wake up before the alarm feels like a shock."', 'Smart alarm'),
-    ('"Seeing my bedtime drift every weekend made me fix it."', 'Statistics'),
-    ('"The rain sound has me asleep in ten minutes."', 'Sleep aid'),
+    ('Wake up in light sleep, before the alarm feels like a shock.', 'Smart alarm'),
+    ('See your bedtime drift on weekends, and fix it.', 'Statistics'),
+    ('Fall asleep to real rain, ocean and stories.', 'Sleep aid'),
   ];
   final _pager = PageController();
   Timer? _t;
