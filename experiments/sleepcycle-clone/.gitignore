@@ -49,3 +49,5 @@ flutter_app/ios/Flutter/Generated.xcconfig
 flutter_app/ios/Flutter/ephemeral/
 flutter_app/ios/Flutter/flutter_export_environment.sh
 flutter_app/ios/Runner/GeneratedPluginRegistrant.*
+
+flutter_app/tools/.media-cache/

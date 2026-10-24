@@ -4,7 +4,7 @@ Goal: measure "as good as the original" on **the same nights**. Both apps
 track side by side, and the harness compares our output with the original
 app's own export.
 
-**Rule:** the original app's export only *grades* ours. It is read by
+**Rule:** the original app's export only _grades_ ours. It is read by
 `benchmark_night.py`, summarised into a report, and never used to train,
 tune or distil any model.
 
@@ -35,14 +35,14 @@ Keep the exports and reports out of git (they are personal sleep data).
 
 ## What it compares
 
-| quantity | ours (from the JSON) | theirs (CSV column) |
-|---|---|---|
-| time in bed | session end − start | `Time in bed (seconds)` |
-| time asleep | non-wake 30-s epochs | `Time asleep (seconds)` |
-| sleep onset latency | first non-wake epoch | `Time before sleep (seconds)` |
-| snore time | `snoreMinutes` (model events) | `Snore time (seconds)` |
-| score | `sleepScore` | `Sleep Quality` (%) |
-| hypnogram | per-epoch stages, REM → light | digitised graph (optional) |
+| quantity            | ours (from the JSON)          | theirs (CSV column)           |
+| ------------------- | ----------------------------- | ----------------------------- |
+| time in bed         | session end − start           | `Time in bed (seconds)`       |
+| time asleep         | non-wake 30-s epochs          | `Time asleep (seconds)`       |
+| sleep onset latency | first non-wake epoch          | `Time before sleep (seconds)` |
+| snore time          | `snoreMinutes` (model events) | `Snore time (seconds)`        |
+| score               | `sleepScore`                  | `Sleep Quality` (%)           |
+| hypnogram           | per-epoch stages, REM → light | digitised graph (optional)    |
 
 Columns are matched by header name, so the parser tolerates added or reordered
 columns and either `;` or `,` as the delimiter. Unmatched columns are listed

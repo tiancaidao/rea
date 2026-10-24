@@ -1,14 +1,20 @@
 import 'dart:convert';
-import 'dart:io' show Directory, File;
+import 'dart:io' show Directory, File, Platform;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../alarm/custom_song.dart';
 import '../app_state.dart';
 import '../backend/backend.dart';
 import '../device/health_connect.dart';
 import '../device/location.dart';
 import '../device/notifications.dart';
+import '../device/wear.dart';
 import '../theme.dart';
-import 'welcome_screen.dart';
+import '../paywall/paywall_config.dart';
+import '../paywall/paywall_screen.dart';
+import 'sleep_aid_sheet.dart' show PremiumBadge;
+import 'welcome_screen.dart' show WelcomeScreen;
 import 'widgets/common.dart';
 import 'widgets/illustrations.dart';
 
@@ -198,6 +204,34 @@ class AlarmSoundPage extends StatelessWidget {
         child: Text('Premium sounds', style: TextStyle(color: context.palette.textMuted)),
       ),
       const PrefRadioList(prefKey: 'alarm_sound', options: premium, onPicked: _preview),
+      Watch((context, s) {
+        final picked = s.pref('alarm_sound') == CustomSong.label && CustomSong.path != null;
+        return ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          leading: Icon(picked ? Icons.radio_button_checked : Icons.library_music, color: context.palette.accent),
+          title: const Text(CustomSong.label, style: TextStyle(fontSize: 16)),
+          subtitle: Text(CustomSong.path == null ? 'Pick any song on your phone' : CustomSong.title,
+              style: TextStyle(color: context.palette.textMuted)),
+          trailing: s.premium ? null : const PremiumBadge(),
+          onTap: () async {
+            if (!s.premium) {
+              showPaywall(context, Placement.lockedFeature);
+              return;
+            }
+            if (CustomSong.path != null && !picked) {
+              s.setPref('alarm_sound', CustomSong.label);
+              return;
+            }
+            try {
+              await CustomSong.pick();
+            } catch (_) {
+              if (context.mounted) toast(context, 'Couldn\'t open that file. Try another song.');
+            }
+          },
+        );
+      }),
+      const AboutBlock('Premium lets you wake up to any song on your phone. It plays at alarm volume and fades in '
+          'like the built-in sounds.'),
     ]);
   }
 }
@@ -210,26 +244,6 @@ class WakeUpPhasePage extends StatelessWidget {
         AboutBlock('The smart alarm wakes you at your lightest moment within this window, ending at your alarm time. '
             'A 30-minute window gives the best chance of catching light sleep.'),
       ]);
-}
-
-class WatchPage extends StatelessWidget {
-  const WatchPage({super.key});
-  @override
-  Widget build(BuildContext context) => Watch((context, s) => SettingsPage(title: 'Watch', children: [
-        NavRow(
-            icon: Icons.notifications,
-            title: 'Alarm type',
-            value: s.pref('watch_alarm_type'),
-            onTap: () => push(context,
-                const SimpleRadioPage('Alarm type', 'watch_alarm_type', ['Automatic', 'Phone only', 'Watch only']))),
-        NavRow(
-            icon: Icons.play_circle_outline,
-            title: 'Automatic start',
-            value: s.pref('watch_auto_start'),
-            onTap: () => push(context, const SimpleRadioPage('Automatic start', 'watch_auto_start', ['On', 'Off']))),
-        const AboutBlock('With a paired watch, keep your phone nearby — it still does the analysis — and use the '
-            'watch to wake you silently. Automatic start begins tracking when the watch detects you\'ve fallen asleep.'),
-      ]));
 }
 
 class WeeklyReportPage extends StatelessWidget {
@@ -339,12 +353,12 @@ class MorePage extends StatelessWidget {
         NavRow(icon: Icons.storage, title: 'Database', onTap: () => open(const DatabasePage())),
         NavRow(
             icon: Icons.extension,
-            title: 'Third-party software',
-            onTap: () => showLicensePage(context: context, applicationName: 'Sleep Tracker')),
+            title: 'Third-party software and media',
+            onTap: () => showLicensePage(context: context, applicationName: 'Lullwake')),
         Padding(
           padding: const EdgeInsets.all(24),
           child: Center(
-              child: Text('Sleep Tracker v0.1.0 (prototype)', style: TextStyle(color: context.palette.textFaint))),
+              child: Text('Lullwake v0.1.0', style: TextStyle(color: context.palette.textFaint))),
         ),
       ]);
     });
@@ -515,6 +529,7 @@ class DatabasePage extends StatelessWidget {
             s.testAlarmArmed = true;
             toast(context, 'Start tracking on the Sleep tab: the alarm rings after 10 seconds');
           }),
+      NavRow(icon: Icons.storefront, title: 'Preview paywalls', onTap: () => push(context, const PaywallPreviewPage())),
       // Prototype helper: populate every screen without tracking for real.
       NavRow(
           icon: Icons.science,
@@ -557,9 +572,126 @@ class HealthConnectPage extends StatelessWidget {
             }
           },
         ),
+        Watch((context, s) => s.pref('health_connect') != 'On'
+            ? const SizedBox.shrink()
+            : ListTile(
+                leading: const Icon(Icons.download_outlined),
+                title: const Text('Import sleep from Health Connect'),
+                subtitle: const Text('Nights from the last 30 days that other apps recorded'),
+                onTap: () async {
+                  final n = await AppState.I.importHealthNights();
+                  if (context.mounted) {
+                    toast(context, n == 0 ? 'No new nights to import' : 'Imported $n night${n == 1 ? '' : 's'}');
+                  }
+                },
+              )),
         const AboutBlock('Read your daily steps from Health Connect and write each night back as a sleep '
-            'session so other health apps can use it.'),
+            'session so other health apps can use it. You can also import nights another app or a watch '
+            'recorded.'),
       ]);
+}
+
+/// Wear OS: the watch is a remote for the phone (start and stop, snooze,
+/// silent wake-up by vibration) plus Snore Alert.
+class WatchPage extends StatelessWidget {
+  const WatchPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    Wear.I.refresh();
+    return SettingsPage(title: 'Watch', children: [
+      ValueListenableBuilder(
+        valueListenable: Wear.I.connected,
+        builder: (context, on, _) => ListTile(
+          leading: Icon(on ? Icons.watch : Icons.watch_off_outlined, color: context.palette.accent),
+          title: Text(on ? 'Watch connected' : 'No watch connected'),
+          subtitle: Text(on ? 'Start, stop and snooze from your wrist' : 'Install the app on your Wear OS watch',
+              style: TextStyle(color: context.palette.textMuted)),
+        ),
+      ),
+      Watch((context, s) => NavRow(
+          icon: Icons.vibration,
+          title: 'Alarm type',
+          value: s.pref('wear_alarm_type'),
+          onTap: () => push(
+              context,
+              const SimpleRadioPage('Alarm type', 'wear_alarm_type', ['Automatic', 'Melody', 'Vibrate'],
+                  about: 'Automatic picks by where you start the night. Started from the phone: melody. '
+                      'Started from the watch: the watch vibrates silently, and the phone joins in if you '
+                      'are still asleep after two minutes. You can also change it on the watch.')))),
+      Watch((context, s) => NavRow(
+          icon: Icons.record_voice_over,
+          title: 'Snore Alert',
+          value: s.pref('snore_alert'),
+          onTap: () => push(context, const SnoreAlertPage()))),
+      const AboutBlock('Keep the phone by your bed: it does the tracking and decides when to wake you. '
+          'Think of the watch as a remote that can wake you silently.'),
+    ]);
+  }
+}
+
+/// Snore Alert: an intro (three pages), consent, then the switch. While
+/// tracking, ongoing snoring buzzes the watch to nudge you onto your side.
+class SnoreAlertPage extends StatefulWidget {
+  const SnoreAlertPage({super.key});
+  @override
+  State<SnoreAlertPage> createState() => _SnoreAlertPageState();
+}
+
+class _SnoreAlertPageState extends State<SnoreAlertPage> {
+  int _page = 0;
+  static const _intro = [
+    (
+      Icons.watch,
+      'Snore Alert',
+      'When the phone hears you snoring, your watch vibrates gently so you change position.'
+    ),
+    (
+      Icons.airline_seat_flat,
+      'Sleep on your side',
+      'Lying on your back can narrow the airway and make snoring worse. Turning to your side often helps.'
+    ),
+    (
+      Icons.science,
+      'Still experimental',
+      'It only works if you are the only one snoring in the room, and the buzzing can disturb your sleep. '
+          'Turn it on only if you accept that.'
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppState.I;
+    if (s.pref('snore_alert') == 'On' || _page >= _intro.length) {
+      return SettingsPage(title: 'Snore Alert', children: [
+        PrefRadioList(prefKey: 'snore_alert', options: const ['On', 'Off']),
+        AboutBlock(Wear.I.connected.value
+            ? 'Buzzes at most every 10 minutes while snoring goes on.'
+            : 'Connect a Wear OS watch with the app for Snore Alert to work.'),
+      ]);
+    }
+    final (icon, title, body) = _intro[_page];
+    final last = _page == _intro.length - 1;
+    return SettingsPage(title: 'Snore Alert', children: [
+      const SizedBox(height: 32),
+      Center(child: CircleArt(icon: icon, size: 180)),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(28, 28, 28, 12),
+        child:
+            Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Text(body, textAlign: TextAlign.center, style: TextStyle(color: context.palette.textMuted, height: 1.4)),
+      ),
+      const SizedBox(height: 32),
+      Center(
+        child: PillButton(last ? 'I understand, turn it on' : 'Next', width: 260, onPressed: () {
+          if (last) s.setPref('snore_alert', 'On');
+          setState(() => _page++);
+        }),
+      ),
+    ]);
+  }
 }
 
 // ── Profile › Premium ───────────────────────────────────────────────────────
@@ -718,6 +850,33 @@ class BenefitsPage extends StatelessWidget {
         Center(
           child: PillButton('Redeem a gift card', width: 240, onPressed: () => redeemGiftCard(context)),
         ),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton(
+            onPressed: () => showPaywall(context, Placement.giftCards),
+            child: Text('Give Premium to two friends', style: TextStyle(color: context.palette.accent)),
+          ),
+        ),
+      ]);
+}
+
+/// Every paywall variant the server can send, to open one directly
+/// (Profile › More › Database). The live choice per placement is the
+/// server's; this skips the experiment.
+class PaywallPreviewPage extends StatelessWidget {
+  const PaywallPreviewPage({super.key});
+  @override
+  Widget build(BuildContext context) => SettingsPage(title: 'Preview paywalls', children: [
+        FutureBuilder(
+          future: Paywalls.I.variants(),
+          builder: (context, snap) => Column(children: [
+            for (final (id, name) in snap.data ?? const <(String, String)>[])
+              NavRow(title: name, value: id, onTap: () => showPaywall(context, Placement.inApp, variant: id)),
+          ]),
+        ),
+        const AboutBlock('Which paywall a person sees is decided by the server for each placement '
+            '(onboarding, in-app, locked feature, gift cards, campaign, app open), as a sticky A/B split. '
+            'Change the split or the copy in Firestore at config/paywalls without a release.'),
       ]);
 }
 
@@ -754,41 +913,142 @@ Future<void> redeemGiftCard(BuildContext context) async {
   }
 }
 
-class HelpPage extends StatelessWidget {
+/// Help center: topics with their articles, a search across every question
+/// and answer, and Contact support (an email with the app and device details
+/// filled in).
+class HelpPage extends StatefulWidget {
   const HelpPage({super.key});
   static const topics = {
     'Getting started': [
       (
         'Where should I put my phone?',
-        'Next to your bed, screen down and charging. With the accelerometer, on the mattress.'
+        'Next to your bed, screen down and charging, when tracking with the microphone. With the '
+            'accelerometer, put it on the mattress near your pillow.'
       ),
-      ('Do I need to be online?', 'No. Tracking and analysis run on your phone.'),
+      (
+        'Do I need to be online?',
+        'No. Tracking and analysis run on your phone. Weather, backup and streamed '
+            'sleep aid need a connection.'
+      ),
+      (
+        'Can two people sleep in the same bed?',
+        'Yes. With the microphone, keep the phone on your side of the '
+            'bed; sounds closest to the phone count most.'
+      ),
+      (
+        'How do I start without an alarm?',
+        'Pick "No alarm" under the alarm time, or long-press the app icon and '
+            'choose Start without alarm.'
+      ),
     ],
     'Top questions': [
       (
         'Why did the alarm ring before my alarm time?',
-        'The smart alarm wakes you in light sleep within your wake-up phase.'
+        'The smart alarm wakes you in light sleep within your wake-up phase (30 minutes by default). Set the '
+            'phase in Profile › Settings › Wake up phase, or use a regular alarm.'
       ),
-      ('How is quality calculated?', 'From time asleep, how often you woke, and deeper sleep.'),
+      (
+        'How is quality calculated?',
+        'From time asleep, how often you woke, and how much deep and REM sleep you '
+            'had, compared with what is typical for you.'
+      ),
+      (
+        'Why is my graph flat?',
+        'The phone didn\'t pick up movement or sound. Check its placement and that the '
+            'microphone permission is on.'
+      ),
+      (
+        'Why did the alarm not ring?',
+        'Keep the app open while tracking and allow Alarms & reminders. Battery '
+            'savers can stop apps overnight; exclude this app in your phone\'s battery settings.'
+      ),
+      (
+        'What do the snore minutes mean?',
+        'Minutes of the night with sounds classified as snoring. Turn on Sound '
+            'detection to keep the recordings so you can listen back.'
+      ),
+    ],
+    'Sleep aid': [
+      (
+        'Can I listen offline?',
+        'Free sounds are part of the app. Streamed tracks download when you open them; '
+            'set Wi-Fi only and how long to keep them in Profile › Settings › Sleep aid.'
+      ),
+      (
+        'How do I stop the sound?',
+        'It fades out after the time you set. You can also pause or stop it from the '
+            'notification.'
+      ),
     ],
     'Subscriptions': [
-      ('How do I cancel my trial?', 'In your phone\'s app store subscriptions, before the trial ends.'),
+      (
+        'How do I cancel my trial?',
+        'In your phone\'s app store subscriptions, before the trial ends. Deleting '
+            'the app doesn\'t cancel it.'
+      ),
+      (
+        'I paid but Premium is locked',
+        'Profile › Premium › Restore purchases, signed in with the same store '
+            'account.'
+      ),
+      ('How do I redeem a gift card?', 'Profile › Premium › Redeem gift code.'),
     ],
     'Account settings': [
       ('How do I export my data?', 'Profile › More › Database › Export database to CSV.'),
+      (
+        'How do I move to a new phone?',
+        'Turn on Online backup and sign in on the new phone with the same '
+            'account.'
+      ),
+      (
+        'How do I delete my data?',
+        'Profile › More › Database › Erase all data. Signed in, this also erases the '
+            'online copy.'
+      ),
+      ('Can I import nights from my watch?', 'Turn on Health Connect and tap Import sleep from Health Connect.'),
     ],
   };
+
+  @override
+  State<HelpPage> createState() => _HelpPageState();
+}
+
+class _HelpPageState extends State<HelpPage> {
+  String _q = '';
+
+  Widget _article(BuildContext context, (String, String) qa) => ExpansionTile(title: Text(qa.$1), children: [
+        Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), child: Text(qa.$2)),
+      ]);
+
+  Future<void> _contact() async {
+    final info = 'App: Lullwake\nPlatform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}\n'
+        'Nights: ${AppState.I.nights.length}\n\nDescribe the problem:\n';
+    final uri = Uri(
+        scheme: 'mailto',
+        path: 'support@matchlab.sg',
+        query: 'subject=${Uri.encodeComponent('Help with Lullwake')}'
+            '&body=${Uri.encodeComponent(info)}');
+    if (!await launchUrl(uri) && mounted) toast(context, 'No email app found');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final q = _q.trim().toLowerCase();
+    final hits = [
+      for (final t in HelpPage.topics.values)
+        for (final qa in t)
+          if (q.isNotEmpty && (qa.$1.toLowerCase().contains(q) || qa.$2.toLowerCase().contains(q))) qa,
+    ];
     return SettingsPage(title: 'Help', children: [
       Container(
         color: context.palette.surfaceHi,
         padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
-        child: const Column(children: [
-          Text('Help center', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700)),
-          SizedBox(height: 16),
+        child: Column(children: [
+          const Text('Help center', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 16),
           TextField(
-            decoration: InputDecoration(
+            onChanged: (v) => setState(() => _q = v),
+            decoration: const InputDecoration(
               filled: true,
               fillColor: Colors.white,
               hintText: 'Search',
@@ -796,29 +1056,33 @@ class HelpPage extends StatelessWidget {
               prefixIcon: Icon(Icons.search, color: Colors.black45),
               border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(24))),
             ),
-            style: TextStyle(color: Colors.black),
+            style: const TextStyle(color: Colors.black),
           ),
         ]),
       ),
-      for (final t in topics.entries)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          child: OutlinedButton(
-            style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(64),
-                side: BorderSide(color: context.palette.accent),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
-            onPressed: () => push(
-                context,
-                SettingsPage(title: t.key, children: [
-                  for (final qa in t.value)
-                    ExpansionTile(title: Text(qa.$1), children: [
-                      Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), child: Text(qa.$2)),
-                    ]),
-                ])),
-            child: Text(t.key, style: TextStyle(color: context.palette.accent, fontSize: 16)),
+      if (q.isNotEmpty) ...[
+        if (hits.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('No articles match "$_q".', style: TextStyle(color: context.palette.textMuted)),
           ),
-        ),
+        for (final qa in hits) _article(context, qa),
+      ] else
+        for (final t in HelpPage.topics.entries)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(64),
+                  side: BorderSide(color: context.palette.accent),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
+              onPressed: () => push(
+                  context, SettingsPage(title: t.key, children: [for (final qa in t.value) _article(context, qa)])),
+              child: Text(t.key, style: TextStyle(color: context.palette.accent, fontSize: 16)),
+            ),
+          ),
+      const SizedBox(height: 24),
+      NavRow(icon: Icons.mail_outline, title: 'Contact support', onTap: _contact),
     ]);
   }
 }

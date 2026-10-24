@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'app_state.dart';
 import 'backend/backend.dart';
+import 'backend/billing.dart';
 import 'device/notifications.dart';
 import 'theme.dart';
 import 'strings.dart';
@@ -10,8 +13,10 @@ import 'ui/welcome_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(_mediaCredits);
   await S.load();
   await Backend.I.init();
+  await Billing.I.init();
   await Notifications.I.init();
   await AppState.I.load();
   if (Backend.I.user != null) await AppState.I.syncFromCloud();
@@ -30,7 +35,7 @@ class SleepApp extends StatelessWidget {
     return ValueListenableBuilder<String>(
       valueListenable: AppState.I.themeName,
       builder: (context, name, _) => MaterialApp(
-        title: 'Sleep Tracker',
+        title: 'Lullwake',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(AppThemeId.byLabel(name).palette),
         home: _home,
@@ -45,4 +50,14 @@ class SleepApp extends StatelessWidget {
             onDone: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const WelcomeScreen())),
           ),
         );
+}
+
+/// Credits for the bundled recordings, stories and photos (several are
+/// CC BY / CC BY-SA and need attribution), shown with the software licences.
+Stream<LicenseEntry> _mediaCredits() async* {
+  for (final f in ['assets/free/CREDITS.md', 'assets/free/CREDITS-audio.md']) {
+    try {
+      yield LicenseEntryWithLineBreaks(['Sounds, music, stories and photos'], await rootBundle.loadString(f));
+    } catch (_) {}
+  }
 }

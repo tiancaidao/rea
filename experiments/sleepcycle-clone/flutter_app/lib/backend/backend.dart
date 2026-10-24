@@ -68,6 +68,7 @@ class Backend {
   FirebaseAuth get _auth => FirebaseAuth.instance;
   FirebaseFirestore get _db => FirebaseFirestore.instanceFor(app: Firebase.app(), databaseId: BackendConfig.database);
   User? get user => enabled ? _auth.currentUser : null;
+  Stream<User?> get authChanges => enabled ? _auth.authStateChanges() : const Stream.empty();
 
   Future<void> init() async {
     if (!BackendConfig.enabled) return;
@@ -90,6 +91,10 @@ class Backend {
 
   Future<User> signUp(String email, String password) =>
       _authCall(() => _auth.createUserWithEmailAndPassword(email: email, password: password));
+
+  /// Sign in with Apple (iOS), through Firebase Auth's Apple provider.
+  Future<User> signInWithApple() =>
+      _authCall(() => _auth.signInWithProvider(AppleAuthProvider()..addScope('email')));
 
   Future<User> _authCall(Future<UserCredential> Function() f) async {
     try {
@@ -185,9 +190,10 @@ class Backend {
   Future<Map<String, dynamic>?> weather(double lat, double lon) async =>
       (await _api('GET', '/v1/weather?lat=$lat&lon=$lon')) as Map<String, dynamic>?;
 
-  Future<Map<String, dynamic>?> verifyPurchase(String productId, String purchaseToken) async =>
-      (await _api('POST', '/v1/billing/verify', body: {'productId': productId, 'purchaseToken': purchaseToken}))
-          as Map<String, dynamic>?;
+  /// Asks the API to re-read this account's subscription from RevenueCat
+  /// right after a purchase or restore (the webhook may lag behind).
+  Future<Map<String, dynamic>?> syncPurchases() async =>
+      (await _api('POST', '/v1/billing/sync')) as Map<String, dynamic>?;
 
   Future<Map<String, dynamic>?> recommendations({int? goalMinutes}) async {
     final tz = DateTime.now().timeZoneOffset.inMinutes;
@@ -208,6 +214,17 @@ class Backend {
   /// Server-recorded trial (once per account); the reminder is local.
   Future<Map<String, dynamic>?> startTrial(String productId) async =>
       (await _api('POST', '/v1/trial/start', body: {'productId': productId})) as Map<String, dynamic>?;
+
+  /// The paywall for [placement] (see backend /v1/paywall); null offline.
+  Future<Map<String, dynamic>?> paywall(String placement, String installId, {String? variant}) async =>
+      (await _api(
+              'GET',
+              '/v1/paywall?placement=$placement&installId=$installId${variant == null ? '' : '&variant=$variant'}',
+              auth: user != null)) as Map<String, dynamic>?;
+
+  /// Two gift codes to share after buying from the gift-card paywall.
+  Future<List<String>> issueGiftCards() async =>
+      [for (final c in ((await _api('POST', '/v1/giftcards/issue')) as Map?)?['codes'] ?? const []) c as String];
 
   Future<Map<String, dynamic>?> redeemGiftCard(String code) async =>
       (await _api('POST', '/v1/giftcards/redeem', body: {'code': code})) as Map<String, dynamic>?;

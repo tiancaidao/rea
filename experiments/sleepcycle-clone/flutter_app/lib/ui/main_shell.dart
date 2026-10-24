@@ -1,7 +1,12 @@
+import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+import 'package:quick_actions/quick_actions.dart';
 import '../alarm/alarm_plan.dart';
 import '../app_state.dart';
 import '../device/notifications.dart';
+import '../paywall/paywall_config.dart';
+import '../paywall/paywall_screen.dart';
 import 'alarm_screen.dart';
 import 'alertness_game.dart';
 import 'journal_tab.dart';
@@ -10,6 +15,7 @@ import 'profile_tab.dart';
 import 'programs_tab.dart';
 import 'sleep_tab.dart';
 import 'statistics_tab.dart';
+import 'tracking_screen.dart';
 import 'whats_new.dart';
 import 'widgets/common.dart';
 
@@ -19,7 +25,8 @@ import 'widgets/common.dart';
 ///
 /// It also routes what arrives from outside the tabs: the morning flow after
 /// the alarm, taps on notifications (the backup alarm, reminders), and the
-/// one-time "What's new" sheet.
+/// one-time "What's new" sheet. Launcher shortcuts (long-press the icon) and
+/// sleepclone:// links arrive through the same route as notification taps.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -36,14 +43,18 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
+  StreamSubscription<Uri>? _links;
+
   @override
   void initState() {
     super.initState();
+    _initShortcuts();
     AppState.I.morning.addListener(_onMorning);
     Notifications.I.tapped.addListener(_onNotification);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _onNotification();
       if (mounted) maybeShowWhatsNew(context);
+      _maybeAppOpenPaywall();
     });
   }
 
@@ -51,7 +62,35 @@ class _MainShellState extends State<MainShell> {
   void dispose() {
     AppState.I.morning.removeListener(_onMorning);
     Notifications.I.tapped.removeListener(_onNotification);
+    _links?.cancel();
     super.dispose();
+  }
+
+  /// The app-open paywall (e.g. a campaign), when the server sends one and
+  /// its re-show interval has passed.
+  Future<void> _maybeAppOpenPaywall() async {
+    if (AppState.I.premium) return;
+    final c = await Paywalls.I.dueOnAppOpen();
+    if (c != null && mounted) await showPaywall(context, Placement.appOpen, variant: c.variant);
+  }
+
+  void _initShortcuts() {
+    void route(String r) => Notifications.I.tapped.value = r;
+    try {
+      const qa = QuickActions();
+      qa.initialize(route);
+      qa.setShortcutItems(const [
+        ShortcutItem(type: 'start_alarm', localizedTitle: 'Start with alarm', icon: 'ic_shortcut_alarm'),
+        ShortcutItem(type: 'start_no_alarm', localizedTitle: 'Start without alarm', icon: 'ic_shortcut_sleep'),
+      ]);
+    } catch (_) {}
+    try {
+      // sleepclone://journal, sleepclone://start, … (the host names the route)
+      _links = AppLinks().uriLinkStream.listen((u) {
+        final r = u.host.isNotEmpty ? u.host : u.pathSegments.firstOrNull;
+        if (r != null) route(r);
+      });
+    } catch (_) {}
   }
 
   void _onMorning() {
@@ -85,6 +124,31 @@ class _MainShellState extends State<MainShell> {
       case 'sleep':
         s.goTab(0);
       case 'premium':
+        s.goTab(4);
+        await showPaywall(context, Placement.inApp);
+      case 'campaign':
+        await showPaywall(context, Placement.campaign);
+      case 'gift':
+        await showPaywall(context, Placement.giftCards);
+      case 'start_watch':
+        // started from the watch: no placement tips, straight to tracking
+        s.goTab(0);
+        if (!s.tracking) await Navigator.push(context, MaterialPageRoute(builder: (_) => const TrackingScreen()));
+      case 'start_alarm' || 'start':
+        s.goTab(0);
+        if (s.alarmMode == 2) s.setAlarmMode(0);
+        await startSleep(context);
+      case 'start_no_alarm' || 'start-no-alarm':
+        s.goTab(0);
+        s.setAlarmMode(2);
+        await startSleep(context);
+      case 'programs':
+        s.goTab(1);
+      case 'journal':
+        s.goTab(2);
+      case 'statistics':
+        s.goTab(3);
+      case 'profile':
         s.goTab(4);
     }
   }

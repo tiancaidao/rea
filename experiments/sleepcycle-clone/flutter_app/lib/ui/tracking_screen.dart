@@ -10,6 +10,7 @@ import '../device/device_sensors.dart';
 import '../device/health_connect.dart';
 import '../device/location.dart';
 import '../device/notifications.dart';
+import '../device/wear.dart';
 import '../device/tracking_service.dart';
 import '../sensing/live_tracker.dart';
 import '../sensing/sleep_tracker.dart';
@@ -64,16 +65,51 @@ class _TrackingScreenState extends State<TrackingScreen> {
         _onsetSeen = true;
         AppState.I.sleepOnsetDetected();
       }
+      _maybeSnoreAlert();
     };
+    AppState.I
+      ..tracking = true
+      ..remote.addListener(_onRemote);
     _tracker.start();
     _plan = _makePlan();
     _armAlarm();
+    _publish();
     _batteryTick = Timer.periodic(const Duration(minutes: 5), (_) => _checkBattery());
     _checkBattery();
   }
 
+  void _publish() => AppState.I.publishToWatch(
+      since: _startedAt,
+      alarmStart: _plan.enabled ? _plan.windowStart : null,
+      alarmEnd: _plan.enabled ? _plan.end : null);
+
+  final DateTime _startedAt = DateTime.now();
+  DateTime? _lastSnoreAlert;
+
+  /// Snore Alert: buzz the watch when snoring goes on, at most every 10 min.
+  void _maybeSnoreAlert() {
+    final s = AppState.I;
+    if (s.pref('snore_alert') != 'On' || !Wear.I.connected.value || !_tracker.snoringNow) return;
+    final now = DateTime.now();
+    if (_lastSnoreAlert != null && now.difference(_lastSnoreAlert!) < const Duration(minutes: 10)) return;
+    _lastSnoreAlert = now;
+    Wear.I.buzzSnore();
+  }
+
+  void _onRemote() {
+    if (AppState.I.remote.value == 'stop' && !_ringing) {
+      AppState.I.remote.value = null;
+      _stop();
+    }
+  }
+
   @override
   void dispose() {
+    AppState.I
+      ..tracking = false
+      ..startedFromWatch = false
+      ..remote.removeListener(_onRemote);
+    unawaited(AppState.I.publishToWatch());
     _clock.cancel();
     _alarmTick?.cancel();
     _batteryTick?.cancel();
@@ -187,6 +223,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
       s.setAlarm(h, m);
       setState(() => _plan = _makePlan());
       _armAlarm();
+      _publish();
     }
   }
 
@@ -204,7 +241,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
           Night.fromResult(_tracker.analyze(), snoreMinutes: _tracker.soundMinutes, coughs: _tracker.coughs, real: true)
             ..clips.addAll(_tracker.clips)
             ..snoreSpans = _tracker.snoreSpans
-            ..lightLux = _tracker.medianLux;
+            ..lightLux = _tracker.medianLux
+            ..noiseDb = _tracker.medianNoiseDb;
     } else {
       if (!mounted) return;
       final sample = await showDialog<bool>(
@@ -246,6 +284,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
         try {
           final w = await Backend.I.weather(loc.$1, loc.$2);
           night.weatherF = (w?['tempF'] as num?)?.round();
+          night.weatherCode = (w?['code'] as num?)?.toInt();
         } catch (_) {}
       }
     }
@@ -283,7 +322,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final moonIndex = (_now.day % 30);
+    final moonIndex = moonPhaseIndex(_now);
     return Scaffold(
       body: StarryBackground(
         child: SafeArea(
@@ -305,7 +344,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
               child: SizedBox(
                 width: 84,
                 height: 84,
-                child: Image.asset('assets/images/night_moon_$moonIndex.webp',
+                child: Image.asset('assets/free/images/moon_${moonIndex.toString().padLeft(2, '0')}.webp',
                     errorBuilder: (_, __, ___) => const _Moon()),
               ),
             ),
@@ -369,4 +408,14 @@ class _Moon extends StatelessWidget {
           boxShadow: [BoxShadow(color: context.palette.glow, blurRadius: 30)],
         ),
       );
+}
+
+/// Tonight's moon as one of 30 frames from new (0) through full (15) and
+/// back, from the mean synodic month counted from a known new moon.
+int moonPhaseIndex(DateTime t) {
+  const synodic = 29.530588853;
+  final newMoon = DateTime.utc(2000, 1, 6, 18, 14);
+  final days = t.toUtc().difference(newMoon).inMinutes / 1440.0;
+  final age = days % synodic;
+  return (age / synodic * 30).round() % 30;
 }

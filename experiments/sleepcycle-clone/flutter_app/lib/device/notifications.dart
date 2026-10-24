@@ -24,7 +24,11 @@ class Notifications {
   /// 'alarm' → open the ringing screen), consumed by the app shell.
   final ValueNotifier<String?> tapped = ValueNotifier(null);
 
-  static const alarmId = 1, bedtimeId = 2, weeklyId = 3, alertnessId = 4, trialId = 5, batteryId = 6;
+  static const alarmId = 1, bedtimeId = 2, weeklyId = 3, alertnessId = 4, trialId = 5, batteryId = 6, playerId = 7;
+
+  /// Handles a tapped notification action button (the sleep-aid player's
+  /// 'aid_toggle' / 'aid_stop'); set by the app state.
+  void Function(String actionId)? onAction;
 
   static const _alarm = AndroidNotificationDetails('alarm', 'Alarm',
       channelDescription: 'Your wake-up alarm',
@@ -64,7 +68,13 @@ class Notifications {
           iOS: DarwinInitializationSettings(
               requestAlertPermission: false, requestBadgePermission: false, requestSoundPermission: false),
         ),
-        onDidReceiveNotificationResponse: (r) => tapped.value = r.payload,
+        onDidReceiveNotificationResponse: (r) {
+          if (r.actionId != null && r.actionId!.isNotEmpty) {
+            onAction?.call(r.actionId!);
+          } else {
+            tapped.value = r.payload;
+          }
+        },
       );
       final launch = await _plugin.getNotificationAppLaunchDetails();
       if (launch?.didNotificationLaunchApp == true) tapped.value = launch!.notificationResponse?.payload;
@@ -197,6 +207,36 @@ class Notifications {
       'Keep smart alarm, sounds and insights by staying on Premium, or cancel any time.',
       _trial,
       payload: 'premium');
+
+  /// The sleep-aid player on the lock screen and in the shade: what's playing,
+  /// with Pause/Play and Stop buttons.
+  Future<void> showNowPlaying(String title, {required bool playing}) async {
+    if (!_ready) return;
+    try {
+      await _plugin.show(
+          id: playerId,
+          title: title,
+          body: playing ? 'Sleep aid playing' : 'Sleep aid paused',
+          payload: 'sleepaid',
+          notificationDetails: NotificationDetails(
+              android: AndroidNotificationDetails('sleep_aid_player', 'Sleep aid player',
+                  channelDescription: 'Controls for the sleep sound that\'s playing',
+                  importance: Importance.low,
+                  priority: Priority.low,
+                  playSound: false,
+                  enableVibration: false,
+                  ongoing: playing,
+                  autoCancel: false,
+                  onlyAlertOnce: true,
+                  showWhen: false,
+                  category: AndroidNotificationCategory.transport,
+                  visibility: NotificationVisibility.public,
+                  actions: [
+                    AndroidNotificationAction('aid_toggle', playing ? 'Pause' : 'Play', cancelNotification: false),
+                    const AndroidNotificationAction('aid_stop', 'Stop', cancelNotification: true),
+                  ])));
+    } catch (_) {}
+  }
 
   Future<void> showBatteryWarning(int percent) async {
     if (!_ready) return;

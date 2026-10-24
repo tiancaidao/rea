@@ -37,6 +37,13 @@ class _ProgramCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             gradient: LinearGradient(colors: program.colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+            image: program.image == null
+                ? null
+                : DecorationImage(
+                    image: AssetImage(program.image!),
+                    fit: BoxFit.cover,
+                    onError: (_, __) {},
+                    colorFilter: const ColorFilter.mode(Color(0x8C000000), BlendMode.darken)),
           ),
           padding: const EdgeInsets.all(18),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -47,7 +54,7 @@ class _ProgramCard extends StatelessWidget {
                 Text(program.subtitle, style: TextStyle(color: context.palette.textMuted, height: 1.3)),
               ]),
             ),
-            Icon(program.icon, size: 72, color: context.palette.textFaint),
+            if (program.image == null) Icon(program.icon, size: 72, color: context.palette.textFaint),
           ]),
         ),
       ),
@@ -74,8 +81,17 @@ class ProgramDetail extends StatelessWidget {
               background: Container(
                 decoration: BoxDecoration(
                     gradient: LinearGradient(
-                        colors: program.colors, begin: Alignment.topCenter, end: Alignment.bottomCenter)),
-                child: Icon(program.icon, size: 140, color: context.palette.textFaint),
+                        colors: program.colors, begin: Alignment.topCenter, end: Alignment.bottomCenter),
+                    image: program.image == null
+                        ? null
+                        : DecorationImage(
+                            image: AssetImage(program.image!),
+                            fit: BoxFit.cover,
+                            onError: (_, __) {},
+                            colorFilter: const ColorFilter.mode(Color(0x59000000), BlendMode.darken))),
+                child: program.image == null
+                    ? Icon(program.icon, size: 140, color: context.palette.textFaint)
+                    : null,
               ),
             ),
           ),
@@ -102,15 +118,20 @@ class ProgramDetail extends StatelessWidget {
                       onTap: () => push(
                           context,
                           l.kind == LessonKind.video
-                              ? _VideoLesson(lesson: l, program: program)
+                              ? (lessonVideos
+                                  ? _VideoLesson(lesson: l, program: program)
+                                  : _CardsLesson(
+                                      lesson: Lesson(l.id, l.title, LessonKind.cards,
+                                          cards: [LessonCard(l.caption, program.icon, program.colors.first)])))
                               : _CardsLesson(lesson: l)),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Expanded(
                           child: Stack(children: [
                             Positioned.fill(
                                 child: ArtBox(
+                                    image: program.image,
                                     colors: program.colors,
-                                    icon: l.kind == LessonKind.video ? Icons.play_circle : program.icon)),
+                                    icon: l.kind == LessonKind.video && lessonVideos ? Icons.play_circle : program.icon)),
                             if (s.completedLessons.contains(l.id))
                               Positioned(
                                   right: 6, top: 6, child: Icon(Icons.check_circle, color: context.palette.accent)),
@@ -130,6 +151,11 @@ class ProgramDetail extends StatelessWidget {
     );
   }
 }
+
+/// Lesson clips aren't bundled in store builds (the one local clip is a
+/// gitignored placeholder), so video lessons show their caption as a card
+/// unless built with --dart-define=LESSON_VIDEOS=true.
+const lessonVideos = bool.fromEnvironment('LESSON_VIDEOS');
 
 /// Video lesson: full-screen clip area with a caption and an Unmute pill.
 /// (No video is bundled; the clip area is a placeholder.)

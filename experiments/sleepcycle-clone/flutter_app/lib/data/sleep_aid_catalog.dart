@@ -1,5 +1,6 @@
 import 'package:flutter/painting.dart';
 import '../backend/backend.dart';
+import 'free_art.dart';
 
 /// Sleep-aid catalog, organised like the original: a featured item, then
 /// themed sections that render as large "hero" cards or a 2-column tile grid,
@@ -25,13 +26,16 @@ class SleepAidItem {
     required this.title,
     this.description = '',
     this.minutes = 0,
-    this.author = 'Sleep Tracker Studio',
+    this.author = 'Lullwake Studio',
     this.narrator = '',
     required this.art,
     this.asset,
     this.url,
     this.premiumFlag,
   });
+
+  /// Cover photo (assets/free/images/covers), or null for the procedural cover.
+  String? get image => sleepAidCovers[id];
 
   /// Premium content (a badge on the tile; free users get the paywall).
   bool get premium => premiumFlag ?? !SleepAidCatalog.freeIds.contains(id);
@@ -44,7 +48,7 @@ class SleepAidItem {
       title: j['title'] as String,
       description: (j['description'] as String?) ?? '',
       minutes: (j['minutes'] as num?)?.toInt() ?? 0,
-      author: (j['author'] as String?) ?? 'Sleep Tracker Studio',
+      author: (j['author'] as String?) ?? 'Lullwake Studio',
       narrator: (j['narrator'] as String?) ?? '',
       art: [hex(art[0]), hex(art[1])],
       url: j['url'] as String?,
@@ -65,7 +69,7 @@ class SleepAidSection {
 class SleepAidCatalog {
   /// What the UI shows: the server catalog once fetched, else the built-in one.
   static List<SleepAidSection> current = sections;
-  static SleepAidItem currentFeatured = featured;
+  static SleepAidItem currentFeatured = sections.first.items.first;
 
   static Future<bool> refresh() async {
     final r = await fetchRemote();
@@ -107,12 +111,17 @@ class SleepAidCatalog {
     'drops',
     'brown',
     'pink',
-    'lighthouse',
+    'calm-rain',
+    'waves',
+    'white',
+    'whale-throat',
+    'peter-rabbit',
     'low-tide',
     'first-snow',
-    'twinkle',
+    'wynken',
   };
 
+  static const _free = 'assets/free/audio/';
   static const _dusk = [Color(0xFFF0A36B), Color(0xFF3B2F5C)];
   static const _sea = [Color(0xFF2E7D9A), Color(0xFF0D2236)];
   static const _rain = [Color(0xFF3C5A78), Color(0xFF101828)];
@@ -121,7 +130,7 @@ class SleepAidCatalog {
   static const _violet = [Color(0xFF7C5CFF), Color(0xFF15122E)];
   static const _city = [Color(0xFFB65A3A), Color(0xFF1B1A2E)];
 
-  static const featured = SleepAidItem(
+  static const _slowExhale = SleepAidItem(
     id: 'slow-exhale',
     title: 'Slow Exhale',
     description: 'A short guided breath that lengthens each exhale to settle a busy mind.',
@@ -130,9 +139,20 @@ class SleepAidCatalog {
     art: _dusk,
   );
 
-  static const sections = <SleepAidSection>[
+  /// The built-in catalog without guided sessions that have no narration
+  /// recorded yet (they would play music in place of a voice, which App
+  /// Review treats as an unfinished feature). They come back once a
+  /// recording is bundled or the server catalog streams one.
+  static final sections = <SleepAidSection>[
+    for (final s in _builtIn)
+      if (s.items.any(_playable)) SleepAidSection(s.title, s.layout, s.items.where(_playable).toList()),
+  ];
+
+  static bool _playable(SleepAidItem it) => it.narrator.isEmpty || it.asset != null;
+
+  static const _builtIn = <SleepAidSection>[
     SleepAidSection('Breathing', SectionLayout.hero, [
-      featured,
+      _slowExhale,
       SleepAidItem(
           id: 'box-breath',
           title: 'Box Breathing for Bed',
@@ -157,24 +177,49 @@ class SleepAidCatalog {
       SleepAidItem(id: 'brown', title: 'Brown noise', art: _city),
       SleepAidItem(id: 'pink', title: 'Pink noise', art: _violet),
       SleepAidItem(id: 'swell', title: 'Ocean swell', art: _sea),
+      // Real field recordings (assets/free/CREDITS-audio.md).
+      SleepAidItem(id: 'calm-rain', title: 'Calm rain', art: _rain, asset: '${_free}amb_calm_rain.mp3'),
+      SleepAidItem(id: 'night-rain', title: 'Rain at night', art: _rain, asset: '${_free}amb_night_rain.mp3'),
+      SleepAidItem(id: 'thunder', title: 'Distant thunder', art: _violet, asset: '${_free}amb_thunder.mp3'),
+      SleepAidItem(id: 'rain-birds', title: 'Rain & birdsong', art: _forest, asset: '${_free}amb_rain_birds.mp3'),
+      SleepAidItem(id: 'waves', title: 'Waves on the shore', art: _sea, asset: '${_free}amb_waves.mp3'),
+      SleepAidItem(id: 'waterfall', title: 'Waterfall', art: _forest, asset: '${_free}amb_waterfall.mp3'),
+      SleepAidItem(id: 'river', title: 'Mountain river', art: _sea, asset: '${_free}amb_river.mp3'),
+      SleepAidItem(id: 'forest-birds', title: 'Forest birds', art: _forest, asset: '${_free}amb_forest_birds.mp3'),
+      SleepAidItem(id: 'wind', title: 'Wind in the trees', art: _city, asset: '${_free}amb_wind.mp3'),
+      SleepAidItem(id: 'stream', title: 'Babbling stream', art: _forest, asset: '${_free}amb_stream.mp3'),
+      SleepAidItem(id: 'heartbeat', title: 'Slow heartbeat', art: _ember, asset: '${_free}amb_heartbeat.mp3'),
+      SleepAidItem(id: 'white', title: 'White noise', art: _violet),
     ]),
+    // Real public-domain readings from LibriVox (assets/free/CREDITS.md).
     SleepAidSection('Stories', SectionLayout.hero, [
       SleepAidItem(
-          id: 'lighthouse',
-          title: 'The Lighthouse Keeper',
-          description: 'A slow tale of a quiet island, told to drift off to.',
-          minutes: 26,
-          author: 'Ida Moberg',
-          narrator: 'Tom Ashby',
-          art: _city),
+          id: 'whale-throat',
+          title: 'How the Whale Got His Throat',
+          description: 'One of Kipling\'s Just So Stories: a curious fish, a clever mariner and a grating.',
+          minutes: 10,
+          author: 'Rudyard Kipling',
+          narrator: 'Tim Bulkeley (LibriVox)',
+          art: _sea,
+          asset: 'assets/free/audio/stories/kipling_whale_throat.mp3'),
       SleepAidItem(
-          id: 'night-train',
-          title: 'Night Train North',
-          description: 'Rails humming through snowy forests until morning.',
-          minutes: 31,
-          author: 'Ida Moberg',
-          narrator: 'Tom Ashby',
-          art: _rain),
+          id: 'peter-rabbit',
+          title: 'The Tale of Peter Rabbit',
+          description: 'Beatrix Potter\'s classic about a very naughty rabbit in Mr. McGregor\'s garden.',
+          minutes: 5,
+          author: 'Beatrix Potter',
+          narrator: 'LibriVox volunteer',
+          art: _forest,
+          asset: 'assets/free/audio/stories/potter_peter_rabbit.mp3'),
+      SleepAidItem(
+          id: 'camel-hump',
+          title: 'How the Camel Got His Hump',
+          description: 'A lazy camel, a busy desert and a Djinn in charge of All Deserts.',
+          minutes: 9,
+          author: 'Rudyard Kipling',
+          narrator: 'Tim Bulkeley (LibriVox)',
+          art: _dusk,
+          asset: 'assets/free/audio/stories/kipling_camel_hump.mp3'),
     ]),
     SleepAidSection('Music', SectionLayout.hero, [
       SleepAidItem(
@@ -238,10 +283,42 @@ class SleepAidCatalog {
           art: _dusk),
     ]),
     SleepAidSection('Bedtime rhymes', SectionLayout.grid, [
-      SleepAidItem(id: 'twinkle', title: 'Little star', art: _violet),
-      SleepAidItem(id: 'moon-boat', title: 'The moon boat', art: _sea),
-      SleepAidItem(id: 'sleepy-bear', title: 'Sleepy bear', art: _forest),
-      SleepAidItem(id: 'counting', title: 'Counting sheep', art: _dusk),
+      SleepAidItem(
+          id: 'wynken',
+          title: 'Wynken, Blynken, and Nod',
+          description: 'Three little fishermen sail off in a wooden shoe on a sea of dew.',
+          minutes: 3,
+          author: 'Eugene Field',
+          narrator: 'Ian King (LibriVox)',
+          art: _sea,
+          asset: 'assets/free/audio/stories/field_wynken_blynken_nod.mp3'),
+      SleepAidItem(
+          id: 'rock-a-by',
+          title: 'The Rock-a-By Lady',
+          description: 'Lullabies from Lullaby-Land: The Rock-a-By Lady, The Night Wind, The Dinkey-Bird and more.',
+          minutes: 14,
+          author: 'Eugene Field',
+          narrator: 'SweetHome (LibriVox)',
+          art: _violet,
+          asset: 'assets/free/audio/stories/field_rock_a_by_lady.mp3'),
+      SleepAidItem(
+          id: 'sugar-plum',
+          title: 'The Sugar-Plum Tree',
+          description: 'More songs of childhood: The Sugar-Plum Tree, Little Blue Pigeon, Teeny-Weeny and others.',
+          minutes: 14,
+          author: 'Eugene Field',
+          narrator: 'SweetHome (LibriVox)',
+          art: _dusk,
+          asset: 'assets/free/audio/stories/field_sugar_plum_tree.mp3'),
+      SleepAidItem(
+          id: 'child-alone',
+          title: 'The Child Alone',
+          description: 'Poems from A Child\'s Garden of Verses, read slowly for bedtime.',
+          minutes: 15,
+          author: 'Robert Louis Stevenson',
+          narrator: 'Arctura (LibriVox)',
+          art: _forest,
+          asset: 'assets/free/audio/stories/stevenson_child_alone.mp3'),
     ]),
     SleepAidSection('Guides', SectionLayout.hero, [
       SleepAidItem(

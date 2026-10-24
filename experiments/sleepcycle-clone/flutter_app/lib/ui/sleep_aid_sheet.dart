@@ -6,7 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import '../app_state.dart';
 import '../data/sleep_aid_catalog.dart';
 import '../theme.dart';
-import 'welcome_screen.dart' show TrialScreen;
+import '../paywall/paywall_config.dart';
+import '../paywall/paywall_screen.dart';
 import 'widgets/common.dart';
 import 'widgets/illustrations.dart';
 
@@ -39,7 +40,7 @@ class SleepAidPill extends StatelessWidget {
                 child: Row(children: [
                   if (item != null) ...[
                     SizedBox(
-                        width: 44, height: 44, child: ArtBox(colors: item.art, radius: 22, seed: item.id.hashCode)),
+                        width: 44, height: 44, child: ArtBox(image: item.image, colors: item.art, radius: 22, seed: item.id.hashCode)),
                     const SizedBox(width: 12),
                   ],
                   Expanded(
@@ -73,7 +74,7 @@ class SleepAidPill extends StatelessWidget {
 /// Opens a track, or the paywall for Premium content on a free account.
 void openItem(BuildContext context, SleepAidItem it) {
   if (it.premium && !AppState.I.premium) {
-    push(context, const TrialScreen());
+    showPaywall(context, Placement.lockedFeature);
     return;
   }
   showTrackSheet(context, it);
@@ -197,7 +198,7 @@ class _Featured extends StatelessWidget {
         ]),
         const SizedBox(height: 12),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: 150, height: 96, child: ArtBox(colors: item.art, seed: item.id.hashCode)),
+          SizedBox(width: 150, height: 96, child: ArtBox(image: item.image, colors: item.art, seed: item.id.hashCode)),
           const SizedBox(width: 12),
           Expanded(child: Text(item.description, style: TextStyle(color: context.palette.textMuted, height: 1.35))),
         ]),
@@ -252,7 +253,7 @@ class _Grid extends StatelessWidget {
           InkWell(
             onTap: () => openItem(context, it),
             child: Stack(children: [
-              Positioned.fill(child: ArtBox(colors: it.art, label: it.title, seed: it.id.hashCode)),
+              Positioned.fill(child: ArtBox(image: it.image, colors: it.art, label: it.title, seed: it.id.hashCode)),
               if (it.premium) const Positioned(left: 8, top: 8, child: PremiumBadge()),
               Positioned(
                 right: 8,
@@ -283,7 +284,7 @@ class HeroCard extends StatelessWidget {
           AspectRatio(
             aspectRatio: 2.3,
             child: Stack(children: [
-              Positioned.fill(child: ArtBox(colors: item.art, radius: 16, seed: item.id.hashCode)),
+              Positioned.fill(child: ArtBox(image: item.image, colors: item.art, radius: 16, seed: item.id.hashCode)),
               if (item.premium) const Positioned(left: 10, top: 10, child: PremiumBadge()),
             ]),
           ),
@@ -364,6 +365,15 @@ class _TrackSheetState extends State<_TrackSheet> {
   /// Streamed tracks are downloaded to the cache before playing, with real
   /// progress and a working Cancel (as the original's sleep-aid downloads).
   Future<void> _download(SleepAidItem it) async {
+    // "Wi-Fi only": on mobile data, stream instead of downloading
+    if (!await AppState.I.downloadsAllowedNow()) {
+      if (mounted) {
+        setState(() => _progress = null);
+        toast(context, 'Streaming: downloads are set to Wi-Fi only.');
+      }
+      AppState.I.chooseSleepAid(it);
+      return;
+    }
     final client = _client = http.Client();
     try {
       final res = await client.send(http.Request('GET', Uri.parse(it.url!)));
@@ -417,7 +427,7 @@ class _TrackSheetState extends State<_TrackSheet> {
       SizedBox(
         height: 400,
         child: Stack(children: [
-          Positioned.fill(child: ArtBox(colors: it.art, radius: 0, seed: it.id.hashCode)),
+          Positioned.fill(child: ArtBox(image: it.image, colors: it.art, radius: 0, seed: it.id.hashCode)),
           // scrim so the title and credits stay readable over the art
           const Positioned.fill(
             child: DecoratedBox(
@@ -481,7 +491,7 @@ class _TrackSheetState extends State<_TrackSheet> {
             section.layout == SectionLayout.grid
                 ? ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: SizedBox(width: 72, child: ArtBox(colors: other.art, radius: 8, seed: other.id.hashCode)),
+                    leading: SizedBox(width: 72, child: ArtBox(image: other.image, colors: other.art, radius: 8, seed: other.id.hashCode)),
                     title: Text(other.title),
                     trailing: other.premium ? const PremiumBadge() : null,
                     onTap: () {

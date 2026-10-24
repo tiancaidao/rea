@@ -1,0 +1,621 @@
+{
+  "_comment": "Server-driven paywalls. Each variant is a list of modules the app renders in order; placements pick a variant per user by weighted, sticky bucketing. Override any part in Firestore at config/paywalls. Keep flutter_app/assets/paywalls.json identical (it is the offline fallback; a test checks).",
+  "products": {
+    "premium_yearly": {
+      "period": "P1Y",
+      "trialDays": 7
+    },
+    "premium_monthly": {
+      "period": "P1M",
+      "trialDays": 0
+    }
+  },
+  "placements": {
+    "onboarding": {
+      "experiment": "onboarding-paywall",
+      "variants": [
+        {
+          "id": "trial_journey",
+          "weight": 40
+        },
+        {
+          "id": "trial_journey_tracking",
+          "weight": 15
+        },
+        {
+          "id": "standard",
+          "weight": 15
+        },
+        {
+          "id": "opt_in_feature_list",
+          "weight": 15
+        },
+        {
+          "id": "two_plan",
+          "weight": 15
+        }
+      ]
+    },
+    "in_app": {
+      "experiment": "in-app-paywall",
+      "variants": [
+        {
+          "id": "dynamic",
+          "weight": 50
+        },
+        {
+          "id": "two_plan",
+          "weight": 25
+        },
+        {
+          "id": "other_sounds",
+          "weight": 25
+        }
+      ]
+    },
+    "locked_feature": {
+      "experiment": "locked-feature-paywall",
+      "returningVariant": "early_adopter",
+      "variants": [
+        {
+          "id": "dynamic",
+          "weight": 50
+        },
+        {
+          "id": "standard",
+          "weight": 50
+        }
+      ]
+    },
+    "gift_cards": {
+      "experiment": "gift-card-paywall",
+      "variants": [
+        {
+          "id": "gift_cards",
+          "weight": 100
+        }
+      ]
+    },
+    "campaign": {
+      "experiment": "campaign-paywall",
+      "variants": [
+        {
+          "id": "campaign",
+          "weight": 100
+        }
+      ]
+    },
+    "app_open": {
+      "experiment": "app-open-paywall",
+      "variants": []
+    }
+  },
+  "variants": {
+    "trial_journey": {
+      "name": "Trial journey",
+      "skippable": true,
+      "offers": [
+        {
+          "product": "premium_yearly",
+          "default": true
+        }
+      ],
+      "modules": [
+        {
+          "type": "hero",
+          "title": "How your free trial works"
+        },
+        {
+          "type": "trial_journey",
+          "steps": [
+            {
+              "icon": "lock_open",
+              "title": "Today: full access",
+              "body": "Smart alarm, sleep aid, programs and statistics, all unlocked."
+            },
+            {
+              "icon": "notifications",
+              "title": "Day 5: a reminder",
+              "body": "We remind you two days before the trial ends."
+            },
+            {
+              "icon": "star",
+              "title": "Day 7: the trial ends",
+              "body": "Cancel before then and you keep the free version."
+            }
+          ]
+        },
+        {
+          "type": "pricing",
+          "layout": "single"
+        },
+        {
+          "type": "legal"
+        }
+      ]
+    },
+    "trial_journey_tracking": {
+      "name": "Trial journey (tracking first)",
+      "skippable": true,
+      "offers": [
+        {
+          "product": "premium_yearly",
+          "default": true
+        }
+      ],
+      "modules": [
+        {
+          "type": "hero",
+          "title": "How your free trial works"
+        },
+        {
+          "type": "trial_journey",
+          "steps": [
+            {
+              "icon": "check",
+              "title": "Profile created",
+              "body": "You're set up and ready for your first night."
+            },
+            {
+              "icon": "nightlight",
+              "title": "Tonight: track your sleep",
+              "body": "Put the phone by the bed and let it listen."
+            },
+            {
+              "icon": "alarm",
+              "title": "Tomorrow: wake up easier",
+              "body": "The smart alarm wakes you in your lightest sleep."
+            },
+            {
+              "icon": "notifications",
+              "title": "Day 5: a reminder",
+              "body": "We remind you two days before the trial ends."
+            },
+            {
+              "icon": "star",
+              "title": "Day 7: welcome",
+              "body": "Your subscription starts. Cancel before and keep the free version."
+            }
+          ]
+        },
+        {
+          "type": "pricing",
+          "layout": "single"
+        },
+        {
+          "type": "legal"
+        }
+      ]
+    },
+    "standard": {
+      "name": "Standard",
+      "skippable": true,
+      "offers": [
+        {
+          "product": "premium_yearly",
+          "default": true
+        },
+        {
+          "product": "premium_monthly"
+        }
+      ],
+      "modules": [
+        {
+          "type": "hero",
+          "title": "Sleep better with Premium",
+          "subtitle": "Everything that helps you understand and improve your nights."
+        },
+        {
+          "type": "selling_points",
+          "items": [
+            {
+              "icon": "alarm",
+              "heading": "Smart alarm",
+              "text": "Wakes you in light sleep."
+            },
+            {
+              "icon": "headphones",
+              "heading": "Sleep aid",
+              "text": "Soothing sounds, music and stories to fall asleep to."
+            },
+            {
+              "icon": "graphic_eq",
+              "heading": "Snore detection",
+              "text": "Track snoring and listen back."
+            },
+            {
+              "icon": "bar_chart",
+              "heading": "Statistics",
+              "text": "See changes and progress over time."
+            },
+            {
+              "icon": "insights",
+              "heading": "Weekly summary",
+              "text": "Learn where your sleep can improve."
+            },
+            {
+              "icon": "edit_note",
+              "heading": "Sleep notes",
+              "text": "See how your days affect your nights."
+            },
+            {
+              "icon": "cloud_done",
+              "heading": "Online backup",
+              "text": "Keep your nights if you change phones."
+            },
+            {
+              "icon": "music_note",
+              "heading": "Alarm sounds",
+              "text": "More alarm sounds, or a song of your own."
+            },
+            {
+              "icon": "mood",
+              "heading": "Wake-up mood",
+              "text": "Log how you feel each morning."
+            }
+          ]
+        },
+        {
+          "type": "social_proof",
+          "reviews": []
+        },
+        {
+          "type": "pricing",
+          "layout": "list"
+        },
+        {
+          "type": "legal"
+        }
+      ]
+    },
+    "opt_in_feature_list": {
+      "name": "Opt-in trial with feature list",
+      "skippable": true,
+      "offers": [
+        {
+          "product": "premium_yearly",
+          "default": true
+        }
+      ],
+      "modules": [
+        {
+          "type": "hero",
+          "title": "Get more from every night"
+        },
+        {
+          "type": "feature_list",
+          "items": [
+            {
+              "heading": "Richer data",
+              "text": "Coughs, ambient noise, light and breathing rate."
+            },
+            {
+              "heading": "Sleep sounds",
+              "text": "Discover snoring, sleep talking and coughing."
+            },
+            {
+              "heading": "Sleep aid",
+              "text": "Fall asleep easier with soothing sounds."
+            },
+            {
+              "heading": "Sleep programs",
+              "text": "Improve your sleep with guided programs."
+            },
+            {
+              "heading": "Who's snoring",
+              "text": "Settle the debate with recordings."
+            },
+            {
+              "heading": "Statistics",
+              "text": "Identify changes and progress over time."
+            },
+            {
+              "heading": "Sleep notes",
+              "text": "Log daily habits and see their effect."
+            },
+            {
+              "heading": "Weekly summary",
+              "text": "Insights on your week, every week."
+            },
+            {
+              "heading": "Alarm sounds",
+              "text": "More sounds, or songs from your own library."
+            },
+            {
+              "heading": "Wake-up mood",
+              "text": "Choose your mood when you wake up."
+            }
+          ]
+        },
+        {
+          "type": "pricing",
+          "layout": "single",
+          "optIn": true
+        },
+        {
+          "type": "legal"
+        }
+      ]
+    },
+    "two_plan": {
+      "name": "Two plans",
+      "skippable": true,
+      "offers": [
+        {
+          "product": "premium_yearly",
+          "default": true
+        },
+        {
+          "product": "premium_monthly"
+        }
+      ],
+      "modules": [
+        {
+          "type": "hero",
+          "title": "Wake up to a brighter you",
+          "animation": "stars"
+        },
+        {
+          "type": "pricing",
+          "layout": "two_plan"
+        },
+        {
+          "type": "legal"
+        }
+      ]
+    },
+    "dynamic": {
+      "name": "Dynamic (modules)",
+      "skippable": true,
+      "initialScrollDown": false,
+      "offers": [
+        {
+          "product": "premium_yearly",
+          "default": true
+        },
+        {
+          "product": "premium_monthly"
+        }
+      ],
+      "modules": [
+        {
+          "type": "hero",
+          "title": "Better nights for brighter days"
+        },
+        {
+          "type": "value_presentation",
+          "items": [
+            {
+              "icon": "insights",
+              "header": "Get to know your sleep",
+              "text": "Track your sleep without effort and understand your patterns."
+            },
+            {
+              "icon": "headphones",
+              "header": "Unwind your way",
+              "text": "From soundscapes to stories, fall asleep faster."
+            },
+            {
+              "icon": "graphic_eq",
+              "header": "Listen to your night",
+              "text": "Uncover snoring and sleep talking."
+            }
+          ]
+        },
+        {
+          "type": "comparison_table",
+          "rows": [
+            {
+              "label": "Smart alarm",
+              "free": true
+            },
+            {
+              "label": "Sleep aid",
+              "free": false
+            },
+            {
+              "label": "Richer data",
+              "free": false
+            },
+            {
+              "label": "Statistics",
+              "free": false
+            },
+            {
+              "label": "Sleep notes",
+              "free": false
+            },
+            {
+              "label": "Weekly summary",
+              "free": false
+            },
+            {
+              "label": "Wake-up mood",
+              "free": false
+            },
+            {
+              "label": "More alarm sounds",
+              "free": false
+            }
+          ]
+        },
+        {
+          "type": "motivational_message",
+          "text": "Imagine waking up well rested every morning…"
+        },
+        {
+          "type": "pricing",
+          "layout": "list"
+        },
+        {
+          "type": "legal"
+        }
+      ]
+    },
+    "other_sounds": {
+      "name": "Standard with sound tracking",
+      "skippable": true,
+      "offers": [
+        {
+          "product": "premium_yearly",
+          "default": true
+        }
+      ],
+      "modules": [
+        {
+          "type": "hero",
+          "title": "Sleep better with Premium"
+        },
+        {
+          "type": "selling_points",
+          "items": [
+            {
+              "icon": "alarm",
+              "heading": "Smart alarm",
+              "text": "Wakes you in light sleep."
+            },
+            {
+              "icon": "record_voice_over",
+              "heading": "Sound tracking",
+              "text": "Discover snoring, sleep talking, coughing and other sounds."
+            },
+            {
+              "icon": "headphones",
+              "heading": "Sleep aid",
+              "text": "Fall asleep easier with soothing sounds."
+            },
+            {
+              "icon": "bar_chart",
+              "heading": "Statistics",
+              "text": "See changes and progress over time."
+            }
+          ]
+        },
+        {
+          "type": "pricing",
+          "layout": "single"
+        },
+        {
+          "type": "legal"
+        }
+      ]
+    },
+    "early_adopter": {
+      "name": "Early adopter",
+      "skippable": true,
+      "offers": [
+        {
+          "product": "premium_yearly",
+          "default": true
+        },
+        {
+          "product": "premium_monthly"
+        }
+      ],
+      "modules": [
+        {
+          "type": "hero",
+          "title": "Get our newest premium features"
+        },
+        {
+          "type": "carousel",
+          "items": [
+            {
+              "icon": "light_mode",
+              "header": "Ambient light",
+              "text": "See how much light enters your bedroom and how it affects your sleep."
+            },
+            {
+              "icon": "air",
+              "header": "Breathing disruptions",
+              "text": "Track pauses in your breathing through the night."
+            },
+            {
+              "icon": "school",
+              "header": "Sleep training",
+              "text": "Programs that build better habits step by step."
+            },
+            {
+              "icon": "volume_up",
+              "header": "Ambient noise",
+              "text": "Noise inside and outside the bedroom can disturb sleep without you noticing."
+            }
+          ]
+        },
+        {
+          "type": "discount_offer",
+          "percent": 30,
+          "text": "You've used the app before, so you get Premium at a discount."
+        },
+        {
+          "type": "pricing",
+          "layout": "list",
+          "cta": "Unlock now"
+        },
+        {
+          "type": "legal"
+        }
+      ]
+    },
+    "gift_cards": {
+      "name": "Gift cards",
+      "skippable": true,
+      "offers": [
+        {
+          "product": "premium_yearly",
+          "default": true
+        }
+      ],
+      "modules": [
+        {
+          "type": "gift_cards",
+          "ribbon": "A friendly offer",
+          "header": "One for you,\ntwo for your friends",
+          "description": "Go Premium today and give two friends a year of Premium for free."
+        },
+        {
+          "type": "pricing",
+          "layout": "single",
+          "cta": "Continue",
+          "showTrial": false
+        },
+        {
+          "type": "legal",
+          "whatsInPremium": true
+        }
+      ]
+    },
+    "campaign": {
+      "name": "Campaign",
+      "skippable": true,
+      "displayInterval": "everyDay",
+      "offers": [
+        {
+          "product": "premium_yearly",
+          "offer": "first-year-50",
+          "default": true
+        }
+      ],
+      "modules": [
+        {
+          "type": "hero",
+          "title": "First year 50% off",
+          "subtitle": "Healthy sleep just got more affordable."
+        },
+        {
+          "type": "discount_offer",
+          "percent": 50,
+          "text": "Don't miss out: the offer ends soon."
+        },
+        {
+          "type": "pricing",
+          "layout": "single",
+          "showTrial": false
+        },
+        {
+          "type": "legal"
+        }
+      ]
+    }
+  }
+}

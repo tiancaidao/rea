@@ -2,12 +2,12 @@
 
 Replaces `../mock-api` with real services.
 
-| Piece | Service | What it does |
-|---|---|---|
-| Sign-in | **Firebase Auth** | email/password (Google sign-in once the app's SHA-1 is registered) |
-| User data | **Firestore** | `users/{uid}` profile + settings, `users/{uid}/nights/{id}` one doc per night, `users/{uid}/reports/{week}`; owner-only rules, `premium` server-written |
-| Media | **Cloud Storage** | `sleep-aid/audio/*`, signed-in read only; the API hands out 1-h signed URLs |
-| API | **Cloud Run** (`api/`, Node/Express) | `/v1/config` (remote config + paywall), `/v1/sleep-aid/catalog`, `/v1/insights/weekly`, `/v1/weather` (Open-Meteo, coords rounded to ~10 km), `/v1/billing/verify` (Google Play subscriptions v2), `/v1/trial/start`, `/v1/giftcards/redeem`, `/v1/insights/recommendations`, `/v1/consent`, `/v1/user/properties`, `/v1/devices/register`, `/v1/account/erase-data`, `/v1/account/delete` |
+| Piece     | Service                              | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign-in   | **Firebase Auth**                    | email/password (Google sign-in once the app's SHA-1 is registered)                                                                                                                                                                                                                                                                                                                                                                                              |
+| User data | **Firestore**                        | `users/{uid}` profile + settings, `users/{uid}/nights/{id}` one doc per night, `users/{uid}/reports/{week}`; owner-only rules, `premium` server-written                                                                                                                                                                                                                                                                                                         |
+| Media     | **Cloud Storage**                    | `sleep-aid/audio/*`, signed-in read only; the API hands out 1-h signed URLs                                                                                                                                                                                                                                                                                                                                                                                     |
+| API       | **Cloud Run** (`api/`, Node/Express) | `/v1/config` (remote config + paywall), `/v1/sleep-aid/catalog`, `/v1/insights/weekly`, `/v1/weather` (Open-Meteo, coords rounded to ~10 km), `/v1/billing/sync` and the `/v1/billing/revenuecat` webhook (App Store and Google Play subscriptions through RevenueCat), `/v1/trial/start`, `/v1/giftcards/redeem`, `/v1/insights/recommendations`, `/v1/consent`, `/v1/user/properties`, `/v1/devices/register`, `/v1/account/erase-data`, `/v1/account/delete` |
 
 Every `/v1` route except config verifies a Firebase ID token. The app reads/writes
 its own data directly in Firestore; the API does what needs a server (signing,
@@ -59,10 +59,19 @@ own project. Keep it that way: the bundled placeholders are third-party content
 for private testing.
 
 ### Still to connect by hand
-- **Google sign-in:** add the debug/release SHA-1 to the Android app in the
-  Firebase console, enable the Google provider, then wire `google_sign_in`.
-- **Play Billing:** publish the app to an internal test track with a
-  `premium_yearly` subscription, grant the API's service account access in Play
-  Console (Users & permissions), and deploy with `--play-package <id>`. Until
-  then the app reports that the product isn't set up and starts a local trial;
-  nothing is charged.
+
+- **Sign in with Apple:** enable the Apple provider in Firebase Auth and add
+  the Sign in with Apple capability to the iOS app.
+- **Subscriptions (RevenueCat):** create `premium_yearly` (1 year, 7-day
+  trial) and `premium_monthly` in App Store Connect and Play Console, add both
+  apps to a RevenueCat project, attach the products to an entitlement named
+  `lulu_wake_pro`, put them in the default offering as the `$rc_annual` and
+  `$rc_monthly` packages (the app reads the plans from there), and connect the stores (App Store Connect API key, Play service
+  account). Build the app with `--dart-define=REVENUECAT_IOS_KEY=appl_...` and
+  `--dart-define=REVENUECAT_ANDROID_KEY=goog_...` (public SDK keys). For the
+  server, create the Secret Manager secrets `revenuecat-api-key` (a secret v1
+  API key) and `revenuecat-webhook-auth` (any long random string), deploy with
+  `--revenuecat`, and set the RevenueCat webhook to
+  `<api-url>/v1/billing/revenuecat` with that string as its Authorization
+  header. The RevenueCat app user id is the Firebase uid. Builds without a
+  RevenueCat key start a local trial and charge nothing.

@@ -12,10 +12,7 @@
           "minutes": 11,
           "author": "Sleep Tracker Studio",
           "narrator": "Maya Lind",
-          "art": [
-            "#F0A36B",
-            "#3B2F5C"
-          ]
+          "art": ["#F0A36B", "#3B2F5C"]
         },
         {
           "id": "box-breath",
@@ -24,10 +21,7 @@
           "minutes": 8,
           "author": "Sleep Tracker Studio",
           "narrator": "Maya Lind",
-          "art": [
-            "#2E7D9A",
-            "#0D2236"
-          ]
+          "art": ["#2E7D9A", "#0D2236"]
         },
         {
           "id": "body-soften",
@@ -36,10 +30,7 @@
           "minutes": 14,
           "author": "Sleep Tracker Studio",
           "narrator": "Maya Lind",
-          "art": [
-            "#3F7A57",
-            "#0F2219"
-          ]
+          "art": ["#3F7A57", "#0F2219"]
         }
       ]
     },
@@ -52,10 +43,7 @@
           "title": "Rain & wind",
           "minutes": 0,
           "author": "Sleep Tracker Studio",
-          "art": [
-            "#3C5A78",
-            "#101828"
-          ],
+          "art": ["#3C5A78", "#101828"],
           "audio": "rain_and_wind.mp3"
         },
         {
@@ -63,10 +51,7 @@
           "title": "Early dawn",
           "minutes": 0,
           "author": "Sleep Tracker Studio",
-          "art": [
-            "#F0A36B",
-            "#3B2F5C"
-          ],
+          "art": ["#F0A36B", "#3B2F5C"],
           "audio": "gentle_dawn.mp3"
         },
         {
@@ -74,10 +59,7 @@
           "title": "Droplets",
           "minutes": 0,
           "author": "Sleep Tracker Studio",
-          "art": [
-            "#2E7D9A",
-            "#0D2236"
-          ],
+          "art": ["#2E7D9A", "#0D2236"],
           "audio": "morning_drops.mp3"
         },
         {
@@ -85,50 +67,35 @@
           "title": "Fireplace",
           "minutes": 0,
           "author": "Sleep Tracker Studio",
-          "art": [
-            "#E2683C",
-            "#2A1420"
-          ]
+          "art": ["#E2683C", "#2A1420"]
         },
         {
           "id": "forest",
           "title": "Night forest",
           "minutes": 0,
           "author": "Sleep Tracker Studio",
-          "art": [
-            "#3F7A57",
-            "#0F2219"
-          ]
+          "art": ["#3F7A57", "#0F2219"]
         },
         {
           "id": "brown",
           "title": "Brown noise",
           "minutes": 0,
           "author": "Sleep Tracker Studio",
-          "art": [
-            "#B65A3A",
-            "#1B1A2E"
-          ]
+          "art": ["#B65A3A", "#1B1A2E"]
         },
         {
           "id": "pink",
           "title": "Pink noise",
           "minutes": 0,
           "author": "Sleep Tracker Studio",
-          "art": [
-            "#7C5CFF",
-            "#15122E"
-          ]
+          "art": ["#7C5CFF", "#15122E"]
         },
         {
           "id": "swell",
           "title": "Ocean swell",
           "minutes": 0,
           "author": "Sleep Tracker Studio",
-          "art": [
-            "#2E7D9A",
-            "#0D2236"
-          ]
+          "art": ["#2E7D9A", "#0D2236"]
         }
       ]
     },
@@ -143,10 +110,7 @@
           "minutes": 26,
           "author": "Ida Moberg",
           "narrator": "Tom Ashby",
-          "art": [
-            "#B65A3A",
-            "#1B1A2E"
-          ]
+          "art": ["#B65A3A", "#1B1A2E"]
         },
         {
           "id": "night-train",
@@ -155,10 +119,7 @@
           "minutes": 31,
           "author": "Ida Moberg",
           "narrator": "Tom Ashby",
-          "art": [
-            "#3C5A78",
-            "#101828"
-          ]
+          "art": ["#3C5A78", "#101828"]
         }
       ]
     },
@@ -172,10 +133,7 @@
           "description": "Sparse piano phrases over soft tape hiss.",
           "minutes": 24,
           "author": "Northlight Ensemble",
-          "art": [
-            "#2E7D9A",
-            "#0D2236"
-          ],
+          "art": ["#2E7D9A", "#0D2236"],
           "audio": "mozarts_morning.mp3"
         },
         {
@@ -184,10 +142,7 @@
           "description": "Warm synth pads that slowly fall away.",
           "minutes": 40,
           "author": "Northlight Ensemble",
-          "art": [
-            "#7C5CFF",
-            "#15122E"
-          ]
+          "art": ["#7C5CFF", "#15122E"]
         }
       ]
     },
@@ -200,40 +155,28 @@
           "title": "Turning pages",
           "minutes": 0,
           "author": "Sleep Tracker Studio",
-          "art": [
-            "#F0A36B",
-            "#3B2F5C"
-          ]
+          "art": ["#F0A36B", "#3B2F5C"]
         },
         {
           "id": "brush",
           "title": "Soft brush",
           "minutes": 0,
           "author": "Sleep Tracker Studio",
-          "art": [
-            "#7C5CFF",
-            "#15122E"
-          ]
+          "art": ["#7C5CFF", "#15122E"]
         },
         {
           "id": "tapping",
           "title": "Tapping",
           "minutes": 0,
           "author": "Sleep Tracker Studio",
-          "art": [
-            "#E2683C",
-            "#2A1420"
-          ]
+          "art": ["#E2683C", "#2A1420"]
         },
         {
           "id": "window",
           "title": "Rain on glass",
           "minutes": 0,
           "author": "Sleep Tracker Studio",
-          "art": [
-            "#3C5A78",
-            "#101828"
-          ]
+          "art": ["#3C5A78", "#101828"]
         }
       ]
     },
@@ -248,10 +191,7 @@
           "minutes": 9,
           "author": "Sleep Tracker Studio",
           "narrator": "Dr. Sam Okafor",
-          "art": [
-            "#F0A36B",
-            "#3B2F5C"
-          ]
+          "art": ["#F0A36B", "#3B2F5C"]
         },
         {
           "id": "wind-down",
@@ -260,10 +200,7 @@
           "minutes": 12,
           "author": "Sleep Tracker Studio",
           "narrator": "Dr. Sam Okafor",
-          "art": [
-            "#3F7A57",
-            "#0F2219"
-          ]
+          "art": ["#3F7A57", "#0F2219"]
         }
       ]
     }

@@ -103,6 +103,7 @@ class LiveTracker {
   int _spikes = 0;
   double _loudestDb = -120;
   final List<double> _windowDb = []; // recent 0.5-s levels for the noise floor
+  final List<double> _floorEpochs = []; // noise floor (dBFS) at each epoch
   bool micActive = false;
 
   // snore model state
@@ -295,6 +296,7 @@ class LiveTracker {
     if (micActive) {
       final floor = _noiseFloor();
       _soundEpochs.add(math.max(0, _loudestDb - floor));
+      _floorEpochs.add(floor);
       _loudestDb = -120;
     }
     if (_luxN > 0) _luxEpochs.add(_luxSum / _luxN);
@@ -302,6 +304,18 @@ class LiveTracker {
     _luxN = 0;
     onEpoch?.call(_accelEpochs.length);
   }
+
+  /// Median overnight background noise in approximate dB SPL, or null
+  /// without the microphone. Phones don't report calibrated levels, so the
+  /// full-scale reading is offset by a typical phone-mic sensitivity
+  /// ([micDbOffset]); good for comparing nights, not for a sound meter.
+  double? get medianNoiseDb {
+    if (_floorEpochs.isEmpty) return null;
+    final s = [..._floorEpochs]..sort();
+    return (s[s.length ~/ 2] + micDbOffset).clamp(0.0, 120.0);
+  }
+
+  static const micDbOffset = 94.0;
 
   /// Median overnight illuminance (lux), or null without a light sensor.
   double? get medianLux {
@@ -417,6 +431,20 @@ class LiveTracker {
   int get soundMinutes => modelActive
       ? (_snoreSeconds(snoreEvents) / 60).round()
       : (_soundEpochs.where((d) => d > 15).length * epochSeconds / 60).round();
+
+  /// Whether the sleeper seems to be snoring right now (for Snore Alert):
+  /// most of the last 10 s called snoring by the model, or without it the
+  /// last two minutes all loud.
+  bool get snoringNow {
+    if (modelActive) {
+      final n = snoreProbs.length;
+      if (n < 10) return false;
+      return snoreProbs.sublist(n - 10).where((p) => !p.isNaN && p >= model!.snoreThreshold).length >= 6;
+    }
+    final n = _soundEpochs.length;
+    final need = (120 / epochSeconds).ceil();
+    return n >= need && _soundEpochs.sublist(n - need).every((d) => d > 15);
+  }
 
   /// Cough events (model only; null when the model isn't running).
   int? get coughs =>

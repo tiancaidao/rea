@@ -27,30 +27,49 @@ function loadDb() {
   }
 }
 function saveDb() {
-  try { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2)); } catch {}
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+  } catch {}
 }
 
 const json = (res, code, body) => {
   const s = JSON.stringify(body);
-  res.writeHead(code, { "content-type": "application/json", "content-length": Buffer.byteLength(s) });
+  res.writeHead(code, {
+    "content-type": "application/json",
+    "content-length": Buffer.byteLength(s),
+  });
   res.end(s);
 };
-const uuid = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-  const r = (Math.random() * 16) | 0; return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-});
-const tokenFor = (id) => Buffer.from(`${id}:${Date.now()}`).toString("base64url");
+const uuid = () =>
+  "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+const tokenFor = (id) =>
+  Buffer.from(`${id}:${Date.now()}`).toString("base64url");
 const userFromAuth = (req) => {
   const h = req.headers["authorization"] || "";
   const tok = h.replace(/^Bearer\s+/i, "");
-  try { return Buffer.from(tok, "base64url").toString().split(":")[0]; } catch { return null; }
+  try {
+    return Buffer.from(tok, "base64url").toString().split(":")[0];
+  } catch {
+    return null;
+  }
 };
 
 function computeInsights(sessions) {
   if (!sessions.length) {
-    return { sleepScore: 0, timeAsleepMin: 0, snorePercent: 0, nights: 0, phases: [] };
+    return {
+      sleepScore: 0,
+      timeAsleepMin: 0,
+      snorePercent: 0,
+      nights: 0,
+      phases: [],
+    };
   }
   const last = sessions[sessions.length - 1];
-  const avg = (f) => Math.round(sessions.reduce((a, s) => a + (s[f] || 0), 0) / sessions.length);
+  const avg = (f) =>
+    Math.round(sessions.reduce((a, s) => a + (s[f] || 0), 0) / sessions.length);
   return {
     sleepScore: avg("sleepScore"),
     timeAsleepMin: last.minutesAsleep || 0,
@@ -70,7 +89,12 @@ const routes = {
   },
   "POST /self-service/login/api": (b) => {
     let user = Object.values(db.users).find((u) => u.email === b.email);
-    if (!user) { const id = uuid(); user = { id, email: b.email || "demo@example.com" }; db.users[id] = user; saveDb(); }
+    if (!user) {
+      const id = uuid();
+      user = { id, email: b.email || "demo@example.com" };
+      db.users[id] = user;
+      saveDb();
+    }
     return { session_token: tokenFor(user.id), identity: user };
   },
   "GET /sessions/whoami": (_b, req) => {
@@ -81,14 +105,31 @@ const routes = {
 
   // --- remote config / dynamic paywall ---
   "GET /v1/config": () => ({
-    features: { snoreDetection: true, sleepAid: true, wearCompanion: false, healthSync: true },
+    features: {
+      snoreDetection: true,
+      sleepAid: true,
+      wearCompanion: false,
+      healthSync: true,
+    },
     experiments: { paywall_variant: "control" },
   }),
   "GET /v1/paywall": () => ({
     id: "dynamic-default",
     products: [
-      { sku: "yearly", title: "Yearly", price: "$39.99", trialDays: 7, highlight: true },
-      { sku: "monthly", title: "Monthly", price: "$6.99", trialDays: 0, highlight: false },
+      {
+        sku: "yearly",
+        title: "Yearly",
+        price: "$39.99",
+        trialDays: 7,
+        highlight: true,
+      },
+      {
+        sku: "monthly",
+        title: "Monthly",
+        price: "$6.99",
+        trialDays: 0,
+        highlight: false,
+      },
     ],
   }),
 
@@ -97,7 +138,12 @@ const routes = {
     packages: [
       { id: "rain", title: "Rain on a tent", durationMin: 45, url: "" },
       { id: "waves", title: "Ocean waves", durationMin: 60, url: "" },
-      { id: "story", title: "Bedtime story: The Lighthouse", durationMin: 25, url: "" },
+      {
+        id: "story",
+        title: "Bedtime story: The Lighthouse",
+        durationMin: 25,
+        url: "",
+      },
     ],
   }),
 
@@ -107,7 +153,11 @@ const routes = {
     const s = { id: uuid(), userId: uid, receivedAt: Date.now(), ...b };
     db.sessions.push(s);
     saveDb();
-    return { id: s.id, status: "stored", nights: db.sessions.filter((x) => x.userId === uid).length };
+    return {
+      id: s.id,
+      status: "stored",
+      nights: db.sessions.filter((x) => x.userId === uid).length,
+    };
   },
   "GET /v1/sessions": (_b, req) => {
     const uid = userFromAuth(req) || "anon";
@@ -122,16 +172,31 @@ const routes = {
   },
 };
 
-http.createServer((req, res) => {
-  let raw = "";
-  req.on("data", (c) => (raw += c));
-  req.on("end", () => {
-    const key = `${req.method} ${req.url.split("?")[0]}`;
-    const handler = routes[key];
-    if (!handler) return json(res, 404, { error: "no mock for " + key, known: Object.keys(routes) });
-    let body = {};
-    try { body = raw ? JSON.parse(raw) : {}; } catch { /* ignore */ }
-    try { json(res, 200, handler(body, req)); }
-    catch (e) { json(res, 500, { error: String(e) }); }
-  });
-}).listen(8787, () => console.log("mock Sleep Cycle API on http://127.0.0.1:8787"));
+http
+  .createServer((req, res) => {
+    let raw = "";
+    req.on("data", (c) => (raw += c));
+    req.on("end", () => {
+      const key = `${req.method} ${req.url.split("?")[0]}`;
+      const handler = routes[key];
+      if (!handler)
+        return json(res, 404, {
+          error: "no mock for " + key,
+          known: Object.keys(routes),
+        });
+      let body = {};
+      try {
+        body = raw ? JSON.parse(raw) : {};
+      } catch {
+        /* ignore */
+      }
+      try {
+        json(res, 200, handler(body, req));
+      } catch (e) {
+        json(res, 500, { error: String(e) });
+      }
+    });
+  })
+  .listen(8787, () =>
+    console.log("mock Sleep Cycle API on http://127.0.0.1:8787"),
+  );

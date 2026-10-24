@@ -2,7 +2,7 @@
   "name": "sleep-tracker-api",
   "version": "0.1.0",
   "private": true,
-  "description": "Cloud Run API for the sleep tracker: config, sleep-aid catalog, weekly insights, weather, Play billing verification, account deletion",
+  "description": "Cloud Run API for the sleep tracker: config, sleep-aid catalog, weekly insights, weather, RevenueCat subscription sync, account deletion",
   "main": "src/index.js",
   "engines": {
     "node": ">=20"
@@ -12,9 +12,7 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
-    "@googleapis/androidpublisher": "^42.2.0",
     "express": "^5.3.0",
-    "firebase-admin": "^14.5.0",
-    "google-auth-library": "^11.3.1"
+    "firebase-admin": "^14.5.0"
   }
 }

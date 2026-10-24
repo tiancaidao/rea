@@ -14,6 +14,7 @@ class Night {
   final Set<String> notes;
   int? steps; // null until known (Health Connect not connected)
   int? weatherF; // null until known (no location / backend off)
+  int? weatherCode; // WMO code of the morning weather, from the same lookup
   final int snoreMinutes;
   final int coughs;
   final double breathingPerHour;
@@ -21,6 +22,7 @@ class Night {
   final List<SoundClip> clips; // the night's kept recordings
   List<(int, int)> snoreSpans; // snoring, seconds from the start
   double? lightLux; // median overnight illuminance, null without a light sensor
+  double? noiseDb; // median overnight background noise (approx. dB), null without the microphone
   AlertnessResult? alertness; // the morning alertness test, if taken
 
   Night({
@@ -29,6 +31,7 @@ class Night {
     Set<String>? notes,
     this.steps,
     required this.weatherF,
+    this.weatherCode,
     required this.snoreMinutes,
     required this.coughs,
     required this.breathingPerHour,
@@ -36,6 +39,7 @@ class Night {
     List<SoundClip>? clips,
     List<(int, int)>? snoreSpans,
     this.lightLux,
+    this.noiseDb,
     this.alertness,
   })  : notes = notes ?? {},
         clips = clips ?? [],
@@ -61,6 +65,7 @@ class Night {
         'notes': notes.toList(),
         'steps': steps,
         'weatherF': weatherF,
+        'weatherCode': weatherCode,
         'snoreMinutes': snoreMinutes,
         'coughs': coughs,
         'breathingPerHour': breathingPerHour,
@@ -70,6 +75,7 @@ class Night {
           for (final s in snoreSpans) [s.$1, s.$2]
         ],
         'lightLux': lightLux,
+        'noiseDb': noiseDb,
         'alertness': alertness?.toJson(),
       };
 
@@ -88,6 +94,7 @@ class Night {
       notes: {for (final n in j['notes'] as List) n as String},
       steps: j['steps'] as int?,
       weatherF: j['weatherF'] as int?,
+      weatherCode: j['weatherCode'] as int?,
       snoreMinutes: j['snoreMinutes'] as int,
       coughs: j['coughs'] as int,
       breathingPerHour: (j['breathingPerHour'] as num).toDouble(),
@@ -95,6 +102,7 @@ class Night {
       clips: [for (final c in j['clips'] as List? ?? const []) SoundClip.fromJson((c as Map).cast<String, dynamic>())],
       snoreSpans: [for (final s in j['snoreSpans'] as List? ?? const []) ((s as List)[0] as int, s[1] as int)],
       lightLux: (j['lightLux'] as num?)?.toDouble(),
+      noiseDb: (j['noiseDb'] as num?)?.toDouble(),
       alertness:
           j['alertness'] == null ? null : AlertnessResult.fromJson((j['alertness'] as Map).cast<String, dynamic>()),
     );
@@ -183,6 +191,7 @@ class Night {
       breathingPerHour: 5 + rng.nextDouble() * 15,
       regularity: 60 + rng.nextInt(40),
       lightLux: rng.nextDouble() < 0.7 ? rng.nextDouble() * 4 : 5 + rng.nextDouble() * 20,
+      noiseDb: 28 + rng.nextDouble() * 14,
       alertness: rng.nextDouble() < 0.5
           ? AlertnessResult(
               reactionMs: 330 + rng.nextInt(140),

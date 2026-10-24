@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -12,7 +14,9 @@ import 'data/night.dart';
 import 'data/recorded_night.dart';
 import 'data/sleep_aid_catalog.dart';
 import 'data/sound_clips.dart';
+import 'device/health_connect.dart';
 import 'device/notifications.dart';
+import 'device/wear.dart';
 
 /// App-wide state for the prototype: alarm, settings, recorded nights and the
 /// chosen sleep-aid track. Persisted locally with shared_preferences (a real
@@ -29,8 +33,12 @@ class AppState extends ChangeNotifier {
 
   /// Restore saved state and warm up local assets. Call once before runApp.
   Future<void> load() async {
+    Notifications.I.onAction = _onNotificationAction;
+    Wear.I.init();
+    Wear.I.requests.listen(_onWatch);
     await RecordedNight.load();
     await _loadAudioPool();
+    unawaited(loadAndPruneDownloads());
     try {
       _clipsRoot = '${(await getApplicationSupportDirectory()).path}/clips';
     } catch (_) {
@@ -210,12 +218,32 @@ class AppState extends ChangeNotifier {
 
   // ── local audio ───────────────────────────────────────────────────────────
   /// Audio files present in assets/audio/ (the extracted comparison
-  /// placeholders). Empty in a clean checkout, where our own synthesised
-  /// clips in assets/audio/own/ (tools/generate_media.py) play instead.
+  /// placeholders). Empty in a clean checkout, where the real recordings in
+  /// assets/free/audio/ (tools/fetch_free_media.py) play instead, and our
+  /// own synthesised clips in assets/audio/own/ fill any gap.
   List<String> ambienceAudio = [];
   List<String> alarmAudio = [];
 
   static const ownDir = 'assets/audio/own/';
+  static const freeDir = 'assets/free/audio/';
+
+  /// The recordings bundled under [freeDir] (public domain / Creative
+  /// Commons, see assets/free/CREDITS-audio.md).
+  static Set<String> freeAudio = {};
+
+  /// Free music for sleep-aid music, stories and guides without audio of
+  /// their own.
+  static const freeMusic = [
+    'soft_breeze',
+    'far_memories',
+    'stillness',
+    'dewdrops',
+    'riddle',
+    'morning_haze',
+    'winter_moon',
+    'slow_waltz',
+    'classical_morning',
+  ];
   static const ownAlarms = [
     'soft_breeze',
     'forest_clearing',
@@ -251,6 +279,7 @@ class AppState extends ChangeNotifier {
               !a.contains('silence'))
           .toList()
         ..sort();
+      freeAudio = manifest.listAssets().where((a) => a.startsWith(freeDir)).toSet();
       alarmAudio = audio.where((a) => a.contains('alarm_sound')).toList();
       ambienceAudio = audio.where((a) => !a.contains('alarm_sound')).toList();
     } catch (_) {}
@@ -279,18 +308,33 @@ class AppState extends ChangeNotifier {
       'pink': 'pink_noise',
       'white': 'white_noise',
       'drop': 'droplets',
-      'dawn': 'droplets',
     };
-    for (final e in keys.entries) {
-      if (t.contains(e.key)) return '${ownDir}amb_${e.value}.mp3';
+    final i = item.id.codeUnits.fold(0, (a, b) => a + b);
+    // birdsong for dawn, real music for anything with a duration
+    if (t.contains('dawn') && freeAudio.contains('${freeDir}alarm_forest_clearing.mp3')) {
+      return '${freeDir}alarm_forest_clearing.mp3';
     }
-    final i = item.id.codeUnits.fold(0, (a, b) => a + b) % ownAmbiences.length;
-    return '${ownDir}amb_${ownAmbiences[i]}.mp3';
+    if (item.minutes > 0) {
+      final m = '${freeDir}alarm_${freeMusic[i % freeMusic.length]}.mp3';
+      if (freeAudio.contains(m)) return m;
+    }
+    for (final e in keys.entries) {
+      if (t.contains(e.key)) return _ambience(e.value);
+    }
+    return _ambience(ownAmbiences[i % ownAmbiences.length]);
   }
 
-  /// Our own alarm melody for an alarm-sound name (premium names reuse the
-  /// free melodies in turn).
+  /// A recorded ambience when we have one, else our synthesised loop.
+  static String _ambience(String key) {
+    final free = '${freeDir}amb_$key.mp3';
+    return freeAudio.contains(free) ? free : '${ownDir}amb_$key.mp3';
+  }
+
+  /// The recording for an alarm-sound name, else our own synthesised melody
+  /// (premium names reuse the free melodies in turn).
   static String ownAlarmFor(String name, List<String> allNames) {
+    final free = '${freeDir}alarm_${name.toLowerCase().replaceAll(' ', '_')}.mp3';
+    if (freeAudio.contains(free)) return free;
     final i = math.max(0, allNames.indexOf(name));
     return '${ownDir}alarm_${ownAlarms[i % ownAlarms.length]}.mp3';
   }
@@ -300,7 +344,8 @@ class AppState extends ChangeNotifier {
   /// soundscapes, the melodic alarm tracks for music/stories/guides), and
   /// with no placeholders at all, our own ambience.
   String? audioFor(SleepAidItem item) {
-    if (item.asset != null && (ambienceAudio.contains(item.asset) || alarmAudio.contains(item.asset))) {
+    if (item.asset != null &&
+        (freeAudio.contains(item.asset) || ambienceAudio.contains(item.asset) || alarmAudio.contains(item.asset))) {
       return item.asset;
     }
     final pool = item.minutes == 0
@@ -320,6 +365,11 @@ class AppState extends ChangeNotifier {
   // ── account ───────────────────────────────────────────────────────────────
   String email = 'demo@example.com';
   bool premium = false;
+  void setPremium(bool on) {
+    if (premium == on) return;
+    premium = on;
+    notifyListeners();
+  }
 
   // ── alarm ─────────────────────────────────────────────────────────────────
   int alarmHour = 7;
@@ -331,11 +381,13 @@ class AppState extends ChangeNotifier {
     alarmMinute = m;
     notifyListeners();
     if (pref('bedtime_reminder') != 'No reminder') unawaited(rescheduleReminders());
+    if (!tracking) unawaited(publishToWatch());
   }
 
   void setAlarmMode(int m) {
     alarmMode = m;
     notifyListeners();
+    if (!tracking) unawaited(publishToWatch());
   }
 
   int get windowMinutes => int.tryParse(pref('wake_phase')) ?? 30;
@@ -346,8 +398,6 @@ class AppState extends ChangeNotifier {
     'sleep_goal': 'Not set',
     'alarm_sound': 'Soft breeze',
     'wake_phase': '30',
-    'watch_alarm_type': 'Automatic',
-    'watch_auto_start': 'Off',
     'weekly_report': 'On',
     'weekly_report_notify': 'On',
     'bedtime_reminder': 'No reminder',
@@ -356,6 +406,8 @@ class AppState extends ChangeNotifier {
     'online_backup': 'On',
     'sleep_aid_download': 'Wi-Fi only',
     'sleep_aid_keep': '20 nights (recommended)',
+    'wear_alarm_type': 'Automatic',
+    'snore_alert': 'Off',
     'sleep_aid_fade': '30 minutes',
     'sleep_notes': 'Hide',
     'wake_up_mood': 'Hide',
@@ -391,6 +443,8 @@ class AppState extends ChangeNotifier {
       unawaited(rescheduleReminders());
     }
     if (key == 'sound_detection') unawaited(pruneClips());
+    if (key == 'sleep_aid_keep') unawaited(loadAndPruneDownloads());
+    if (key == 'wear_alarm_type') unawaited(publishToWatch());
     if (Backend.I.user != null) unawaited(_syncPref(key).catchError((_) {}));
     notifyListeners();
   }
@@ -428,6 +482,50 @@ class AppState extends ChangeNotifier {
   ];
   void notesChanged() => notifyListeners();
 
+  // ── watch ─────────────────────────────────────────────────────────────────
+  /// Whether the tracking screen is open (a night is being recorded).
+  bool tracking = false;
+
+  /// The current night was started from the watch (Alarm type › Automatic).
+  bool startedFromWatch = false;
+
+  /// Requests from the watch for the open tracking or alarm screen
+  /// (stop · snooze · stop_alarm); the screen clears it after acting.
+  final ValueNotifier<String?> remote = ValueNotifier(null);
+
+  void _onWatch(String r) {
+    switch (r) {
+      case 'start':
+        if (tracking) return;
+        startedFromWatch = true;
+        Notifications.I.tapped.value = 'start_watch';
+      case 'stop' || 'snooze' || 'stop_alarm':
+        remote.value = r;
+      case 'sync':
+        unawaited(publishToWatch());
+      default:
+        if (r.startsWith('alarm_type:')) setPref('wear_alarm_type', r.substring('alarm_type:'.length));
+    }
+  }
+
+  /// Send the phone's state (tracking, alarm window, alarm type) to the watch.
+  Future<void> publishToWatch({DateTime? since, DateTime? alarmStart, DateTime? alarmEnd}) => Wear.I.publish(
+        tracking: tracking,
+        since: since,
+        alarmStart: alarmStart ??
+            (alarmMode == 2 ? null : bedtimeAlarm().subtract(Duration(minutes: alarmMode == 0 ? windowMinutes : 0))),
+        alarmEnd: alarmEnd ?? (alarmMode == 2 ? null : bedtimeAlarm()),
+        alarmType: pref('wear_alarm_type'),
+      );
+
+  /// The next alarm time from the alarm settings.
+  DateTime bedtimeAlarm() {
+    final now = DateTime.now();
+    var t = DateTime(now.year, now.month, now.day, alarmHour, alarmMinute);
+    if (!t.isAfter(now)) t = t.add(const Duration(days: 1));
+    return t;
+  }
+
   // ── nights ────────────────────────────────────────────────────────────────
   final List<Night> nights = []; // oldest first
   int? selectedNight; // index into nights; null = latest
@@ -442,6 +540,34 @@ class AppState extends ChangeNotifier {
     unawaited(Backend.I.saveNight(n).catchError((_) {}));
     // ask for a store rating after a few good nights, as the original does
     if ((nights.length == 3 || nights.length == 10) && n.quality >= 70) unawaited(_askForReview());
+  }
+
+  /// Add the nights other apps wrote to Health Connect, skipping any that
+  /// overlap a night already here. Returns how many were added.
+  Future<int> importHealthNights() async {
+    final added = <Night>[];
+    for (final s in await HealthConnect.I.importSleep()) {
+      final overlaps = nights.any((n) => n.wentToBed.isBefore(s.endedAt) && n.wokeUp.isAfter(s.startedAt));
+      if (overlaps) continue;
+      final n = Night(
+          session: s,
+          weatherF: null,
+          snoreMinutes: 0,
+          coughs: 0,
+          breathingPerHour: 0,
+          regularity: 0,
+          notes: {'Imported'});
+      nights.add(n);
+      added.add(n);
+    }
+    if (added.isEmpty) return 0;
+    nights.sort((a, b) => a.wokeUp.compareTo(b.wokeUp));
+    selectedNight = null;
+    notifyListeners();
+    for (final n in added) {
+      unawaited(Backend.I.saveNight(n).catchError((_) {}));
+    }
+    return added.length;
   }
 
   Future<void> _askForReview() async {
@@ -528,6 +654,19 @@ class AppState extends ChangeNotifier {
     } catch (_) {
       // file missing: keep the mock "playing" state
     }
+    unawaited(Notifications.I.showNowPlaying(item.title, playing: true));
+  }
+
+  /// Stop the sleep aid and clear its player notification.
+  Future<void> stopSleepAid() async {
+    await pauseSleepAid();
+    await Notifications.I.cancel(Notifications.playerId);
+  }
+
+  /// Pause/Play/Stop from the player notification.
+  void _onNotificationAction(String id) {
+    if (id == 'aid_toggle') toggleSleepAid();
+    if (id == 'aid_stop') stopSleepAid();
   }
 
   Future<void> pauseSleepAid() async {
@@ -537,12 +676,46 @@ class AppState extends ChangeNotifier {
     try {
       await player.pause();
     } catch (_) {}
+    final item = sleepAid;
+    if (item != null) unawaited(Notifications.I.showNowPlaying(item.title, playing: false));
   }
 
   Future<void> toggleSleepAid() => sleepAidPlaying ? pauseSleepAid() : playSleepAid();
 
   /// Downloaded streamed tracks (item id → local file), from the track sheet.
   final Map<String, String> sleepAidCache = {};
+
+  /// Whether the Download files setting allows downloading on the current
+  /// connection ("Wi-Fi only" refuses mobile data).
+  Future<bool> downloadsAllowedNow() async {
+    if (pref('sleep_aid_download') != 'Wi-Fi only') return true;
+    try {
+      final c = await Connectivity().checkConnectivity();
+      return c.contains(ConnectivityResult.wifi) || c.contains(ConnectivityResult.ethernet);
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Find downloads from earlier runs and delete those older than Keep
+  /// downloaded files for allows.
+  Future<void> loadAndPruneDownloads() async {
+    try {
+      final dir = await getApplicationCacheDirectory();
+      final keep = pref('sleep_aid_keep');
+      final days = keep.startsWith('Forever') ? null : int.tryParse(keep.split(' ').first);
+      for (final e in dir.listSync().whereType<File>()) {
+        final name = e.uri.pathSegments.last;
+        if (!name.startsWith('sleepaid_')) continue;
+        final age = DateTime.now().difference(e.statSync().modified);
+        if (days != null && age > Duration(days: days)) {
+          e.deleteSync();
+        } else {
+          sleepAidCache[name.substring('sleepaid_'.length)] = e.path;
+        }
+      }
+    } catch (_) {}
+  }
 
   // ── sleep-aid fade-out ────────────────────────────────────────────────────
   Timer? _fadeTimer;
