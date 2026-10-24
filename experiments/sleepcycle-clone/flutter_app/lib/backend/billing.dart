@@ -31,6 +31,7 @@ class StoreOffer {
 /// (RevenueCat app user id = Firebase uid) once signed in.
 ///
 ///   --dart-define=REVENUECAT_IOS_KEY=appl_...  --dart-define=REVENUECAT_ANDROID_KEY=goog_...
+///   --dart-define=REVENUECAT_KEY=test_...      # one key for both, e.g. the Test Store
 ///
 /// These are RevenueCat's public SDK keys. Without one (dev builds) the store
 /// is unavailable and the paywall falls back to a local trial.
@@ -42,6 +43,7 @@ class Billing {
   static const productId = 'premium_yearly';
   static const _iosKey = String.fromEnvironment('REVENUECAT_IOS_KEY');
   static const _androidKey = String.fromEnvironment('REVENUECAT_ANDROID_KEY');
+  static const _sharedKey = String.fromEnvironment('REVENUECAT_KEY');
 
   /// --dart-define=PREVIEW_PRICES=true shows the US list prices on the
   /// paywall when no store is configured (for store screenshots); buying
@@ -56,11 +58,14 @@ class Billing {
   /// to a gift card or a local trial), so a lapsed subscription removes it.
   bool _fromStore = false;
 
-  static String get _key => Platform.isIOS
-      ? _iosKey
-      : Platform.isAndroid
-          ? _androidKey
-          : '';
+  static String get _key {
+    final own = Platform.isIOS
+        ? _iosKey
+        : Platform.isAndroid
+            ? _androidKey
+            : '';
+    return own.isNotEmpty ? own : _sharedKey;
+  }
 
   Future<void> init() async {
     if (_ready || _key.isEmpty) return;
