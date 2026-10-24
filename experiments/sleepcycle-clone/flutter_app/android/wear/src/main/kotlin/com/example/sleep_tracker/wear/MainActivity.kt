@@ -65,7 +65,7 @@ private fun Home() {
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            if (s.tracking) "Sleeping since ${clock(s.since)}" else "Sleep clone",
+            if (s.tracking) "Sleeping since ${clock(s.since)}" else "Lullwake",
             fontSize = 14.sp, textAlign = TextAlign.Center,
         )
         Text(alarm, fontSize = 12.sp, color = Color.LightGray, textAlign = TextAlign.Center)

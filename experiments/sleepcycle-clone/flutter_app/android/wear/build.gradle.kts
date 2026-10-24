@@ -13,7 +13,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.sleep_tracker"
+        applicationId = "com.matchlab.lullwake"
         minSdk = 30
         targetSdk = 36
         versionCode = 1

@@ -185,7 +185,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
         actions: [
           TextButton(
             onPressed: () => SharePlus.instance.share(ShareParams(
-                text: 'You have been given a year of Sleep clone Premium. Redeem one of these codes in '
+                text: 'You have been given a year of Lullwake Premium. Redeem one of these codes in '
                     'Profile › Benefits:\n\n${codes.join('\n')}')),
             child: const Text('Share'),
           ),

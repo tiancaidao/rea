@@ -354,11 +354,11 @@ class MorePage extends StatelessWidget {
         NavRow(
             icon: Icons.extension,
             title: 'Third-party software and media',
-            onTap: () => showLicensePage(context: context, applicationName: 'Sleep Tracker')),
+            onTap: () => showLicensePage(context: context, applicationName: 'Lullwake')),
         Padding(
           padding: const EdgeInsets.all(24),
           child: Center(
-              child: Text('Sleep Tracker v0.1.0 (prototype)', style: TextStyle(color: context.palette.textFaint))),
+              child: Text('Lullwake v0.1.0', style: TextStyle(color: context.palette.textFaint))),
         ),
       ]);
     });
@@ -1021,11 +1021,11 @@ class _HelpPageState extends State<HelpPage> {
       ]);
 
   Future<void> _contact() async {
-    final info = 'App: Sleep clone\nPlatform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}\n'
+    final info = 'App: Lullwake\nPlatform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}\n'
         'Nights: ${AppState.I.nights.length}\n\nDescribe the problem:\n';
     final uri = Uri(
         scheme: 'mailto',
-        query: 'subject=${Uri.encodeComponent('Help with Sleep clone')}'
+        query: 'subject=${Uri.encodeComponent('Help with Lullwake')}'
             '&body=${Uri.encodeComponent(info)}');
     if (!await launchUrl(uri) && mounted) toast(context, 'No email app found');
   }

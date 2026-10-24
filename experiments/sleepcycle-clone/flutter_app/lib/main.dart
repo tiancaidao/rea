@@ -33,7 +33,7 @@ class SleepApp extends StatelessWidget {
     return ValueListenableBuilder<String>(
       valueListenable: AppState.I.themeName,
       builder: (context, name, _) => MaterialApp(
-        title: 'Sleep Tracker',
+        title: 'Lullwake',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(AppThemeId.byLabel(name).palette),
         home: _home,

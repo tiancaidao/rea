@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
 
     <application
-        android:label="Sleep clone"
+        android:label="Lullwake"
         android:icon="@drawable/ic_watch_app"
         android:theme="@android:style/Theme.DeviceDefault">
         <!-- needs the phone app: the phone tracks, the watch is a remote -->

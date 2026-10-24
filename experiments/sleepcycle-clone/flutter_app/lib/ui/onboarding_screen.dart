@@ -26,7 +26,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _Step(
       lottie: 'assets/lottie/animated_onboarding.json',
       icon: Icons.nightlight_round,
-      title: S.get('app_name', 'Sleep Tracker'),
+      title: S.get('app_name', 'Lullwake'),
       body: 'Track every night and wake up gently, at your lightest moment.',
       perks: const [],
     ),
