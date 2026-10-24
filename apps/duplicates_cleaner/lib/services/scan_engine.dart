@@ -274,9 +274,13 @@ class ScanEngine {
       }
     }
     if (_cancelled) return const [];
-    _report(ScanPhase.comparing, 0, 1, '');
+    final label = 'Comparing ${features.length} images';
     return [
-      for (final g in groupSimilarImages(features))
+      for (final g in groupSimilarImages(
+        features,
+        onProgress: (percent) =>
+            onProgress?.call(ScanProgress(ScanPhase.comparing, percent, label)),
+      ))
         DuplicateGroup([for (final i in g) analysed[i]]),
     ];
   }

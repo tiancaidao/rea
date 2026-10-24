@@ -85,34 +85,57 @@ class PhotoLibraryService {
 
   /// The appearance scan sees thumbnails, so its items carry the thumbnail's
   /// size; this replaces it with the original's for the matched items only.
+  ///
+  /// Reading an original can be slow (it may come from iCloud), so a few are
+  /// read at a time and [onProgress] reports how many are done.
   Future<List<DuplicateGroup>> withOriginalSizes(
-    List<DuplicateGroup> groups,
-  ) async {
-    final result = <DuplicateGroup>[];
-    for (final g in groups) {
-      final items = <DuplicateItem>[];
-      for (final i in g.items) {
-        final asset = i.assetId == null
-            ? null
-            : await AssetEntity.fromId(i.assetId!);
-        final file = await asset?.originFile;
-        items.add(
-          file == null
-              ? i
-              : DuplicateItem(
-                  path: i.path,
-                  name: i.name,
-                  size: await file.length(),
-                  modified: i.modified,
-                  assetId: i.assetId,
-                  isMainFile: i.isMainFile,
-                  checked: i.checked,
-                ),
+    List<DuplicateGroup> groups, {
+    ProgressCallback? onProgress,
+  }) async {
+    final items = [for (final g in groups) ...g.items];
+    final sizes = <DuplicateItem, int>{};
+    var next = 0, done = 0;
+    Future<void> worker() async {
+      while (next < items.length) {
+        final i = items[next++];
+        try {
+          final asset = i.assetId == null
+              ? null
+              : await AssetEntity.fromId(i.assetId!);
+          final file = await asset?.originFile;
+          if (file != null) sizes[i] = await file.length();
+        } catch (_) {
+          // Keep the thumbnail's size if the original can't be read.
+        }
+        done++;
+        onProgress?.call(
+          ScanProgress(
+            ScanPhase.comparing,
+            done * 100 ~/ items.length,
+            'Reading photo sizes: $done of ${items.length}',
+          ),
         );
       }
-      result.add(DuplicateGroup(items));
     }
-    return result;
+
+    await Future.wait([for (var w = 0; w < 6; w++) worker()]);
+    return [
+      for (final g in groups)
+        DuplicateGroup([
+          for (final i in g.items)
+            sizes[i] == null
+                ? i
+                : DuplicateItem(
+                    path: i.path,
+                    name: i.name,
+                    size: sizes[i]!,
+                    modified: i.modified,
+                    assetId: i.assetId,
+                    isMainFile: i.isMainFile,
+                    checked: i.checked,
+                  ),
+        ]),
+    ];
   }
 
   /// Moves the assets to Recently Deleted. iOS asks the user to confirm once
