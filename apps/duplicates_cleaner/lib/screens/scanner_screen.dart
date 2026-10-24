@@ -12,6 +12,7 @@ import '../models/duplicate_item.dart';
 import '../models/enums.dart';
 import '../services/app_log.dart';
 import '../services/background_scanner.dart';
+import '../services/photo_library.dart';
 import '../services/results_controller.dart';
 import '../services/scan_engine.dart';
 import '../services/storage_service.dart';
@@ -109,9 +110,47 @@ class _ScannerScreenState extends State<ScannerScreen> {
       return;
     }
 
+    // iOS keeps photos and videos in the Photos library rather than in files,
+    // so internal storage there is the library plus the app's own folder.
+    final photos = scope.storage.photos;
+    var photoItems = const <DuplicateItem>[];
+    if (storage == StorageSelection.internal &&
+        PhotoLibraryService.covers(widget.scanType)) {
+      if (!await photos.ensureAccess()) {
+        if (!mounted) return;
+        final open = await confirm(
+          context,
+          title: 'Photos access required',
+          message:
+              'To find duplicate photos and videos, the app needs access to '
+              'your Photos library. Please allow it in Settings to proceed.',
+          yes: 'Show me',
+          no: 'Back',
+        );
+        if (open) await photos.openAccessSettings();
+        if (mounted) Navigator.of(context).pop();
+        return;
+      }
+      try {
+        photoItems = await photos.collect(
+          widget.scanType,
+          algorithm,
+          exclusion,
+          onProgress: (p) {
+            if (mounted) setState(() => _progress = p);
+          },
+          isCancelled: () => !mounted,
+        );
+      } catch (e) {
+        AppLog.error('Photos library read failed: $e');
+      }
+      if (!mounted) return;
+    }
+
     AppLog.info(
       'Scan started: ${widget.scanType.label}, ${algorithm.label}, '
-      '${storage.label}, ${exclusion.label}, roots: ${roots.join(', ')}',
+      '${storage.label}, ${exclusion.label}, roots: ${roots.join(', ')}, '
+      'photos: ${photoItems.length}',
     );
     final scan = await BackgroundScan.start(
       ScanRequest(
@@ -120,6 +159,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
         algorithm: algorithm,
         sizeExclusion: exclusion,
         verifyContent: settings.verifyContent,
+        extraFiles: photoItems,
       ),
     );
     if (!mounted) {
@@ -131,7 +171,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
       if (mounted) setState(() => _progress = p);
     });
     try {
-      final groups = await scan.result;
+      var groups = await scan.result;
+      if (algorithm == ScanAlgorithm.sameAppearance && photoItems.isNotEmpty) {
+        groups = await photos.withOriginalSizes(groups);
+      }
       AppLog.info(
         'Scan finished: ${groups.length} sets, '
         '${groups.fold(0, (n, g) => n + g.items.length - 1)} duplicates',
@@ -171,6 +214,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     setState(() => _deleting = true);
     final outcome = await results.deleteSelected(
       fallback: scope.storage.deleteOnRemovableVolume,
+      deleteAssets: scope.storage.photos.delete,
     );
     AppLog.info(
       'Deleted ${outcome.deleted} files, ${formatBytes(outcome.freedBytes)} freed',
@@ -526,7 +570,26 @@ class _DuplicateTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const dim = 48.0;
-    final thumb = _isImage
+    final assetId = item.assetId;
+    final thumb = assetId != null
+        ? ClipOval(
+            child: FutureBuilder(
+              future: AppScope.of(context).storage.photos.thumbnail(assetId),
+              builder: (_, snap) => snap.data == null
+                  ? const IconBadge(
+                      icon: Icons.photo_outlined,
+                      size: dim,
+                      solid: true,
+                    )
+                  : Image.memory(
+                      snap.data!,
+                      width: dim,
+                      height: dim,
+                      fit: BoxFit.cover,
+                    ),
+            ),
+          )
+        : _isImage
         ? ClipOval(
             child: Image.file(
               File(item.path),
@@ -614,7 +677,7 @@ class _DuplicateTile extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    item.path,
+                    assetId != null ? 'Photos library' : item.path,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
