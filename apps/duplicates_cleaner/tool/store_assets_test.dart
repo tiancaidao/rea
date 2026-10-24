@@ -100,6 +100,7 @@ class Device {
 const devices = [
   Device('ios_iphone_6.9', Size(1320, 2868), Size(440, 956), ios: true),
   Device('ios_iphone_6.5', Size(1284, 2778), Size(428, 926), ios: true),
+  Device('ios_iphone_6.3', Size(1206, 2622), Size(402, 874), ios: true),
   Device(
     'ios_ipad_13',
     Size(2064, 2752),
