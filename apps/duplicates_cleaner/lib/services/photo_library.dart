@@ -120,6 +120,11 @@ class PhotoLibraryService {
   Future<List<String>> delete(List<String> ids) =>
       PhotoManager.editor.deleteWithIds(ids);
 
+  /// The full-size original of an asset, for viewing. The appearance scan
+  /// only exports thumbnails, so its items' paths are not the photo itself.
+  Future<File?> original(String assetId) async =>
+      (await AssetEntity.fromId(assetId))?.originFile;
+
   Future<Uint8List?> thumbnail(String assetId) =>
       _thumbnails.putIfAbsent(assetId, () async {
         final asset = await AssetEntity.fromId(assetId);

@@ -577,9 +577,18 @@ class _DuplicateTile extends StatelessWidget {
   );
 
   /// `DupesAdapter_ViewButtonClick`: open the file in another app, or say
-  /// which file type has no app to open it.
+  /// which file type has no app to open it. A Photos item opens its
+  /// full-size original, not the copy that was scanned.
   Future<void> _view(BuildContext context) async {
-    final result = await OpenFilex.open(item.path);
+    final assetId = item.assetId;
+    var path = item.path;
+    if (assetId != null) {
+      final original = await AppScope.of(context).storage.photos
+          .original(assetId)
+          .catchError((_) => null);
+      if (original != null) path = original.path;
+    }
+    final result = await OpenFilex.open(path);
     if (result.type == ResultType.done || !context.mounted) return;
     final ext = p.extension(item.name).replaceFirst('.', '');
     await showMessage(
