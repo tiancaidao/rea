@@ -54,7 +54,7 @@ class AboutScreen extends StatelessWidget {
                       : 'Upgrade - Premium Version',
                 ),
                 onTap: premium.isPremium ? null : () => showPaywall(context),
-                trailing: premium.isPremium && premium.canPurchase
+                trailing: premium.isPremium && premium.canReset
                     ? TextButton(
                         onPressed: premium.reset,
                         child: const Text('Reset'),

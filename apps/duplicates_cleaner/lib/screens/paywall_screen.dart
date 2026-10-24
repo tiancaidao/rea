@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../app.dart';
 import '../core/byte_size.dart';
@@ -69,21 +70,32 @@ class _PaywallScreenState extends State<PaywallScreen> {
   Future<void> _purchase() async {
     final premium = AppScope.of(context).premium;
     setState(() => _busy = true);
-    final ok = await premium.purchase(_plan);
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (ok) return _welcome();
-    await showMessage(
-      context,
-      'Not available',
-      'In-app purchases are not configured in this build yet.',
-    );
+    try {
+      final ok = await premium.purchase(_plan);
+      if (ok && mounted) _welcome();
+    } on PremiumException catch (e) {
+      if (mounted) await showMessage(context, 'Purchase failed', e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _restore() async {
     final premium = AppScope.of(context).premium;
-    if (await premium.restore()) return _welcome();
+    setState(() => _busy = true);
+    bool restored;
+    try {
+      restored = await premium.restore();
+    } on PremiumException catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        await showMessage(context, 'Restore failed', e.message);
+      }
+      return;
+    }
     if (!mounted) return;
+    setState(() => _busy = false);
+    if (restored) return _welcome();
     await showMessage(
       context,
       'Nothing to restore',
@@ -104,6 +116,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
   @override
   Widget build(BuildContext context) {
     final premium = AppScope.of(context).premium;
+    return ListenableBuilder(
+      listenable: premium,
+      builder: (context, _) => _buildPage(premium),
+    );
+  }
+
+  Widget _buildPage(PremiumService premium) {
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -543,6 +562,14 @@ class _Footer extends StatelessWidget {
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
         ),
+        const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _Link('Terms of Use', AppConstants.termsOfUseUrl),
+            Text('·', style: TextStyle(color: AppColors.textMuted)),
+            _Link('Privacy Policy', AppConstants.privacyPolicyUrl),
+          ],
+        ),
         if (onSkip != null)
           TextButton(
             onPressed: busy ? null : onSkip,
@@ -552,6 +579,26 @@ class _Footer extends StatelessWidget {
           const SizedBox(height: 6),
       ],
     ),
+  );
+}
+
+class _Link extends StatelessWidget {
+  const _Link(this.label, this.url);
+
+  final String label;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) => TextButton(
+    style: TextButton.styleFrom(
+      foregroundColor: AppColors.textMuted,
+      textStyle: const TextStyle(fontSize: 11.5),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      minimumSize: const Size(0, 30),
+    ),
+    onPressed: () =>
+        launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+    child: Text(label),
   );
 }
 

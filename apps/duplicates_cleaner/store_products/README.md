@@ -1,15 +1,43 @@
 # Store subscriptions
 
-`subscriptions.json` defines the app's auto-renewing subscription (Prime
-Monthly). Two scripts make each store match it:
+`subscriptions.json` defines the app's Prime products: the auto-renewing
+Prime Monthly subscription, and Prime Lifetime, a one-time purchase. Three
+scripts make the stores and RevenueCat match it:
 
-| Script | Store | API |
+| Script | Where | API |
 |---|---|---|
 | `play_subscriptions.py` | Google Play | Play Developer API, `monetization.subscriptions` |
 | `asc_subscriptions.py` | App Store | App Store Connect API, subscription groups and subscriptions |
+| `revenuecat_products.py` | RevenueCat | REST API v2: products, entitlement, offering and packages |
 
-Run them through `scripts/store_subscriptions.sh <play|ios> <list|sync> [options]`,
-which sets up `store_products/.venv` and loads `fastlane/.env` for `ios`.
+Run them through `scripts/store_subscriptions.sh <play|ios|revenuecat> <list|sync> [options]`,
+which sets up `store_products/.venv` and loads `fastlane/.env` for `ios` and
+`revenuecat`.
+
+## How the app buys Prime
+
+`lib/services/premium_service.dart` uses RevenueCat (`purchases_flutter`).
+Prime is the `prime` entitlement. The current offering (`default`) has a
+`$rc_monthly` package holding `prime_monthly` and a `$rc_lifetime` package
+holding `prime_lifetime`, each with its App Store and Play product.
+`revenuecat_products.py sync` adds every product, attaches them to the
+entitlement, creates the packages and makes the offering current. It never
+deletes.
+
+The app reads the RevenueCat public SDK keys from `--dart-define`
+(`REVENUECAT_IOS_KEY`, `REVENUECAT_ANDROID_KEY`). `scripts/publish_ios.sh` and
+`scripts/publish_android.sh` pass them from `fastlane/.env` and refuse to build
+a release without one, unless `ALLOW_NO_BILLING=1`.
+
+Order for a new setup:
+
+1. In RevenueCat, create the project and add the App Store app (bundle id,
+   in-app purchase key) and the Play Store app (package, service account).
+2. Create the products in each store: `store_subscriptions.sh ios sync --apply`,
+   `store_subscriptions.sh play sync --apply`, and Prime Lifetime in each
+   console.
+3. `store_subscriptions.sh revenuecat sync --apply`.
+4. Put the public SDK keys in `fastlane/.env` and publish.
 
 - `list` prints what the store has now.
 - `sync` creates whatever is missing and updates names, descriptions and
@@ -41,6 +69,15 @@ one `scripts/publish_ios.sh` uses, in `fastlane/.env` (gitignored):
 ASC_KEY_ID=...
 ASC_ISSUER_ID=...
 ASC_KEY_PATH=~/keys/AuthKey_XXXX.p8
+```
+
+**RevenueCat**: a v2 secret API key with project configuration read and write
+(Project settings > API keys) and the project id from the dashboard URL, also in
+`fastlane/.env`:
+
+```
+REVENUECAT_API_KEY=sk_...
+REVENUECAT_PROJECT_ID=proj...
 ```
 
 **Google Play**: a service account with the Google Play Android Developer API

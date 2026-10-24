@@ -4,6 +4,11 @@ class AppConstants {
   static const freeAppName = 'Duplicate Sweep';
   static const premiumAppName = 'Duplicate Sweep Prime';
 
+  /// Linked from the paywall, as the stores require for subscriptions.
+  static const privacyPolicyUrl = 'https://www.matchlab.sg/privacy.html';
+  static const termsOfUseUrl =
+      'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+
   /// Free users cannot delete a selection totalling this size or more (500 MB).
   static const freeFileSizeLimit = 524288000;
 

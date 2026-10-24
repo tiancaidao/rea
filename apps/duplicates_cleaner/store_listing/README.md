@@ -35,11 +35,10 @@ regenerate after UI changes, see the header of that file.
 These are in the app, not the listing, and each one would get a review
 rejection or a bad first impression:
 
-1. **Billing is not wired.** `PremiumService` is a stub, so the paywall can't
-   actually sell Prime. Apple (guideline 2.1 / 3.1.1) and Google both reject a
-   paywall that doesn't complete a purchase. Wire StoreKit / Play Billing
-   (for example `in_app_purchase` or RevenueCat) with the product IDs in the
-   metadata files, plus a working Restore.
+1. **Billing.** Prime now sells through RevenueCat (see
+   `store_products/README.md`). Before submitting, create the products in each
+   store and in RevenueCat, and set `REVENUECAT_IOS_KEY` /
+   `REVENUECAT_ANDROID_KEY` in `fastlane/.env` so the build includes them.
 2. **Bundle ID and package name are `com.example...`.** Both stores refuse
    these. Change them before creating the store records.
 3. **iPhone photos are HEIC, and HEIC isn't in the image extensions**, so an

@@ -160,8 +160,8 @@ Duplicate Sweep is a duplicate file finder. Its core feature is to scan the user
 
 ## In-app products
 
-Product IDs must match what the billing code queries. The original app used
-`dc_prime_one_time_purchase` and `dc_prime_benefits`; pick your own names.
+Product IDs must match `PremiumPlan` in `lib/services/premium_service.dart`
+and `store_products/subscriptions.json`.
 
 | | One-time product | Subscription |
 | --- | --- | --- |

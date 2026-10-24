@@ -135,7 +135,7 @@ def build_ipa(build_number:)
       sh("flutter", "pub", "get")
       # Writes the release config, build number and Pods; Xcode builds next.
       sh("flutter", "build", "ios", "--release", "--config-only",
-         "--build-number", build_number.to_s)
+         "--build-number", build_number.to_s, *revenuecat_defines("REVENUECAT_IOS_KEY"))
     end
 
     build_app(
@@ -159,6 +159,16 @@ def build_ipa(build_number:)
   ipa = latest_ipa
   UI.success("Built #{ipa} (build #{build_number})")
   ipa
+end
+
+# The RevenueCat public SDK key, compiled in. Without it the build can't sell
+# Prime, so it's an error unless ALLOW_NO_BILLING=1.
+def revenuecat_defines(name)
+  key = ENV[name].to_s
+  return ["--dart-define=#{name}=#{key}"] unless key.empty?
+  UI.user_error!("Set #{name} in fastlane/.env (RevenueCat > API keys), or ALLOW_NO_BILLING=1") unless ENV["ALLOW_NO_BILLING"] == "1"
+  UI.important("#{name} is not set: this build can't sell Prime")
+  []
 end
 
 def upload_ipa(api_key, ipa)
