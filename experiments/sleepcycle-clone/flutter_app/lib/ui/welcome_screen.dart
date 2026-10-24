@@ -9,8 +9,8 @@ import '../paywall/paywall_config.dart';
 import '../paywall/paywall_screen.dart';
 import 'widgets/common.dart';
 
-/// After onboarding: account choice (continue with a provider, sign up, or
-/// log in), then the free-trial explainer, then the app. Mirrors the
+/// After onboarding: account choice (continue with a provider, sign up, log
+/// in, or skip), then the free-trial explainer, then the app. Mirrors the
 /// original's post-onboarding journey with our own copy; sign-in providers
 /// and purchases are mocked.
 class WelcomeScreen extends StatelessWidget {
@@ -73,6 +73,11 @@ class WelcomeScreen extends StatelessWidget {
                       onPressed: () => _email(context),
                       child: Text('Log in', style: TextStyle(color: context.palette.accent, fontSize: 16))),
                 ]),
+                // The app works fully without an account (App Review 5.1.1).
+                TextButton(
+                    onPressed: () => _signedIn(context),
+                    child: Text('Continue without an account',
+                        style: TextStyle(color: context.palette.textMuted, fontSize: 15))),
               ]),
             ),
           ]),
