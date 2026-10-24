@@ -23,19 +23,14 @@
           "play_offer_id": "free-trial-7d",
           "type": "free_trial",
           "duration": "P1W",
-          "stores": [
-            "play",
-            "ios"
-          ]
+          "stores": ["play", "ios"]
         },
         {
           "play_offer_id": "campaign-first-year",
           "type": "pay_as_you_go",
           "price_usd": "19.99",
           "periods": 1,
-          "stores": [
-            "play"
-          ]
+          "stores": ["play"]
         }
       ],
       "localizations": {
