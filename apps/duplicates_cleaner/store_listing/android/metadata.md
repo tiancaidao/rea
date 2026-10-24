@@ -8,7 +8,7 @@ placeholder for you to fill.
 | Field | Value |
 | --- | --- |
 | App name (30) | `Duplicate Sweep` (15). |
-| Package name | `com.duplicates_cleaner.android` |
+| Package name | `com.matchlab.duplicatesweep` |
 | Default language | English (United States) – en-US |
 | App or game | App |
 | Free or paid | Free (with in-app products) |

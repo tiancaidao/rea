@@ -1,6 +1,6 @@
 {
   "_comment": "The app's Prime products. play_subscriptions.py and asc_subscriptions.py create the auto-renewing subscriptions in each store; revenuecat_products.py adds every product (subscriptions and the one-time Lifetime purchase) to RevenueCat with the entitlement, offering and packages the app reads. Prime Lifetime is created in the store consoles (see store_listing/). Product ids must match PremiumPlan in lib/services/premium_service.dart. Prices are USD; each store converts them for other countries.",
-  "android_package": "com.duplicates_cleaner.android",
+  "android_package": "com.matchlab.duplicatesweep",
   "ios_bundle_id": "com.duplicates-cleaner.ios",
   "subscription_group": {
     "reference_name": "Duplicate Sweep Prime",

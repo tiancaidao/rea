@@ -23,7 +23,7 @@ UPLOAD_RETRIES = 3
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
-DEFAULT_PACKAGE = "com.duplicates_cleaner.android"
+DEFAULT_PACKAGE = "com.matchlab.duplicatesweep"
 DEFAULT_KEY_FILE = os.path.join(SCRIPT_DIR, "google-play-credentials.json")
 DEFAULT_AAB = os.path.join(PROJECT_ROOT, "build/app/outputs/bundle/release/app-release.aab")
 
