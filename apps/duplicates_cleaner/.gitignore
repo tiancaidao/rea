@@ -47,3 +47,10 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 tool/PlusJakartaSans.ttf
+
+# fastlane: local credentials, gems and run output
+/fastlane/.env
+/fastlane/report.xml
+/fastlane/README.md
+/vendor/bundle/
+/.bundle/

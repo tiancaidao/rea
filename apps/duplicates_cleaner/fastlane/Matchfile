@@ -1,0 +1,7 @@
+# Signing certificates and profiles live in a separate private git repo,
+# never in this app repo. Set MATCH_GIT_URL and MATCH_PASSWORD in fastlane/.env.
+git_url(ENV["MATCH_GIT_URL"])
+storage_mode("git")
+type("appstore")
+app_identifier([ENV.fetch("APP_IDENTIFIER", "com.duplicates-cleaner.ios")])
+team_id(ENV.fetch("APPLE_TEAM_ID", "PYN33LW94S"))

@@ -1,0 +1,2 @@
+app_identifier(ENV.fetch("APP_IDENTIFIER", "com.duplicates-cleaner.ios"))
+team_id(ENV.fetch("APPLE_TEAM_ID", "PYN33LW94S"))

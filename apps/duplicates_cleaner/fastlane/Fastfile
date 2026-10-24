@@ -1,0 +1,190 @@
+require "base64"
+require "fileutils"
+require "shellwords"
+require "tmpdir"
+
+default_platform(:ios)
+
+ROOT = File.expand_path("..", __dir__)
+IPA_DIR = File.join(ROOT, "build/ios/ipa")
+PBXPROJ = File.join(ROOT, "ios/Runner.xcodeproj/project.pbxproj")
+SCREENSHOTS = File.join(ROOT, "store_listing/ios/screenshots")
+
+platform :ios do
+  desc "Build a signed release IPA into build/ios/ipa/"
+  lane :build do
+    api_key = asc_api_key
+    build_ipa(build_number: next_build_number(api_key))
+  end
+
+  desc "Build a signed release IPA and upload it to TestFlight"
+  lane :beta do
+    api_key = asc_api_key
+    ipa = build_ipa(build_number: next_build_number(api_key))
+    upload_ipa(api_key, ipa)
+  end
+
+  desc "Upload an already built IPA to TestFlight (IPA=path, default build/ios/ipa/*.ipa)"
+  lane :upload do
+    upload_ipa(asc_api_key, ENV["IPA"] || latest_ipa)
+  end
+
+  desc "Upload the store text and screenshots to the version being prepared"
+  lane :listing do
+    Dir.mktmpdir do |shots|
+      # deliver reads screenshots per language and picks each one's device
+      # slot from its pixel size, so every set can share one folder.
+      lang = File.join(shots, "en-US")
+      FileUtils.mkdir_p(lang)
+      Dir[File.join(SCREENSHOTS, "*/*.png")].sort.each do |png|
+        FileUtils.cp(png, File.join(lang, "#{File.basename(File.dirname(png))}_#{File.basename(png)}"))
+      end
+
+      deliver(
+        api_key: asc_api_key,
+        app_identifier: app_identifier,
+        metadata_path: File.join(__dir__, "metadata"),
+        screenshots_path: shots,
+        overwrite_screenshots: true,
+        skip_binary_upload: true,
+        skip_app_version_update: false,
+        submit_for_review: false,
+        run_precheck_before_submit: false,
+        force: true
+      )
+    end
+  end
+end
+
+def app_identifier
+  CredentialsManager::AppfileConfig.try_fetch_value(:app_identifier)
+end
+
+def team
+  CredentialsManager::AppfileConfig.try_fetch_value(:team_id)
+end
+
+def asc_api_key
+  return @api_key if @api_key
+
+  key_id = ENV["ASC_KEY_ID"].to_s
+  issuer_id = ENV["ASC_ISSUER_ID"].to_s
+  if key_id.empty? || issuer_id.empty?
+    UI.user_error!("Set ASC_KEY_ID and ASC_ISSUER_ID (see fastlane/.env.example)")
+  end
+
+  if ENV["ASC_KEY_CONTENT_BASE64"].to_s.empty?
+    key_path = File.expand_path(ENV["ASC_KEY_PATH"].to_s)
+    UI.user_error!("Set ASC_KEY_PATH to your AuthKey_#{key_id}.p8") unless File.file?(key_path)
+  else
+    # xcodebuild needs the key as a file, so decode it to a temp one.
+    key_path = File.join(Dir.tmpdir, "AuthKey_#{key_id}.p8")
+    File.write(key_path, Base64.decode64(ENV["ASC_KEY_CONTENT_BASE64"]))
+    File.chmod(0o600, key_path)
+  end
+
+  @xcode_auth_args = [
+    "-allowProvisioningUpdates",
+    "-authenticationKeyPath", key_path,
+    "-authenticationKeyID", key_id,
+    "-authenticationKeyIssuerID", issuer_id
+  ].map { |arg| Shellwords.escape(arg) }.join(" ")
+
+  @api_key = app_store_connect_api_key(key_id: key_id, issuer_id: issuer_id, key_filepath: key_path)
+end
+
+# BUILD_NUMBER wins; otherwise the larger of pubspec's build number and the
+# latest TestFlight build + 1, so an upload never collides with an earlier one.
+def next_build_number(api_key)
+  return ENV["BUILD_NUMBER"].to_i if ENV["BUILD_NUMBER"].to_s =~ /\A\d+\z/
+
+  version = File.read(File.join(ROOT, "pubspec.yaml"))[/^version:\s*(\S+)/, 1].to_s
+  pubspec_build = version.split("+")[1].to_i
+  latest = latest_testflight_build_number(
+    api_key: api_key,
+    app_identifier: app_identifier,
+    initial_build_number: 0
+  ).to_i
+  [pubspec_build, latest + 1].max
+end
+
+def build_ipa(build_number:)
+  profile = nil
+  original_pbxproj = File.read(PBXPROJ)
+
+  begin
+    # With MATCH_GIT_URL set, sign with match's App Store profile. Otherwise
+    # Xcode automatic signing runs with the App Store Connect API key, so no
+    # Apple account has to be signed in to Xcode on this Mac.
+    unless ENV["MATCH_GIT_URL"].to_s.empty?
+      match(type: "appstore", readonly: true)
+      profile = ENV["sigh_#{app_identifier}_appstore_profile-name"]
+      update_code_signing_settings(
+        path: File.join(ROOT, "ios/Runner.xcodeproj"),
+        use_automatic_signing: false,
+        targets: ["Runner"],
+        build_configurations: ["Release"],
+        team_id: team,
+        code_sign_identity: "Apple Distribution",
+        profile_name: profile
+      )
+    end
+
+    FileUtils.rm_rf(IPA_DIR)
+    Dir.chdir(ROOT) do
+      sh("flutter", "pub", "get")
+      # Writes the release config, build number and Pods; Xcode builds next.
+      sh("flutter", "build", "ios", "--release", "--config-only",
+         "--build-number", build_number.to_s)
+    end
+
+    build_app(
+      workspace: File.join(ROOT, "ios/Runner.xcworkspace"),
+      scheme: "Runner",
+      configuration: "Release",
+      export_method: "app-store",
+      export_team_id: team,
+      export_options: export_options(profile),
+      output_directory: IPA_DIR,
+      archive_path: File.join(ROOT, "build/ios/archive/Runner.xcarchive"),
+      # gym passes xcargs to both the archive and the export step.
+      xcargs: @xcode_auth_args,
+      clean: true
+    )
+  ensure
+    # Signing changes are only for this build; leave the project file as it was.
+    File.write(PBXPROJ, original_pbxproj) if File.read(PBXPROJ) != original_pbxproj
+  end
+
+  ipa = latest_ipa
+  UI.success("Built #{ipa} (build #{build_number})")
+  ipa
+end
+
+def upload_ipa(api_key, ipa)
+  upload_to_testflight(
+    api_key: api_key,
+    ipa: ipa,
+    changelog: ENV["CHANGELOG"],
+    skip_waiting_for_build_processing: true
+  )
+end
+
+def latest_ipa
+  ipa = Dir[File.join(IPA_DIR, "*.ipa")].max_by { |f| File.mtime(f) }
+  UI.user_error!("No IPA found in #{IPA_DIR}") unless ipa
+  ipa
+end
+
+def export_options(profile_name)
+  options = { teamID: team, uploadSymbols: true }
+  if profile_name
+    options.merge(
+      signingStyle: "manual",
+      signingCertificate: "Apple Distribution",
+      provisioningProfiles: { app_identifier => profile_name }
+    )
+  else
+    options.merge(signingStyle: "automatic")
+  end
+end
