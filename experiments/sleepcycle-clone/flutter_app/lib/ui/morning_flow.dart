@@ -13,6 +13,8 @@ Future<void> runMorningFlow(BuildContext context, Night night) async {
   if (s.pref('wake_up_mood') == 'Show' && night.mood == null) {
     await showWakeUpMoodSheet(context, night);
   }
+  if (!context.mounted) return;
+  await Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (_) => MorningSummary(night: night)));
   if (!context.mounted || !alertnessAvailable(night)) return;
   final play = await showModalBottomSheet<bool>(
     context: context,
@@ -95,4 +97,73 @@ class MoodFacePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(MoodFacePainter o) => o.mood != mood || o.color != color;
+}
+
+/// Weather art for a WMO code: an icon and the sky behind it.
+(IconData, List<Color>, String) weatherArt(int? code, DateTime at) {
+  final day = at.hour >= 6 && at.hour < 19;
+  final clear = day ? const [Color(0xFF3A7BD5), Color(0xFF8EC5FC)] : const [Color(0xFF0F2027), Color(0xFF2C5364)];
+  const grey = [Color(0xFF4B5563), Color(0xFF9CA3AF)];
+  const storm = [Color(0xFF1F2937), Color(0xFF4B5563)];
+  return switch (code) {
+    null => (day ? Icons.wb_twilight : Icons.nights_stay, clear, ''),
+    0 || 1 => (day ? Icons.wb_sunny : Icons.nightlight_round, clear, code == 0 ? 'Clear' : 'Mainly clear'),
+    2 => (day ? Icons.wb_cloudy : Icons.cloud, clear, 'Partly cloudy'),
+    3 => (Icons.cloud, grey, 'Overcast'),
+    45 || 48 => (Icons.foggy, grey, 'Fog'),
+    >= 51 && <= 67 || >= 80 && <= 82 => (Icons.water_drop, grey, 'Rain'),
+    >= 71 && <= 77 || 85 || 86 => (Icons.ac_unit, grey, 'Snow'),
+    >= 95 => (Icons.thunderstorm, storm, 'Thunderstorm'),
+    _ => (Icons.cloud, grey, ''),
+  };
+}
+
+/// "Good morning": the night at a glance over the morning's weather, shown
+/// once after the alarm (before the alertness offer).
+class MorningSummary extends StatelessWidget {
+  final Night night;
+  const MorningSummary({super.key, required this.night});
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final (icon, sky, label) = weatherArt(night.weatherCode, now);
+    final greeting = now.hour < 12 ? 'Good morning' : (now.hour < 18 ? 'Good afternoon' : 'Good evening');
+    final temp = night.weatherF == null ? null : '${night.weatherF}°F';
+    Widget stat(String v, String k) => Column(children: [
+          Text(v, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(k, style: const TextStyle(color: Colors.white70)),
+        ]);
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: sky)),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+            child: Column(children: [
+              Text(greeting,
+                  style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              Text(fmtDt(now), style: const TextStyle(color: Colors.white70, fontSize: 18)),
+              const Spacer(),
+              Icon(icon, size: 120, color: Colors.white),
+              const SizedBox(height: 12),
+              if (temp != null || label.isNotEmpty)
+                Text([if (temp != null) temp, if (label.isNotEmpty) label].join(' · '),
+                    style: const TextStyle(color: Colors.white, fontSize: 20)),
+              const Spacer(),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+                stat('${night.quality}%', 'Sleep quality'),
+                stat(fmtDuration(night.asleepMinutes), 'Time asleep'),
+                stat(fmtDt(night.wentToBed), 'Went to bed'),
+              ]),
+              const SizedBox(height: 40),
+              PillButton('See my night', width: 240, onPressed: () => Navigator.pop(context)),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
 }

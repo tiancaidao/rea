@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -12,6 +14,7 @@ import 'data/night.dart';
 import 'data/recorded_night.dart';
 import 'data/sleep_aid_catalog.dart';
 import 'data/sound_clips.dart';
+import 'device/health_connect.dart';
 import 'device/notifications.dart';
 
 /// App-wide state for the prototype: alarm, settings, recorded nights and the
@@ -29,8 +32,10 @@ class AppState extends ChangeNotifier {
 
   /// Restore saved state and warm up local assets. Call once before runApp.
   Future<void> load() async {
+    Notifications.I.onAction = _onNotificationAction;
     await RecordedNight.load();
     await _loadAudioPool();
+    unawaited(loadAndPruneDownloads());
     try {
       _clipsRoot = '${(await getApplicationSupportDirectory()).path}/clips';
     } catch (_) {
@@ -430,6 +435,7 @@ class AppState extends ChangeNotifier {
       unawaited(rescheduleReminders());
     }
     if (key == 'sound_detection') unawaited(pruneClips());
+    if (key == 'sleep_aid_keep') unawaited(loadAndPruneDownloads());
     if (Backend.I.user != null) unawaited(_syncPref(key).catchError((_) {}));
     notifyListeners();
   }
@@ -481,6 +487,28 @@ class AppState extends ChangeNotifier {
     unawaited(Backend.I.saveNight(n).catchError((_) {}));
     // ask for a store rating after a few good nights, as the original does
     if ((nights.length == 3 || nights.length == 10) && n.quality >= 70) unawaited(_askForReview());
+  }
+
+  /// Add the nights other apps wrote to Health Connect, skipping any that
+  /// overlap a night already here. Returns how many were added.
+  Future<int> importHealthNights() async {
+    final added = <Night>[];
+    for (final s in await HealthConnect.I.importSleep()) {
+      final overlaps = nights.any((n) => n.wentToBed.isBefore(s.endedAt) && n.wokeUp.isAfter(s.startedAt));
+      if (overlaps) continue;
+      final n = Night(
+          session: s, weatherF: null, snoreMinutes: 0, coughs: 0, breathingPerHour: 0, regularity: 0, notes: {'Imported'});
+      nights.add(n);
+      added.add(n);
+    }
+    if (added.isEmpty) return 0;
+    nights.sort((a, b) => a.wokeUp.compareTo(b.wokeUp));
+    selectedNight = null;
+    notifyListeners();
+    for (final n in added) {
+      unawaited(Backend.I.saveNight(n).catchError((_) {}));
+    }
+    return added.length;
   }
 
   Future<void> _askForReview() async {
@@ -567,6 +595,19 @@ class AppState extends ChangeNotifier {
     } catch (_) {
       // file missing: keep the mock "playing" state
     }
+    unawaited(Notifications.I.showNowPlaying(item.title, playing: true));
+  }
+
+  /// Stop the sleep aid and clear its player notification.
+  Future<void> stopSleepAid() async {
+    await pauseSleepAid();
+    await Notifications.I.cancel(Notifications.playerId);
+  }
+
+  /// Pause/Play/Stop from the player notification.
+  void _onNotificationAction(String id) {
+    if (id == 'aid_toggle') toggleSleepAid();
+    if (id == 'aid_stop') stopSleepAid();
   }
 
   Future<void> pauseSleepAid() async {
@@ -576,12 +617,46 @@ class AppState extends ChangeNotifier {
     try {
       await player.pause();
     } catch (_) {}
+    final item = sleepAid;
+    if (item != null) unawaited(Notifications.I.showNowPlaying(item.title, playing: false));
   }
 
   Future<void> toggleSleepAid() => sleepAidPlaying ? pauseSleepAid() : playSleepAid();
 
   /// Downloaded streamed tracks (item id → local file), from the track sheet.
   final Map<String, String> sleepAidCache = {};
+
+  /// Whether the Download files setting allows downloading on the current
+  /// connection ("Wi-Fi only" refuses mobile data).
+  Future<bool> downloadsAllowedNow() async {
+    if (pref('sleep_aid_download') != 'Wi-Fi only') return true;
+    try {
+      final c = await Connectivity().checkConnectivity();
+      return c.contains(ConnectivityResult.wifi) || c.contains(ConnectivityResult.ethernet);
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Find downloads from earlier runs and delete those older than Keep
+  /// downloaded files for allows.
+  Future<void> loadAndPruneDownloads() async {
+    try {
+      final dir = await getApplicationCacheDirectory();
+      final keep = pref('sleep_aid_keep');
+      final days = keep.startsWith('Forever') ? null : int.tryParse(keep.split(' ').first);
+      for (final e in dir.listSync().whereType<File>()) {
+        final name = e.uri.pathSegments.last;
+        if (!name.startsWith('sleepaid_')) continue;
+        final age = DateTime.now().difference(e.statSync().modified);
+        if (days != null && age > Duration(days: days)) {
+          e.deleteSync();
+        } else {
+          sleepAidCache[name.substring('sleepaid_'.length)] = e.path;
+        }
+      }
+    } catch (_) {}
+  }
 
   // ── sleep-aid fade-out ────────────────────────────────────────────────────
   Timer? _fadeTimer;

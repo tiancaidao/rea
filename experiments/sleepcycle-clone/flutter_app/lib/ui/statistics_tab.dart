@@ -77,6 +77,15 @@ final metrics = <Metric>[
       (v) => '${v.toStringAsFixed(1)} lx',
       'How bright your bedroom was overnight (median, from the phone\'s light sensor). Below 1 lux is properly dark; '
           'streetlight through curtains or a screen can be 5 to 20 lux.'),
+  Metric(
+      'Noise',
+      ChartKind.bar,
+      _chart,
+      (n) => n.noiseDb ?? 0,
+      (v) => '${v.round()} dB',
+      'The steady background sound in your bedroom overnight (median, from the microphone). Around 30 dB is a quiet '
+          'bedroom; traffic, a fan or a partner\'s snoring can push it past 40. Phone microphones aren\'t calibrated, '
+          'so compare your own nights rather than reading it as a sound meter.'),
 ];
 
 class _Point {

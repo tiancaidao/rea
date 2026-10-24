@@ -3,6 +3,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:vibration/vibration.dart';
 import '../app_state.dart';
+import 'custom_song.dart';
 import '../ui/settings_pages.dart' show AlarmSoundPage;
 
 /// Plays the wake-up alarm: the chosen alarm sound, looping, fading in from a
@@ -42,13 +43,18 @@ class AlarmRinger {
   }
 
   Future<void> _playSound(String name) async {
-    final file = AlarmSoundPage.fileFor(name);
+    final custom = name == CustomSong.label ? CustomSong.path : null;
+    final file = custom ?? AlarmSoundPage.fileFor(name);
     if (file == null) return;
     try {
       await _player.setAndroidAudioAttributes(const AndroidAudioAttributes(
           usage: AndroidAudioUsage.alarm, contentType: AndroidAudioContentType.sonification));
       await _player.setLoopMode(LoopMode.one);
-      await _player.setAsset(file);
+      if (custom != null) {
+        await _player.setFilePath(custom);
+      } else {
+        await _player.setAsset(file);
+      }
       await _player.setVolume(0.08);
       unawaited(_player.play());
       final t0 = DateTime.now();

@@ -364,6 +364,15 @@ class _TrackSheetState extends State<_TrackSheet> {
   /// Streamed tracks are downloaded to the cache before playing, with real
   /// progress and a working Cancel (as the original's sleep-aid downloads).
   Future<void> _download(SleepAidItem it) async {
+    // "Wi-Fi only": on mobile data, stream instead of downloading
+    if (!await AppState.I.downloadsAllowedNow()) {
+      if (mounted) {
+        setState(() => _progress = null);
+        toast(context, 'Streaming: downloads are set to Wi-Fi only.');
+      }
+      AppState.I.chooseSleepAid(it);
+      return;
+    }
     final client = _client = http.Client();
     try {
       final res = await client.send(http.Request('GET', Uri.parse(it.url!)));

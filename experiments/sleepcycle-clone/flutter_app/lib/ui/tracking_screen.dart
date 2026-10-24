@@ -204,7 +204,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
           Night.fromResult(_tracker.analyze(), snoreMinutes: _tracker.soundMinutes, coughs: _tracker.coughs, real: true)
             ..clips.addAll(_tracker.clips)
             ..snoreSpans = _tracker.snoreSpans
-            ..lightLux = _tracker.medianLux;
+            ..lightLux = _tracker.medianLux
+            ..noiseDb = _tracker.medianNoiseDb;
     } else {
       if (!mounted) return;
       final sample = await showDialog<bool>(
@@ -246,6 +247,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
         try {
           final w = await Backend.I.weather(loc.$1, loc.$2);
           night.weatherF = (w?['tempF'] as num?)?.round();
+          night.weatherCode = (w?['code'] as num?)?.toInt();
         } catch (_) {}
       }
     }
