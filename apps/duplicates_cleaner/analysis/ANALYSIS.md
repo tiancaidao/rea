@@ -119,7 +119,31 @@ file and stays unchecked; others are checked when Auto Select is on. Select
 filters: Select all, Unselect all, Select duplicates.
 
 **Sort** (`IDuplicatesGroupingService`): size, name length, name alphabetical,
-path, date created; ascending or descending.
+path, date created; ascending or descending (New / Old for date created). Each
+`GetSortedGroupsBy*` orders *every file* by the key, then regroups, and
+`AggregateResults` marks the first file of each group as the main file, so the
+sort also decides which copy is kept (Date created - Old keeps the oldest). The
+selection is reset to the Auto Select setting after a sort. "Path" orders by
+the path's *length*, not alphabetically.
+
+**Scan pipeline** (`ScannerPageActivity.ScanFiles`): same content and same size
+both run `ProcessFiles` (size candidates, then `GetXhash`); a file whose hash is
+0, i.e. under 2048 bytes, is never stored. Same name and same name and size run
+`ProcessFilesNonSameContent`. Same appearance runs `ProcessSimilarImageFiles`
+for image scans only. An image scan of internal storage lists files from the
+MediaStore index (`_data LIKE '/storage/emulated/%'`, no extension filter);
+every other scan walks folders breadth first with a queue, files before
+subfolders, hidden files included. Custom Files with no extensions set scans
+nothing.
+
+**Settings** (`SettingsActivity`): Android 10 and below only offer Internal, SD
+Card, Custom Folder and Parallel. Choosing SD Card or Internal + SD Card with no
+card mounted resets to internal storage and shows "SD Card Not Found!". The
+similar image warning appears when Same Appearance is chosen there.
+
+**Results**: tapping a file opens it in another app, or shows "File Launch
+Failed!" naming the file type. Deletion reports a percentage and passes every
+deleted internal-storage file to `MediaScannerConnection.scanFile`.
 
 **Free tier limits** (`DeleteSelectedDuplicates`): at most 100 files per
 delete operation, and a selection totalling 500 MB (524,288,000 bytes) or more
@@ -151,8 +175,8 @@ select filters.
 - **Same content** uses the original hash and groups by it alone. An extra
   step, on by default (Settings → Confirm Same Content Byte by Byte), splits
   each group by real byte equality, so a hash collision never offers a
-  different file for deletion. Files under 2 KB all hash to 0 in the original;
-  with the setting off the port reproduces that.
+  different file for deletion. Files under 2 KB, which the original's hash maps
+  to 0 and never stores, are skipped by same content and same size scans.
 - **Same name** finds candidates by lower-cased name and then groups by the
   exact name, as the original does. **Name and size** uses the original
   `NSHash` key (lower-cased name followed by the size).
@@ -175,3 +199,37 @@ select filters.
 - **iOS** has no shared file system, so "internal" scans the app's Documents
   folder (visible in the Files app) and "custom folder" uses the system
   folder picker. The original is Android only.
+
+## Gap analysis against the port
+
+A second pass compared the CIL of `ScannerPageActivity`, `FilesScanner`,
+`FileUtility`, the five `DuplicatesGrouping*Service` classes and
+`SettingsActivity` with the Flutter code, area by area.
+
+| Area | Original | Port before | Port now |
+| ---- | -------- | ----------- | -------- |
+| File categories, custom extension pattern | `StaticDataStore` | Same | Same |
+| Size exclusion ranges, 8 KB floor | `FileCanBeProcessed` | Same | Same |
+| Same content fingerprint | `GetXhash`, hash 0 never stored | Same hash, files under 2 KB grouped by hash 0 | Files under 2 KB skipped |
+| Same size | Content pipeline, grouped by size | Grouped by size, any size | Files under 2 KB skipped |
+| Same name / name and size | `ProcessFileByName`, `NSHash` | Same | Same |
+| Same appearance | Nine features, two passes | Same | Same |
+| Walk order | Breadth first queue, hidden files included | Depth first stack, hidden files skipped | Breadth first, hidden included |
+| Internal storage image scan | MediaStore index | Folder walk | MediaStore index (Android) |
+| Main (kept) file | First stored row per group | Same | Same |
+| Sort | Reorders files, regroups, first file is kept, selection reset | Reordered groups only | Same as original |
+| Path sort key | Path length | Path, alphabetical | Path length |
+| Select filters | All, none, duplicates; Prime | Same | Same |
+| Free limits | More than 100 files, or 500 MB or more | Same | Same |
+| Prime gates | APK, Custom, storage, algorithms, exclusion, filters | Same | Same |
+| Scan locations on Android 10 and below | Four options | All six | Four options |
+| SD card missing when chosen in Settings | Reset to internal, dialog | Error at scan time | Reset to internal, dialog |
+| Similar image warning | When chosen in Settings | At scan start | When chosen in Settings |
+| Open file with no app | "File Launch Failed!" dialog | Nothing shown | Dialog |
+| After deleting | Media scanner told, progress shown | Not told, spinner | Media scanner told, percentage |
+
+Left as they were, on purpose: same appearance chosen for a non-image scan
+falls back to same content (the original groups those files by an unset
+`SimHash`, which puts them all in one set); groups left with one file after a
+delete are hidden; the Free Version Limits dialog is replaced by the paywall
+that follows onboarding, which lists the same limits.

@@ -2,15 +2,20 @@ package com.matchlab.duplicatesweep
 
 import android.app.Activity
 import android.content.Intent
+import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Build
 import android.provider.DocumentsContract
+import android.provider.MediaStore
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 /// Deletes files on SD cards and USB drives through the Storage Access
 /// Framework, as the original does with `DocumentFile` tree URIs. The user
-/// grants each volume once; the grant is persisted.
+/// grants each volume once; the grant is persisted. Also lists internal
+/// storage images from MediaStore and tells the media scanner about deleted
+/// files, as the original's `FileUtility` and deletion code do.
 class MainActivity : FlutterActivity() {
     private var pendingGrant: ((Uri?) -> Unit)? = null
 
@@ -27,9 +32,54 @@ class MainActivity : FlutterActivity() {
                             deleteOnVolume(path) { result.success(it) }
                         }
                     }
+                    "internalImagePaths" -> Thread {
+                        val paths = try {
+                            internalImagePaths()
+                        } catch (e: Exception) {
+                            null
+                        }
+                        runOnUiThread {
+                            if (paths == null) {
+                                result.error("query_failed", null, null)
+                            } else {
+                                result.success(paths)
+                            }
+                        }
+                    }.start()
+                    "scanFiles" -> {
+                        val paths = call.argument<List<String>>("paths").orEmpty()
+                        if (paths.isNotEmpty()) {
+                            MediaScannerConnection.scanFile(
+                                applicationContext, paths.toTypedArray(), null, null,
+                            )
+                        }
+                        result.success(null)
+                    }
+                    "sdkInt" -> result.success(Build.VERSION.SDK_INT)
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    /// `FetchInternalStorageImageFilesIndexBased`: every indexed image whose
+    /// file is on internal storage.
+    private fun internalImagePaths(): List<String> {
+        val paths = mutableListOf<String>()
+        @Suppress("DEPRECATION")
+        val column = MediaStore.Images.Media.DATA
+        contentResolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            arrayOf(column),
+            "$column LIKE ?",
+            arrayOf("/storage/emulated/%"),
+            null,
+        )?.use { cursor ->
+            val index = cursor.getColumnIndexOrThrow(column)
+            while (cursor.moveToNext()) {
+                cursor.getString(index)?.let { paths.add(it) }
+            }
+        }
+        return paths
     }
 
     /// [path] looks like /storage/1234-ABCD/DCIM/a.jpg.

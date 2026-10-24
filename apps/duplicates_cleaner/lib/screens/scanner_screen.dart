@@ -36,6 +36,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
   ResultsController? _results;
   String? _error;
   bool _deleting = false;
+  int _deletePercent = 0;
 
   @override
   void initState() {
@@ -66,20 +67,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
     final exclusion = premium.allowsSizeExclusion(settings.sizeExclusion)
         ? settings.sizeExclusion
         : FileSizeExclusion.none;
-
-    if (algorithm == ScanAlgorithm.sameAppearance &&
-        !settings.similarImageWarningDisabled) {
-      final dontRemind = await confirm(
-        context,
-        title: 'Similar image scan',
-        message:
-            'This scan can take time. Please review each image carefully; '
-            'false positives are possible.',
-        yes: 'Dont remind again',
-        no: 'Ok',
-      );
-      if (dontRemind) settings.similarImageWarningDisabled = true;
-    }
 
     if (!await scope.storage.ensureAccess()) {
       if (!mounted) return;
@@ -147,10 +134,19 @@ class _ScannerScreenState extends State<ScannerScreen> {
       if (!mounted) return;
     }
 
+    // `GetAllStorageFilePathsIterative`: an image scan of internal storage
+    // reads the MediaStore index rather than walking folders.
+    List<String>? listed;
+    if (storage == StorageSelection.internal &&
+        widget.scanType == ScanType.image) {
+      listed = await scope.storage.internalImagePaths();
+      if (!mounted) return;
+    }
+
     AppLog.info(
       'Scan started: ${widget.scanType.label}, ${algorithm.label}, '
       '${storage.label}, ${exclusion.label}, roots: ${roots.join(', ')}, '
-      'photos: ${photoItems.length}',
+      'photos: ${photoItems.length}, indexed: ${listed?.length ?? '-'}',
     );
     final scan = await BackgroundScan.start(
       ScanRequest(
@@ -160,6 +156,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
         sizeExclusion: exclusion,
         verifyContent: settings.verifyContent,
         extraFiles: photoItems,
+        listedPaths: listed,
       ),
     );
     if (!mounted) {
@@ -211,11 +208,20 @@ class _ScannerScreenState extends State<ScannerScreen> {
       );
       if (!ok) return;
     }
-    setState(() => _deleting = true);
+    setState(() {
+      _deleting = true;
+      _deletePercent = 0;
+    });
     final outcome = await results.deleteSelected(
       fallback: scope.storage.deleteOnRemovableVolume,
       deleteAssets: scope.storage.photos.delete,
+      onProgress: (p) {
+        if (mounted && p != _deletePercent) {
+          setState(() => _deletePercent = p);
+        }
+      },
     );
+    await scope.storage.notifyDeleted(outcome.deletedPaths);
     AppLog.info(
       'Deleted ${outcome.deleted} files, ${formatBytes(outcome.freedBytes)} freed',
     );
@@ -300,7 +306,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
       title: 'Sort',
       options: options,
       selected: r.sortField == null ? null : (r.sortField!, r.ascending),
-      label: (o) => '${o.$1.label} - ${o.$2 ? 'Ascending' : 'Descending'}',
+      // Date created reads New / Old in the original's sort dialog.
+      label: (o) => o.$1 == SortField.dateCreated
+          ? '${o.$1.label} - ${o.$2 ? 'Old' : 'New'}'
+          : '${o.$1.label} - ${o.$2 ? 'Ascending' : 'Descending'}',
     );
     if (picked == null || !mounted) return;
     if (!scope.premium.allowsSortAndSelectFilters) {
@@ -373,7 +382,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                   onPressed: results.selectedCount == 0 ? null : _delete,
                   icon: Icons.cleaning_services_outlined,
                   label: _deleting
-                      ? 'Deleting files...'
+                      ? 'Deleting files... $_deletePercent%'
                       : 'Clean Now (${formatBytes(results.selectedBytes)})',
                 ),
               ),
@@ -567,6 +576,19 @@ class _DuplicateTile extends StatelessWidget {
     p.extension(item.name).replaceFirst('.', '').toLowerCase(),
   );
 
+  /// `DupesAdapter_ViewButtonClick`: open the file in another app, or say
+  /// which file type has no app to open it.
+  Future<void> _view(BuildContext context) async {
+    final result = await OpenFilex.open(item.path);
+    if (result.type == ResultType.done || !context.mounted) return;
+    final ext = p.extension(item.name).replaceFirst('.', '');
+    await showMessage(
+      context,
+      'File Launch Failed!',
+      "Make sure you have an app installed that can open '.$ext' file type",
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const dim = 48.0;
@@ -623,7 +645,7 @@ class _DuplicateTile extends StatelessWidget {
               message: 'Open file',
               child: InkWell(
                 customBorder: const CircleBorder(),
-                onTap: () => OpenFilex.open(item.path),
+                onTap: () => _view(context),
                 child: thumb,
               ),
             ),

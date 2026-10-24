@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import '../app.dart';
@@ -22,9 +20,6 @@ class SettingsScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: Listenable.merge([settings, premium]),
       builder: (context, _) {
-        final locations = Platform.isIOS
-            ? const [StorageSelection.internal, StorageSelection.customFolder]
-            : StorageSelection.values;
         return PanelScaffold(
           title: 'Settings',
           body: ListView(
@@ -40,6 +35,8 @@ class SettingsScreen extends StatelessWidget {
                     ? 'Custom: ${settings.customFolder}'
                     : settings.storage.label,
                 onTap: () async {
+                  final locations = await scope.storage.availableLocations();
+                  if (!context.mounted) return;
                   final s = await chooseOne(
                     context,
                     title: 'Scan Location',
@@ -51,6 +48,17 @@ class SettingsScreen extends StatelessWidget {
                   if (s == null || !context.mounted) return;
                   if (!premium.allowsStorage(s)) {
                     return showPaywall(context);
+                  }
+                  if ((s == StorageSelection.sdCard ||
+                          s == StorageSelection.internalPlusSdCard) &&
+                      !await scope.storage.hasSdCard()) {
+                    settings.storage = StorageSelection.internal;
+                    if (!context.mounted) return;
+                    return showMessage(
+                      context,
+                      'SD Card Not Found!',
+                      'Please re-check the device memory card slot.',
+                    );
                   }
                   if (s == StorageSelection.customFolder) {
                     final folder = await scope.storage.pickFolder();
@@ -79,6 +87,20 @@ class SettingsScreen extends StatelessWidget {
                     return showPaywall(context);
                   }
                   settings.algorithm = a;
+                  // `ShowSimilarImageWarningIfNeeded`, shown on choosing it.
+                  if (a == ScanAlgorithm.sameAppearance &&
+                      !settings.similarImageWarningDisabled) {
+                    final dontRemind = await confirm(
+                      context,
+                      title: 'Similar image scan',
+                      message:
+                          'This scan can take time. Please review each image '
+                          'carefully; false positives are possible.',
+                      yes: 'Dont remind again',
+                      no: 'Ok',
+                    );
+                    if (dontRemind) settings.similarImageWarningDisabled = true;
+                  }
                 },
               ),
               _OptionCard(

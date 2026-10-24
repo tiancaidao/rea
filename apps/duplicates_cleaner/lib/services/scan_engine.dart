@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -17,6 +18,7 @@ class ScanRequest {
     required this.sizeExclusion,
     this.verifyContent = true,
     this.extraFiles = const [],
+    this.listedPaths,
   });
 
   final List<String> roots;
@@ -31,6 +33,12 @@ class ScanRequest {
   /// Files found outside [roots], such as assets exported from the iOS
   /// Photos library, scanned together with the walked files.
   final List<DuplicateItem> extraFiles;
+
+  /// Files to scan instead of walking [roots]. An image scan of Android's
+  /// internal storage reads them from the MediaStore index, as the original's
+  /// `FetchInternalStorageImageFilesIndexBased` does; these paths skip the
+  /// extension filter, since the index only lists images.
+  final List<String>? listedPaths;
 }
 
 enum ScanPhase { enumerating, analyzing, comparing }
@@ -47,6 +55,11 @@ typedef ProgressCallback = void Function(ScanProgress progress);
 /// Directories that are unreadable or never contain user files.
 const _skippedDirs = {'Android/data', 'Android/obb'};
 
+/// `FileCheck.GetXhash` returns 0 for files shorter than this, and the
+/// original never stores a file whose hash is 0, so the same content and same
+/// size scans skip them.
+const _minHashableSize = 2048;
+
 /// Pure-Dart port of the original `FilesScanner` pipeline. It walks the roots,
 /// filters by extension and size, then groups files by the chosen algorithm.
 class ScanEngine {
@@ -59,8 +72,17 @@ class ScanEngine {
   bool get _cancelled => isCancelled?.call() ?? false;
 
   Future<List<DuplicateGroup>> run() async {
-    final files = [...await enumerate(), ...request.extraFiles];
+    var files = [...await enumerate(), ...request.extraFiles];
     if (_cancelled) return const [];
+    // Same size goes through the original's content pipeline too
+    // (`ProcessFiles`), so it shares the hash's size floor.
+    if (request.algorithm == ScanAlgorithm.sameContent ||
+        request.algorithm == ScanAlgorithm.sameSize) {
+      files = [
+        for (final f in files)
+          if (f.size >= _minHashableSize) f,
+      ];
+    }
     final groups = switch (request.algorithm) {
       ScanAlgorithm.sameContent => await _bySameContent(files),
       ScanAlgorithm.sameName => _bySameName(files),
@@ -78,52 +100,78 @@ class ScanEngine {
     return groups;
   }
 
-  /// Iterative walk, like `FileUtility.FetchStorageFilesIterative`.
+  /// Breadth-first walk, like `FileUtility.FetchStorageFilesIterative`
+  /// (a queue, hidden files included), so the first copy found, which is kept,
+  /// is the one nearest the root.
   Future<List<DuplicateItem>> enumerate() async {
     final result = <DuplicateItem>[];
     final seen = <String>{};
-    final stack = <Directory>[for (final r in request.roots) Directory(r)];
+    final listed = request.listedPaths;
+    if (listed != null) {
+      for (final path in listed) {
+        if (_cancelled) break;
+        await _add(File(path), result, seen, filterExtension: false);
+      }
+      return result;
+    }
+    final queue = Queue<Directory>.of([
+      for (final r in request.roots) Directory(r),
+    ]);
     var visited = 0;
-    while (stack.isNotEmpty && !_cancelled) {
-      final dir = stack.removeLast();
+    while (queue.isNotEmpty && !_cancelled) {
+      final dir = queue.removeFirst();
       List<FileSystemEntity> entries;
       try {
         entries = await dir.list(followLinks: false).toList();
       } on FileSystemException {
         continue;
       }
+      // Files first, then subfolders, as the original enumerates them.
+      final subdirs = <Directory>[];
       for (final e in entries) {
-        final name = p.basename(e.path);
-        if (name.startsWith('.')) continue;
         if (e is Directory) {
           if (_skippedDirs.any((s) => e.path.endsWith(s))) continue;
-          stack.add(e);
+          subdirs.add(e);
         } else if (e is File) {
-          final ext = p.extension(name).replaceFirst('.', '').toLowerCase();
-          if (!request.extensions.contains(ext)) continue;
-          FileStat stat;
-          try {
-            stat = await e.stat();
-          } on FileSystemException {
-            continue;
-          }
-          if (!request.sizeExclusion.allows(stat.size)) continue;
-          if (!seen.add(e.absolute.path)) continue;
-          result.add(
-            DuplicateItem(
-              path: e.path,
-              name: name,
-              size: stat.size,
-              modified: stat.modified,
-            ),
-          );
+          await _add(e, result, seen);
         }
       }
+      queue.addAll(subdirs);
       if (++visited % 25 == 0) {
         onProgress?.call(ScanProgress(ScanPhase.enumerating, 0, dir.path));
       }
     }
     return result;
+  }
+
+  Future<void> _add(
+    File file,
+    List<DuplicateItem> result,
+    Set<String> seen, {
+    bool filterExtension = true,
+  }) async {
+    final name = p.basename(file.path);
+    if (filterExtension) {
+      final ext = p.extension(name).replaceFirst('.', '').toLowerCase();
+      if (!request.extensions.contains(ext)) return;
+    }
+    FileStat stat;
+    try {
+      stat = await file.stat();
+    } on FileSystemException {
+      return;
+    }
+    if (stat.type != FileSystemEntityType.file) return;
+    if (!request.sizeExclusion.allows(stat.size)) return;
+    if (!seen.add(file.absolute.path)) return;
+    result.add(
+      DuplicateItem(
+        path: file.path,
+        name: name,
+        size: stat.size,
+        modified: stat.modified,
+      ),
+    );
   }
 
   List<DuplicateGroup> _groupBy(
@@ -175,8 +223,7 @@ class ScanEngine {
     }
 
     // Optional extra step: split each bucket by real byte equality, so a hash
-    // collision (including every file under 2 KB, which all hash to 0) never
-    // offers a different file for deletion.
+    // collision never offers a different file for deletion.
     final groups = <DuplicateGroup>[];
     for (var done = 0; done < buckets.length && !_cancelled; done++) {
       var remaining = [...buckets[done]];
