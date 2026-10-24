@@ -12,7 +12,8 @@ class StoreOffer {
   final double rawPrice;
   final String currencySymbol;
   final StoreProduct? product; // null for preview prices
-  StoreOffer(this.id, StoreProduct this.product)
+  final Package? package; // the offering package it came from, if any
+  StoreOffer(this.id, StoreProduct this.product, [this.package])
       : price = product.priceString,
         rawPrice = product.price,
         currencySymbol = product.priceString.replaceAll(RegExp(r'[\d.,\s\u00a0]'), '');
@@ -20,6 +21,7 @@ class StoreOffer {
   /// US list price, for builds with no store (store screenshots).
   StoreOffer.preview(this.id, this.rawPrice)
       : product = null,
+        package = null,
         currencySymbol = r'$',
         price = '\$${rawPrice.toStringAsFixed(2)}';
 }
@@ -27,7 +29,9 @@ class StoreOffer {
 /// App Store and Google Play subscriptions through RevenueCat, which
 /// validates receipts and tells our API about renewals and cancellations
 /// (webhook → POST /v1/billing/revenuecat). Premium is the RevenueCat
-/// entitlement [entitlement]; purchases belong to the Firebase account
+/// entitlement [entitlement]. The plans come from the current offering's
+/// annual and monthly packages, so the store product ids can be anything;
+/// purchases belong to the Firebase account
 /// (RevenueCat app user id = Firebase uid) once signed in.
 ///
 ///   --dart-define=REVENUECAT_IOS_KEY=appl_...  --dart-define=REVENUECAT_ANDROID_KEY=goog_...
@@ -39,7 +43,7 @@ class Billing {
   Billing._();
   static final Billing I = Billing._();
 
-  static const entitlement = 'premium';
+  static const entitlement = 'lulu_wake_pro';
   static const productId = 'premium_yearly';
   static const _iosKey = String.fromEnvironment('REVENUECAT_IOS_KEY');
   static const _androidKey = String.fromEnvironment('REVENUECAT_ANDROID_KEY');
@@ -116,8 +120,16 @@ class Billing {
       };
     }
     try {
+      final offering = (await Purchases.getOfferings()).current;
+      final packages = {'premium_yearly': offering?.annual, 'premium_monthly': offering?.monthly};
+      final found = {
+        for (final id in ids)
+          if (packages[id] != null) id: StoreOffer(id, packages[id]!.storeProduct, packages[id]),
+      };
+      if (found.isNotEmpty) return found;
+      // No offering: look the products up by id. Play reports subscriptions
+      // as "<product>:<base plan>".
       final list = await Purchases.getProducts(ids.toList());
-      // Play reports subscriptions as "<product>:<base plan>"
       return {for (final p in list) p.identifier.split(':').first: StoreOffer(p.identifier.split(':').first, p)};
     } catch (_) {
       return {};
@@ -133,7 +145,9 @@ class Billing {
     final offer = (await products({id}))[id];
     if (offer?.product == null) return 'The subscription isn\'t set up in the store yet.';
     try {
-      final r = await Purchases.purchase(PurchaseParams.storeProduct(offer!.product!));
+      final r = await Purchases.purchase(offer!.package != null
+          ? PurchaseParams.package(offer.package!)
+          : PurchaseParams.storeProduct(offer.product!));
       _apply(r.customerInfo);
       unawaited(Backend.I.syncPurchases());
       return AppState.I.premium ? null : 'The purchase went through but Premium isn\'t active yet.';

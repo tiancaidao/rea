@@ -188,7 +188,7 @@ function createApp({ db, auth, bucket, revenueCat = {}, fetchImpl = fetch }) {
     }),
   );
 
-  // Mirror the RevenueCat "premium" entitlement into users/{uid}.premium. A
+  // Mirror the RevenueCat "lulu_wake_pro" entitlement into users/{uid}.premium. A
   // gift-card Premium that is still running is kept when the store has none.
   async function recordPremium(uid, premium) {
     const ref = db.doc(`users/${uid}`);

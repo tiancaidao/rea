@@ -1,9 +1,9 @@
 // RevenueCat: the app buys through the RevenueCat SDK (App Store and Google
 // Play), RevenueCat validates the receipts, and this service mirrors the
-// "premium" entitlement into users/{uid}.premium. The RevenueCat app user id
+// "lulu_wake_pro" entitlement into users/{uid}.premium. The RevenueCat app user id
 // is the Firebase uid.
 
-const ENTITLEMENT = "premium";
+const ENTITLEMENT = "lulu_wake_pro";
 const API = "https://api.revenuecat.com/v1";
 
 const anonymous = (id) => !id || String(id).startsWith("$RCAnonymousID:");

@@ -325,7 +325,7 @@ test("RevenueCat webhook mirrors the premium entitlement", async (t) => {
     type: "INITIAL_PURCHASE",
     app_user_id: "u1",
     aliases: ["$RCAnonymousID:abc", "u1"],
-    entitlement_ids: ["premium"],
+    entitlement_ids: ["lulu_wake_pro"],
     product_id: "premium_yearly:yearly",
     period_type: "TRIAL",
     expiration_at_ms: now + 7 * DAY,
@@ -340,7 +340,7 @@ test("RevenueCat webhook mirrors the premium entitlement", async (t) => {
   await hook({
     type: "EXPIRATION",
     app_user_id: "u1",
-    entitlement_ids: ["premium"],
+    entitlement_ids: ["lulu_wake_pro"],
     expiration_at_ms: now - 1000,
   });
   assert.equal(db.docs.get("users/u1").premium.active, false);
@@ -348,7 +348,7 @@ test("RevenueCat webhook mirrors the premium entitlement", async (t) => {
   await hook({
     type: "EXPIRATION",
     app_user_id: "gift",
-    entitlement_ids: ["premium"],
+    entitlement_ids: ["lulu_wake_pro"],
     expiration_at_ms: now - 1000,
   });
   assert.equal(db.docs.get("users/gift").premium.source, "giftcard");
@@ -362,7 +362,7 @@ test("billing sync reads the subscriber from RevenueCat", async (t) => {
       JSON.stringify({
         subscriber: {
           entitlements: {
-            premium: {
+            lulu_wake_pro: {
               expires_date: new Date(Date.now() + 300 * DAY).toISOString(),
               product_identifier: "premium_yearly",
             },

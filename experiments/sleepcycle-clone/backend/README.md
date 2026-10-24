@@ -65,7 +65,8 @@ for private testing.
 - **Subscriptions (RevenueCat):** create `premium_yearly` (1 year, 7-day
   trial) and `premium_monthly` in App Store Connect and Play Console, add both
   apps to a RevenueCat project, attach the products to an entitlement named
-  `premium`, and connect the stores (App Store Connect API key, Play service
+  `lulu_wake_pro`, put them in the default offering as the `$rc_annual` and
+  `$rc_monthly` packages (the app reads the plans from there), and connect the stores (App Store Connect API key, Play service
   account). Build the app with `--dart-define=REVENUECAT_IOS_KEY=appl_...` and
   `--dart-define=REVENUECAT_ANDROID_KEY=goog_...` (public SDK keys). For the
   server, create the Secret Manager secrets `revenuecat-api-key` (a secret v1
