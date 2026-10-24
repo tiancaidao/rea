@@ -1025,6 +1025,7 @@ class _HelpPageState extends State<HelpPage> {
         'Nights: ${AppState.I.nights.length}\n\nDescribe the problem:\n';
     final uri = Uri(
         scheme: 'mailto',
+        path: 'support@matchlab.sg',
         query: 'subject=${Uri.encodeComponent('Help with Lullwake')}'
             '&body=${Uri.encodeComponent(info)}');
     if (!await launchUrl(uri) && mounted) toast(context, 'No email app found');
