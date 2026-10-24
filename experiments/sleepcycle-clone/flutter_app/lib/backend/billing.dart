@@ -11,11 +11,17 @@ class StoreOffer {
   final String price; // localized, e.g. "$39.99"
   final double rawPrice;
   final String currencySymbol;
-  final StoreProduct product;
-  StoreOffer(this.id, this.product)
+  final StoreProduct? product; // null for preview prices
+  StoreOffer(this.id, StoreProduct this.product)
       : price = product.priceString,
         rawPrice = product.price,
-        currencySymbol = product.priceString.replaceAll(RegExp(r'[\d.,\s ]'), '');
+        currencySymbol = product.priceString.replaceAll(RegExp(r'[\d.,\s\u00a0]'), '');
+
+  /// US list price, for builds with no store (store screenshots).
+  StoreOffer.preview(this.id, this.rawPrice)
+      : product = null,
+        currencySymbol = r'$',
+        price = '\$${rawPrice.toStringAsFixed(2)}';
 }
 
 /// App Store and Google Play subscriptions through RevenueCat, which
@@ -36,6 +42,12 @@ class Billing {
   static const productId = 'premium_yearly';
   static const _iosKey = String.fromEnvironment('REVENUECAT_IOS_KEY');
   static const _androidKey = String.fromEnvironment('REVENUECAT_ANDROID_KEY');
+
+  /// --dart-define=PREVIEW_PRICES=true shows the US list prices on the
+  /// paywall when no store is configured (for store screenshots); buying
+  /// still needs the store.
+  static const _previewPrices = bool.fromEnvironment('PREVIEW_PRICES');
+  static const _listPrices = {'premium_yearly': 39.99, 'premium_monthly': 9.99};
 
   bool _ready = false;
   bool get available => _ready;
@@ -91,7 +103,13 @@ class Billing {
 
   /// Store details for [ids]; products not set up in the store are missing.
   Future<Map<String, StoreOffer>> products(Set<String> ids) async {
-    if (!_ready) return {};
+    if (!_ready) {
+      if (!_previewPrices) return {};
+      return {
+        for (final id in ids)
+          if (_listPrices[id] != null) id: StoreOffer.preview(id, _listPrices[id]!),
+      };
+    }
     try {
       final list = await Purchases.getProducts(ids.toList());
       // Play reports subscriptions as "<product>:<base plan>"
@@ -108,9 +126,9 @@ class Billing {
   Future<String?> buy(String id) async {
     if (!_ready) return 'The store isn\'t available in this build.';
     final offer = (await products({id}))[id];
-    if (offer == null) return 'The subscription isn\'t set up in the store yet.';
+    if (offer?.product == null) return 'The subscription isn\'t set up in the store yet.';
     try {
-      final r = await Purchases.purchase(PurchaseParams.storeProduct(offer.product));
+      final r = await Purchases.purchase(PurchaseParams.storeProduct(offer!.product!));
       _apply(r.customerInfo);
       unawaited(Backend.I.syncPurchases());
       return AppState.I.premium ? null : 'The purchase went through but Premium isn\'t active yet.';
