@@ -11,27 +11,15 @@ initializeApp({
   storageBucket: process.env.STORAGE_BUCKET,
 });
 
-let publisher = null;
-const packageName = process.env.PLAY_PACKAGE_NAME || null;
-if (packageName) {
-  const { androidpublisher } = require("@googleapis/androidpublisher");
-  const { GoogleAuth } = require("google-auth-library");
-  publisher = androidpublisher({
-    version: "v3",
-    auth: new GoogleAuth({
-      scopes: ["https://www.googleapis.com/auth/androidpublisher"],
-    }),
-  });
-}
-
 const app = createApp({
   // a named database keeps this app's data apart when the project is shared
   db: getFirestore(process.env.FIRESTORE_DATABASE || "(default)"),
   auth: getAuth(),
   bucket: getStorage().bucket(),
-  publisher,
-  packageName,
-  appleBundleId: process.env.APPLE_BUNDLE_ID || "com.matchlab.lullwake",
+  revenueCat: {
+    apiKey: process.env.REVENUECAT_API_KEY || null,
+    webhookAuth: process.env.REVENUECAT_WEBHOOK_AUTH || null,
+  },
 });
 
 const port = Number(process.env.PORT || 8080);

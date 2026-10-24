@@ -3,19 +3,23 @@
 #
 #   scripts/deploy.sh <project-id> [--account you@example.com] [--region asia-southeast1]
 #                     [--database sleep-tracker] [--audio-dir ../flutter_app/assets/audio]
-#                     [--play-package com.example.sleep_tracker]
+#                     [--revenuecat]
 #                     [--create --billing <ACCOUNT_ID>]
 #
 # Safe in a project shared with other apps: data lives in its own named
 # Firestore database (rules deployed to that database only), media in its own
 # private bucket served via signed URLs (no Storage rules are changed), and the
 # app is registered as a separate Android app. Only Firebase Auth is shared.
+# --revenuecat wires the RevenueCat secret API key and webhook Authorization
+# value from Secret Manager (secrets revenuecat-api-key and
+# revenuecat-webhook-auth, created beforehand). Then point the RevenueCat
+# webhook at <api-url>/v1/billing/revenuecat with that Authorization value.
 # Idempotent: re-running updates rules, the API and the seed data.
 set -euo pipefail
 
 PROJECT="${1:?usage: deploy.sh <project-id> [options]}"; shift
 REGION="asia-southeast1"; DATABASE="sleep-tracker"
-CREATE=0; BILLING=""; AUDIO_DIR=""; PLAY_PACKAGE=""; ACCOUNT=""
+CREATE=0; BILLING=""; AUDIO_DIR=""; REVENUECAT=0; ACCOUNT=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --create) CREATE=1 ;;
@@ -23,7 +27,7 @@ while [ $# -gt 0 ]; do
     --region) REGION="$2"; shift ;;
     --database) DATABASE="$2"; shift ;;
     --audio-dir) AUDIO_DIR="$2"; shift ;;
-    --play-package) PLAY_PACKAGE="$2"; shift ;;
+    --revenuecat) REVENUECAT=1 ;;
     --account) ACCOUNT="$2"; shift ;;
     *) echo "unknown option $1"; exit 2 ;;
   esac
@@ -51,7 +55,7 @@ echo "▸ billing check"
 echo "▸ enabling APIs"
 G services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
   firestore.googleapis.com identitytoolkit.googleapis.com storage.googleapis.com \
-  iamcredentials.googleapis.com androidpublisher.googleapis.com
+  iamcredentials.googleapis.com secretmanager.googleapis.com
 
 echo "▸ Firestore database '$DATABASE' ($REGION)"
 G firestore databases describe --database="$DATABASE" >/dev/null 2>&1 || \
@@ -93,10 +97,17 @@ G iam service-accounts add-iam-policy-binding "$SA" --member="serviceAccount:$SA
 
 echo "▸ Cloud Run: sleep-tracker-api ($REGION)"
 ENV="STORAGE_BUCKET=$BUCKET,GOOGLE_CLOUD_PROJECT=$PROJECT,FIRESTORE_DATABASE=$DATABASE"
-[ -n "$PLAY_PACKAGE" ] && ENV="$ENV,PLAY_PACKAGE_NAME=$PLAY_PACKAGE"
+SECRETS=()
+if [ "$REVENUECAT" = 1 ]; then
+  for s in revenuecat-api-key revenuecat-webhook-auth; do
+    G secrets add-iam-policy-binding "$s" --member="serviceAccount:$SA" \
+      --role=roles/secretmanager.secretAccessor >/dev/null
+  done
+  SECRETS=(--update-secrets="REVENUECAT_API_KEY=revenuecat-api-key:latest,REVENUECAT_WEBHOOK_AUTH=revenuecat-webhook-auth:latest")
+fi
 # public ingress: every /v1 route verifies a Firebase ID token itself
 G run deploy sleep-tracker-api --source="$HERE/api" --region="$REGION" \
-  --service-account="$SA" --allow-unauthenticated --set-env-vars="$ENV" \
+  --service-account="$SA" --allow-unauthenticated --set-env-vars="$ENV" ${SECRETS[@]+"${SECRETS[@]}"} \
   --min-instances=0 --max-instances=3 --memory=512Mi
 URL="$(G run services describe sleep-tracker-api --region="$REGION" --format='value(status.url)')"
 

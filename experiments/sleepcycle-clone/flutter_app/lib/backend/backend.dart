@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -69,6 +68,7 @@ class Backend {
   FirebaseAuth get _auth => FirebaseAuth.instance;
   FirebaseFirestore get _db => FirebaseFirestore.instanceFor(app: Firebase.app(), databaseId: BackendConfig.database);
   User? get user => enabled ? _auth.currentUser : null;
+  Stream<User?> get authChanges => enabled ? _auth.authStateChanges() : const Stream.empty();
 
   Future<void> init() async {
     if (!BackendConfig.enabled) return;
@@ -190,12 +190,10 @@ class Backend {
   Future<Map<String, dynamic>?> weather(double lat, double lon) async =>
       (await _api('GET', '/v1/weather?lat=$lat&lon=$lon')) as Map<String, dynamic>?;
 
-  /// Server check of a store purchase: a Play purchase token, or on iOS a
-  /// StoreKit 2 signed transaction.
-  Future<Map<String, dynamic>?> verifyPurchase(String productId, String purchaseToken) async => (await _api(
-          'POST', '/v1/billing/verify',
-          body: {'productId': productId, 'purchaseToken': purchaseToken, 'platform': Platform.isIOS ? 'ios' : 'android'}))
-      as Map<String, dynamic>?;
+  /// Asks the API to re-read this account's subscription from RevenueCat
+  /// right after a purchase or restore (the webhook may lag behind).
+  Future<Map<String, dynamic>?> syncPurchases() async =>
+      (await _api('POST', '/v1/billing/sync')) as Map<String, dynamic>?;
 
   Future<Map<String, dynamic>?> recommendations({int? goalMinutes}) async {
     final tz = DateTime.now().timeZoneOffset.inMinutes;

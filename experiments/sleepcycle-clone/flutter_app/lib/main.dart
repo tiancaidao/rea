@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app_state.dart';
 import 'backend/backend.dart';
+import 'backend/billing.dart';
 import 'device/notifications.dart';
 import 'theme.dart';
 import 'strings.dart';
@@ -15,6 +16,7 @@ Future<void> main() async {
   LicenseRegistry.addLicense(_mediaCredits);
   await S.load();
   await Backend.I.init();
+  await Billing.I.init();
   await Notifications.I.init();
   await AppState.I.load();
   if (Backend.I.user != null) await AppState.I.syncFromCloud();

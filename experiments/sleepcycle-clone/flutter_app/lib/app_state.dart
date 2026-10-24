@@ -365,6 +365,11 @@ class AppState extends ChangeNotifier {
   // ── account ───────────────────────────────────────────────────────────────
   String email = 'demo@example.com';
   bool premium = false;
+  void setPremium(bool on) {
+    if (premium == on) return;
+    premium = on;
+    notifyListeners();
+  }
 
   // ── alarm ─────────────────────────────────────────────────────────────────
   int alarmHour = 7;

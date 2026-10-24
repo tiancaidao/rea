@@ -21,8 +21,8 @@ flutter test                # unit tests for the algorithms
 ### Backend
 
 By default the app is local-only. To use the real backend (Firebase Auth,
-Firestore sync, streamed sleep aid, weekly reports, weather, Play Billing
-verification) see [`../backend/README.md`](../backend/README.md):
+Firestore sync, streamed sleep aid, weekly reports, weather, subscriptions
+through RevenueCat) see [`../backend/README.md`](../backend/README.md):
 
 ```bash
 flutter run --dart-define=BACKEND=emulator                 # local Firebase emulators + API

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../app_state.dart';
@@ -35,7 +34,7 @@ class PaywallScreen extends StatefulWidget {
 class _PaywallScreenState extends State<PaywallScreen> {
   PaywallConfig? _cfg;
   bool _loading = true;
-  Map<String, ProductDetails> _store = {};
+  Map<String, StoreOffer> _store = {};
   String? _selected;
   bool _trialOn = true; // the opt-in variant's trial switch
   bool _buying = false;
@@ -91,7 +90,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   bool _yearly(String id) => (_cfg!.products[id] as Map?)?['period'] == 'P1Y';
 
-  String _money(ProductDetails d, double v) => '${d.currencySymbol}${v.toStringAsFixed(2)}';
+  String _money(StoreOffer d, double v) => '${d.currencySymbol}${v.toStringAsFixed(2)}';
 
   String? _perMonth(String id) {
     final d = _store[id];
@@ -128,18 +127,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
     setState(() => _buying = true);
     final id = _selected!;
     try {
-      // Real Play Billing + server verification when signed in; until the
-      // subscription exists in Play Console, a local trial.
-      var paid = false;
-      if (Backend.I.user != null) {
+      // The store through RevenueCat; builds without a RevenueCat key
+      // (development) start a local trial instead.
+      final paid = Billing.I.available;
+      if (paid) {
         final err = await Billing.I.buy(id);
-        if (err == null) {
-          paid = true;
-        } else if (mounted) {
-          toast(context, '$err Starting a local trial.');
+        if (err != null) {
+          if (mounted) toast(context, err);
+          return;
         }
+      } else {
+        AppState.I.premium = true;
       }
-      if (!paid) AppState.I.premium = true;
       if (_showTrial) await _trialStarted(id);
       if (paid && _module('gift_cards') != null && mounted) await _shareGiftCards();
       if (mounted) _close();

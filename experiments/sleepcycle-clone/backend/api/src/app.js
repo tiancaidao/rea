@@ -5,14 +5,14 @@
 // (profile, settings, nights) is read/written by the app directly in
 // Firestore under security rules; this service does the work that needs a
 // server: signed media URLs, cross-night insights, third-party calls (weather,
-// Google Play) and privileged writes (premium status, account deletion).
+// RevenueCat) and privileged writes (premium status, account deletion).
 
 const express = require("express");
 const { weeklyReport, DAY } = require("./insights");
 const { currentWeather } = require("./weather");
 const { recommendations } = require("./recommendations");
 const paywalls = require("./paywalls");
-const apple = require("./apple");
+const rc = require("./revenuecat");
 
 const DEFAULT_CONFIG = {
   minAppVersion: "0.1.0",
@@ -30,20 +30,11 @@ const DEFAULT_CONFIG = {
  * @param deps.db        Firestore
  * @param deps.auth      firebase-admin Auth
  * @param deps.bucket    Cloud Storage bucket (sleep-aid media)
- * @param deps.publisher Google Play androidpublisher client, or null
- * @param deps.packageName Android package name for Play verification
- * @param deps.appleBundleId iOS bundle id App Store transactions must carry
+ * @param deps.revenueCat {apiKey, webhookAuth}: RevenueCat secret API key and
+ *                       the webhook's Authorization value (either may be null)
  * @param deps.fetchImpl fetch (injectable for tests)
  */
-function createApp({
-  db,
-  auth,
-  bucket,
-  publisher = null,
-  packageName = null,
-  appleBundleId = "com.matchlab.lullwake",
-  fetchImpl = fetch,
-}) {
+function createApp({ db, auth, bucket, revenueCat = {}, fetchImpl = fetch }) {
   const app = express();
   app.use(express.json({ limit: "2mb" }));
   // one structured line per request (Cloud Logging parses JSON on stdout)
@@ -197,59 +188,84 @@ function createApp({
     }),
   );
 
-  // Verify a Google Play subscription purchase and record premium status.
+  // Mirror the RevenueCat "premium" entitlement into users/{uid}.premium. A
+  // gift-card Premium that is still running is kept when the store has none.
+  async function recordPremium(uid, premium) {
+    const ref = db.doc(`users/${uid}`);
+    const snap = await ref.get();
+    const cur = snap.exists ? snap.data().premium : null;
+    if (
+      !premium.active &&
+      cur &&
+      cur.source === "giftcard" &&
+      cur.expiry > Date.now()
+    )
+      return cur;
+    await ref.set({ premium }, { merge: true });
+    try {
+      const u = await auth.getUser(uid);
+      await auth.setCustomUserClaims(uid, {
+        ...(u.customClaims || {}),
+        premium: premium.active,
+      });
+    } catch {
+      // not a Firebase user (yet): the Firestore record is enough
+    }
+    return premium;
+  }
+
+  // The app calls this after a purchase or restore so Premium is on the
+  // server at once, without waiting for the webhook.
   app.post(
-    "/v1/billing/verify",
+    "/v1/billing/sync",
     requireUser,
     asyncRoute(async (req, res) => {
-      const { purchaseToken, productId } = req.body || {};
-      if (!purchaseToken)
-        return res.status(400).json({ error: "purchaseToken required" });
-      // App Store (StoreKit 2): the token is a signed transaction we verify ourselves
-      if (
-        (req.body || {}).platform === "ios" ||
-        purchaseToken.split(".").length === 3
-      ) {
-        const tx = apple.verifyTransaction(purchaseToken);
-        const premium = apple.premiumFrom(tx, { bundleId: appleBundleId });
-        await db.doc(`users/${req.user.uid}`).set({ premium }, { merge: true });
-        await auth.setCustomUserClaims(req.user.uid, {
-          ...(req.user.claims || {}),
-          premium: premium.active,
-        });
-        return res.json(premium);
-      }
-      if (!publisher || !packageName) {
+      if (!revenueCat.apiKey)
         return res.status(501).json({
-          error:
-            "Play verification not configured (set PLAY_PACKAGE_NAME and grant the service account Play Console access)",
+          error: "RevenueCat not configured (set REVENUECAT_API_KEY)",
         });
+      const subscriber = await rc.fetchSubscriber(req.user.uid, {
+        apiKey: revenueCat.apiKey,
+        fetchImpl,
+      });
+      res.json(
+        await recordPremium(req.user.uid, rc.premiumFromSubscriber(subscriber)),
+      );
+    }),
+  );
+
+  // RevenueCat webhook (purchases, renewals, cancellations, expirations,
+  // transfers). RevenueCat sends the Authorization value set in its
+  // dashboard; with a secret API key the subscriber is re-read from
+  // RevenueCat, as it recommends, else the event itself is used.
+  app.post(
+    "/v1/billing/revenuecat",
+    asyncRoute(async (req, res) => {
+      if (
+        !revenueCat.webhookAuth ||
+        req.get("authorization") !== revenueCat.webhookAuth
+      )
+        return res.status(401).json({ error: "bad webhook authorization" });
+      const ev = (req.body || {}).event || {};
+      if (ev.type === "TEST") return res.json({ ok: true, updated: [] });
+      const updated = [];
+      for (const uid of rc.eventUids(ev)) {
+        let premium;
+        if (revenueCat.apiKey) {
+          const subscriber = await rc.fetchSubscriber(uid, {
+            apiKey: revenueCat.apiKey,
+            fetchImpl,
+          });
+          premium = rc.premiumFromSubscriber(subscriber);
+        } else if (ev.type === "TRANSFER") {
+          continue; // needs the REST key to know each side's state
+        } else {
+          premium = rc.premiumFromEvent(ev);
+        }
+        await recordPremium(uid, premium);
+        updated.push(uid);
       }
-      const { data } = await publisher.purchases.subscriptionsv2.get({
-        packageName,
-        token: purchaseToken,
-      });
-      const active = [
-        "SUBSCRIPTION_STATE_ACTIVE",
-        "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
-      ].includes(data.subscriptionState);
-      const line = (data.lineItems || [])[0] || {};
-      const premium = {
-        active,
-        state: data.subscriptionState,
-        productId: line.productId || productId || null,
-        expiry: line.expiryTime ? Date.parse(line.expiryTime) : null,
-        trial: Boolean(
-          line.offerDetails && /trial/i.test(line.offerDetails.offerId || ""),
-        ),
-        verifiedAt: Date.now(),
-      };
-      await db.doc(`users/${req.user.uid}`).set({ premium }, { merge: true });
-      await auth.setCustomUserClaims(req.user.uid, {
-        ...(req.user.claims || {}),
-        premium: active,
-      });
-      res.json(premium);
+      res.json({ ok: true, updated });
     }),
   );
 
@@ -352,7 +368,7 @@ function createApp({
   );
 
   // Start the free trial once per account; the trial reminder is scheduled on
-  // the device. Store purchases still go through /v1/billing/verify.
+  // the device. Store purchases come from RevenueCat (/v1/billing/*).
   app.post(
     "/v1/trial/start",
     requireUser,

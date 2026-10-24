@@ -6,9 +6,14 @@ const { makeDb, fakeAuth } = require("./fake_firestore");
 
 const DAY = 86400e3;
 
-async function start(initial) {
+async function start(initial, opts = {}) {
   const db = makeDb(initial);
-  const server = createApp({ db, auth: fakeAuth, bucket: null }).listen(0);
+  const server = createApp({
+    db,
+    auth: fakeAuth,
+    bucket: null,
+    ...opts,
+  }).listen(0);
   const base = `http://127.0.0.1:${server.address().port}`;
   const call = (method, path, body, uid = "u1") =>
     fetch(base + path, {
@@ -295,4 +300,91 @@ test("gift cards: a subscriber gets two codes once, and a friend can redeem one"
     (await call("POST", "/v1/giftcards/issue", {}, "friend")).status,
     403,
   );
+});
+
+test("RevenueCat webhook mirrors the premium entitlement", async (t) => {
+  const now = Date.now();
+  const { db, server } = await start(
+    {
+      "users/gift": {
+        premium: { active: true, source: "giftcard", expiry: now + 30 * DAY },
+      },
+    },
+    { revenueCat: { webhookAuth: "Bearer hook-secret" } },
+  );
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const hook = (event, auth = "Bearer hook-secret") =>
+    fetch(`${base}/v1/billing/revenuecat`, {
+      method: "POST",
+      headers: { authorization: auth, "content-type": "application/json" },
+      body: JSON.stringify({ event }),
+    });
+  assert.equal((await hook({ type: "TEST" }, "Bearer wrong")).status, 401);
+  const buy = await hook({
+    type: "INITIAL_PURCHASE",
+    app_user_id: "u1",
+    aliases: ["$RCAnonymousID:abc", "u1"],
+    entitlement_ids: ["premium"],
+    product_id: "premium_yearly:yearly",
+    period_type: "TRIAL",
+    expiration_at_ms: now + 7 * DAY,
+    store: "PLAY_STORE",
+  });
+  assert.deepStrictEqual((await buy.json()).updated, ["u1"]);
+  const p = db.docs.get("users/u1").premium;
+  assert.deepStrictEqual(
+    [p.active, p.source, p.productId, p.trial],
+    [true, "store", "premium_yearly", true],
+  );
+  await hook({
+    type: "EXPIRATION",
+    app_user_id: "u1",
+    entitlement_ids: ["premium"],
+    expiration_at_ms: now - 1000,
+  });
+  assert.equal(db.docs.get("users/u1").premium.active, false);
+  // a running gift card outlives a lapsed store subscription
+  await hook({
+    type: "EXPIRATION",
+    app_user_id: "gift",
+    entitlement_ids: ["premium"],
+    expiration_at_ms: now - 1000,
+  });
+  assert.equal(db.docs.get("users/gift").premium.source, "giftcard");
+});
+
+test("billing sync reads the subscriber from RevenueCat", async (t) => {
+  const seen = [];
+  const fetchImpl = async (url, init) => {
+    seen.push([url, init.headers.authorization]);
+    return new Response(
+      JSON.stringify({
+        subscriber: {
+          entitlements: {
+            premium: {
+              expires_date: new Date(Date.now() + 300 * DAY).toISOString(),
+              product_identifier: "premium_yearly",
+            },
+          },
+          subscriptions: {
+            premium_yearly: { period_type: "normal", store: "app_store" },
+          },
+        },
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+  };
+  const { db, server, call } = await start(
+    {},
+    { revenueCat: { apiKey: "sk_test" }, fetchImpl },
+  );
+  t.after(() => server.close());
+  const r = await call("POST", "/v1/billing/sync");
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).active, true);
+  assert.deepStrictEqual(seen, [
+    ["https://api.revenuecat.com/v1/subscribers/u1", "Bearer sk_test"],
+  ]);
+  assert.equal(db.docs.get("users/u1").premium.store, "app_store");
 });

@@ -153,12 +153,11 @@ test("API against emulators", async (t) => {
   });
 
   await t.test(
-    "billing verify reports when Play is not configured",
+    "billing sync reports when RevenueCat is not configured",
     async () => {
-      const r = await fetch(`${base}/v1/billing/verify`, {
+      const r = await fetch(`${base}/v1/billing/sync`, {
         method: "POST",
         headers: H,
-        body: JSON.stringify({ purchaseToken: "x" }),
       });
       assert.equal(r.status, 501);
     },
