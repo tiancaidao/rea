@@ -17,6 +17,8 @@ models, or brand assets.
 | Path | What it is |
 |---|---|
 | `flutter_app/` | **The app.** Original Flutter sleep tracker (iOS + Android): tracking, hypnogram + score, smart-alarm settings, sign-in, sleep-aid, paywall; native accelerometer platform channel (Kotlin + Swift). Runs on a simulated night out of the box. |
+| `flutter_app/android/wear/` | **Wear OS companion** (Kotlin + Compose for Wear): start/stop the night, snooze/stop the alarm, Automatic/Melody/Vibrate alarm type (silent wake-up), Snore Alert buzz. Talks to the phone app over the Wearable Data Layer (`WearPlugin.kt` on the phone). Build with `cd flutter_app/android && ./gradlew :wear:assembleDebug`, install on a paired watch with `adb -s <watch> install`. |
+| `backend/api/src/paywalls.json` | **Server-driven paywalls**: ten variants as module lists and the per-placement A/B split, served by `GET /v1/paywall`; override in Firestore at `config/paywalls`. The app bundles the same file as its offline fallback. |
 | `sleep_core/` | **Original** sleep-tracking algorithms (movement, staging, smart alarm, snore events) from standard techniques — not ported. Plain Python with tests. |
 | `ml/training/` | Trains your **own** models (sleep stager, snore classifier, 16-D snore-signature embedder) in PyTorch → ONNX, on synthetic or your own data. Runnable. |
 | `mock-api/` | Zero-dependency mock backend (token auth, persisted sessions, computed insights, paywall, sleep-aid catalog). |

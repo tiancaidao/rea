@@ -72,6 +72,15 @@
                 <category android:name="android.intent.category.HEALTH_PERMISSIONS"/>
             </intent-filter>
         </activity-alias>
+        <!-- requests from the Wear OS app (android/wear) -->
+        <service
+            android:name=".PhoneWearService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED"/>
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/sleepclone/request"/>
+            </intent-filter>
+        </service>
         <!-- overnight tracking service (flutter_foreground_task) -->
         <service
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"

@@ -432,6 +432,20 @@ class LiveTracker {
       ? (_snoreSeconds(snoreEvents) / 60).round()
       : (_soundEpochs.where((d) => d > 15).length * epochSeconds / 60).round();
 
+  /// Whether the sleeper seems to be snoring right now (for Snore Alert):
+  /// most of the last 10 s called snoring by the model, or without it the
+  /// last two minutes all loud.
+  bool get snoringNow {
+    if (modelActive) {
+      final n = snoreProbs.length;
+      if (n < 10) return false;
+      return snoreProbs.sublist(n - 10).where((p) => !p.isNaN && p >= model!.snoreThreshold).length >= 6;
+    }
+    final n = _soundEpochs.length;
+    final need = (120 / epochSeconds).ceil();
+    return n >= need && _soundEpochs.sublist(n - need).every((d) => d > 15);
+  }
+
   /// Cough events (model only; null when the model isn't running).
   int? get coughs =>
       modelActive ? detectSnoreEvents(coughProbs, onThreshold: 0.5, majorityWindow: 1, minEventFrames: 1).length : null;

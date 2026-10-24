@@ -9,6 +9,7 @@ import '../backend/backend.dart';
 import '../device/health_connect.dart';
 import '../device/location.dart';
 import '../device/notifications.dart';
+import '../device/wear.dart';
 import '../theme.dart';
 import '../paywall/paywall_config.dart';
 import '../paywall/paywall_screen.dart';
@@ -243,26 +244,6 @@ class WakeUpPhasePage extends StatelessWidget {
         AboutBlock('The smart alarm wakes you at your lightest moment within this window, ending at your alarm time. '
             'A 30-minute window gives the best chance of catching light sleep.'),
       ]);
-}
-
-class WatchPage extends StatelessWidget {
-  const WatchPage({super.key});
-  @override
-  Widget build(BuildContext context) => Watch((context, s) => SettingsPage(title: 'Watch', children: [
-        NavRow(
-            icon: Icons.notifications,
-            title: 'Alarm type',
-            value: s.pref('watch_alarm_type'),
-            onTap: () => push(context,
-                const SimpleRadioPage('Alarm type', 'watch_alarm_type', ['Automatic', 'Phone only', 'Watch only']))),
-        NavRow(
-            icon: Icons.play_circle_outline,
-            title: 'Automatic start',
-            value: s.pref('watch_auto_start'),
-            onTap: () => push(context, const SimpleRadioPage('Automatic start', 'watch_auto_start', ['On', 'Off']))),
-        const AboutBlock('With a paired watch, keep your phone nearby — it still does the analysis — and use the '
-            'watch to wake you silently. Automatic start begins tracking when the watch detects you\'ve fallen asleep.'),
-      ]));
 }
 
 class WeeklyReportPage extends StatelessWidget {
@@ -610,6 +591,109 @@ class HealthConnectPage extends StatelessWidget {
       ]);
 }
 
+/// Wear OS: the watch is a remote for the phone (start and stop, snooze,
+/// silent wake-up by vibration) plus Snore Alert.
+class WatchPage extends StatelessWidget {
+  const WatchPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    Wear.I.refresh();
+    return SettingsPage(title: 'Watch', children: [
+      ValueListenableBuilder(
+        valueListenable: Wear.I.connected,
+        builder: (context, on, _) => ListTile(
+          leading: Icon(on ? Icons.watch : Icons.watch_off_outlined, color: context.palette.accent),
+          title: Text(on ? 'Watch connected' : 'No watch connected'),
+          subtitle: Text(on ? 'Start, stop and snooze from your wrist' : 'Install the app on your Wear OS watch',
+              style: TextStyle(color: context.palette.textMuted)),
+        ),
+      ),
+      Watch((context, s) => NavRow(
+          icon: Icons.vibration,
+          title: 'Alarm type',
+          value: s.pref('wear_alarm_type'),
+          onTap: () => push(
+              context,
+              const SimpleRadioPage('Alarm type', 'wear_alarm_type', ['Automatic', 'Melody', 'Vibrate'],
+                  about: 'Automatic picks by where you start the night. Started from the phone: melody. '
+                      'Started from the watch: the watch vibrates silently, and the phone joins in if you '
+                      'are still asleep after two minutes. You can also change it on the watch.')))),
+      Watch((context, s) => NavRow(
+          icon: Icons.record_voice_over,
+          title: 'Snore Alert',
+          value: s.pref('snore_alert'),
+          onTap: () => push(context, const SnoreAlertPage()))),
+      const AboutBlock('Keep the phone by your bed: it does the tracking and decides when to wake you. '
+          'Think of the watch as a remote that can wake you silently.'),
+    ]);
+  }
+}
+
+/// Snore Alert: an intro (three pages), consent, then the switch. While
+/// tracking, ongoing snoring buzzes the watch to nudge you onto your side.
+class SnoreAlertPage extends StatefulWidget {
+  const SnoreAlertPage({super.key});
+  @override
+  State<SnoreAlertPage> createState() => _SnoreAlertPageState();
+}
+
+class _SnoreAlertPageState extends State<SnoreAlertPage> {
+  int _page = 0;
+  static const _intro = [
+    (
+      Icons.watch,
+      'Snore Alert',
+      'When the phone hears you snoring, your watch vibrates gently so you change position.'
+    ),
+    (
+      Icons.airline_seat_flat,
+      'Sleep on your side',
+      'Lying on your back can narrow the airway and make snoring worse. Turning to your side often helps.'
+    ),
+    (
+      Icons.science,
+      'Still experimental',
+      'It only works if you are the only one snoring in the room, and the buzzing can disturb your sleep. '
+          'Turn it on only if you accept that.'
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppState.I;
+    if (s.pref('snore_alert') == 'On' || _page >= _intro.length) {
+      return SettingsPage(title: 'Snore Alert', children: [
+        PrefRadioList(prefKey: 'snore_alert', options: const ['On', 'Off']),
+        AboutBlock(Wear.I.connected.value
+            ? 'Buzzes at most every 10 minutes while snoring goes on.'
+            : 'Connect a Wear OS watch with the app for Snore Alert to work.'),
+      ]);
+    }
+    final (icon, title, body) = _intro[_page];
+    final last = _page == _intro.length - 1;
+    return SettingsPage(title: 'Snore Alert', children: [
+      const SizedBox(height: 32),
+      Center(child: CircleArt(icon: icon, size: 180)),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(28, 28, 28, 12),
+        child:
+            Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Text(body, textAlign: TextAlign.center, style: TextStyle(color: context.palette.textMuted, height: 1.4)),
+      ),
+      const SizedBox(height: 32),
+      Center(
+        child: PillButton(last ? 'I understand, turn it on' : 'Next', width: 260, onPressed: () {
+          if (last) s.setPref('snore_alert', 'On');
+          setState(() => _page++);
+        }),
+      ),
+    ]);
+  }
+}
+
 // ── Profile › Premium ───────────────────────────────────────────────────────
 
 class OnlineBackupPage extends StatelessWidget {
@@ -841,12 +925,21 @@ class HelpPage extends StatefulWidget {
         'Next to your bed, screen down and charging, when tracking with the microphone. With the '
             'accelerometer, put it on the mattress near your pillow.'
       ),
-      ('Do I need to be online?', 'No. Tracking and analysis run on your phone. Weather, backup and streamed '
-          'sleep aid need a connection.'),
-      ('Can two people sleep in the same bed?', 'Yes. With the microphone, keep the phone on your side of the '
-          'bed; sounds closest to the phone count most.'),
-      ('How do I start without an alarm?', 'Pick "No alarm" under the alarm time, or long-press the app icon and '
-          'choose Start without alarm.'),
+      (
+        'Do I need to be online?',
+        'No. Tracking and analysis run on your phone. Weather, backup and streamed '
+            'sleep aid need a connection.'
+      ),
+      (
+        'Can two people sleep in the same bed?',
+        'Yes. With the microphone, keep the phone on your side of the '
+            'bed; sounds closest to the phone count most.'
+      ),
+      (
+        'How do I start without an alarm?',
+        'Pick "No alarm" under the alarm time, or long-press the app icon and '
+            'choose Start without alarm.'
+      ),
     ],
     'Top questions': [
       (
@@ -854,34 +947,64 @@ class HelpPage extends StatefulWidget {
         'The smart alarm wakes you in light sleep within your wake-up phase (30 minutes by default). Set the '
             'phase in Profile › Settings › Wake up phase, or use a regular alarm.'
       ),
-      ('How is quality calculated?', 'From time asleep, how often you woke, and how much deep and REM sleep you '
-          'had, compared with what is typical for you.'),
-      ('Why is my graph flat?', 'The phone didn\'t pick up movement or sound. Check its placement and that the '
-          'microphone permission is on.'),
-      ('Why did the alarm not ring?', 'Keep the app open while tracking and allow Alarms & reminders. Battery '
-          'savers can stop apps overnight; exclude this app in your phone\'s battery settings.'),
-      ('What do the snore minutes mean?', 'Minutes of the night with sounds classified as snoring. Turn on Sound '
-          'detection to keep the recordings so you can listen back.'),
+      (
+        'How is quality calculated?',
+        'From time asleep, how often you woke, and how much deep and REM sleep you '
+            'had, compared with what is typical for you.'
+      ),
+      (
+        'Why is my graph flat?',
+        'The phone didn\'t pick up movement or sound. Check its placement and that the '
+            'microphone permission is on.'
+      ),
+      (
+        'Why did the alarm not ring?',
+        'Keep the app open while tracking and allow Alarms & reminders. Battery '
+            'savers can stop apps overnight; exclude this app in your phone\'s battery settings.'
+      ),
+      (
+        'What do the snore minutes mean?',
+        'Minutes of the night with sounds classified as snoring. Turn on Sound '
+            'detection to keep the recordings so you can listen back.'
+      ),
     ],
     'Sleep aid': [
-      ('Can I listen offline?', 'Free sounds are part of the app. Streamed tracks download when you open them; '
-          'set Wi-Fi only and how long to keep them in Profile › Settings › Sleep aid.'),
-      ('How do I stop the sound?', 'It fades out after the time you set. You can also pause or stop it from the '
-          'notification.'),
+      (
+        'Can I listen offline?',
+        'Free sounds are part of the app. Streamed tracks download when you open them; '
+            'set Wi-Fi only and how long to keep them in Profile › Settings › Sleep aid.'
+      ),
+      (
+        'How do I stop the sound?',
+        'It fades out after the time you set. You can also pause or stop it from the '
+            'notification.'
+      ),
     ],
     'Subscriptions': [
-      ('How do I cancel my trial?', 'In your phone\'s app store subscriptions, before the trial ends. Deleting '
-          'the app doesn\'t cancel it.'),
-      ('I paid but Premium is locked', 'Profile › Premium › Restore purchases, signed in with the same store '
-          'account.'),
+      (
+        'How do I cancel my trial?',
+        'In your phone\'s app store subscriptions, before the trial ends. Deleting '
+            'the app doesn\'t cancel it.'
+      ),
+      (
+        'I paid but Premium is locked',
+        'Profile › Premium › Restore purchases, signed in with the same store '
+            'account.'
+      ),
       ('How do I redeem a gift card?', 'Profile › Premium › Redeem gift code.'),
     ],
     'Account settings': [
       ('How do I export my data?', 'Profile › More › Database › Export database to CSV.'),
-      ('How do I move to a new phone?', 'Turn on Online backup and sign in on the new phone with the same '
-          'account.'),
-      ('How do I delete my data?', 'Profile › More › Database › Erase all data. Signed in, this also erases the '
-          'online copy.'),
+      (
+        'How do I move to a new phone?',
+        'Turn on Online backup and sign in on the new phone with the same '
+            'account.'
+      ),
+      (
+        'How do I delete my data?',
+        'Profile › More › Database › Erase all data. Signed in, this also erases the '
+            'online copy.'
+      ),
       ('Can I import nights from my watch?', 'Turn on Health Connect and tap Import sleep from Health Connect.'),
     ],
   };
@@ -900,8 +1023,10 @@ class _HelpPageState extends State<HelpPage> {
   Future<void> _contact() async {
     final info = 'App: Sleep clone\nPlatform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}\n'
         'Nights: ${AppState.I.nights.length}\n\nDescribe the problem:\n';
-    final uri = Uri(scheme: 'mailto', query: 'subject=${Uri.encodeComponent('Help with Sleep clone')}'
-        '&body=${Uri.encodeComponent(info)}');
+    final uri = Uri(
+        scheme: 'mailto',
+        query: 'subject=${Uri.encodeComponent('Help with Sleep clone')}'
+            '&body=${Uri.encodeComponent(info)}');
     if (!await launchUrl(uri) && mounted) toast(context, 'No email app found');
   }
 

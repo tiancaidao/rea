@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import '../alarm/alarm_plan.dart';
 import '../alarm/alarm_ringer.dart';
+import '../app_state.dart';
 import '../device/device_sensors.dart';
 import '../device/notifications.dart';
+import '../device/wear.dart';
 import '../theme.dart';
 import 'widgets/common.dart';
 
@@ -40,6 +42,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
     super.initState();
     _clock = Timer.periodic(const Duration(seconds: 1), (_) => setState(() => _now = DateTime.now()));
     showOverLockScreen(true);
+    AppState.I.remote.addListener(_onRemote);
     _ring();
     try {
       _accel = accelerometerEventStream().listen(_onAccel, onError: (_) {});
@@ -51,7 +54,9 @@ class _AlarmScreenState extends State<AlarmScreen> {
     _clock.cancel();
     _snoozeTimer?.cancel();
     _accel?.cancel();
+    AppState.I.remote.removeListener(_onRemote);
     AlarmRinger.I.stop();
+    Wear.I.stopRinging();
     showOverLockScreen(false);
     super.dispose();
   }
@@ -59,8 +64,25 @@ class _AlarmScreenState extends State<AlarmScreen> {
   void _ring() {
     _snoozedUntil = null;
     _armedAt = DateTime.now();
-    AlarmRinger.I.start();
+    // Watch › Alarm type: vibrate the watch silently, or ring it alongside
+    // the phone's melody
+    final s = AppState.I;
+    final watch = Wear.I.connected.value;
+    final silent = watch && Wear.vibrateFor(s.pref('wear_alarm_type'), startedFromWatch: s.startedFromWatch);
+    if (watch) Wear.I.ring(vibrate: silent);
+    AlarmRinger.I.start(silent: silent);
     Notifications.I.showAlarmNow();
+  }
+
+  void _onRemote() {
+    final r = AppState.I.remote.value;
+    if (r == 'snooze') {
+      AppState.I.remote.value = null;
+      _snooze();
+    } else if (r == 'stop_alarm' || r == 'stop') {
+      AppState.I.remote.value = null;
+      _stop();
+    }
   }
 
   // a sharp jolt well away from resting gravity, after a short grace period
@@ -75,6 +97,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
     if (!_ringing || !widget.plan.canSnooze) return;
     final d = widget.plan.snoozeFor(DateTime.now());
     AlarmRinger.I.stop();
+    Wear.I.stopRinging();
     Notifications.I.cancel(Notifications.alarmId);
     setState(() {
       _snoozes++;

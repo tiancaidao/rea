@@ -16,6 +16,7 @@ import 'data/sleep_aid_catalog.dart';
 import 'data/sound_clips.dart';
 import 'device/health_connect.dart';
 import 'device/notifications.dart';
+import 'device/wear.dart';
 
 /// App-wide state for the prototype: alarm, settings, recorded nights and the
 /// chosen sleep-aid track. Persisted locally with shared_preferences (a real
@@ -33,6 +34,8 @@ class AppState extends ChangeNotifier {
   /// Restore saved state and warm up local assets. Call once before runApp.
   Future<void> load() async {
     Notifications.I.onAction = _onNotificationAction;
+    Wear.I.init();
+    Wear.I.requests.listen(_onWatch);
     await RecordedNight.load();
     await _loadAudioPool();
     unawaited(loadAndPruneDownloads());
@@ -342,9 +345,7 @@ class AppState extends ChangeNotifier {
   /// with no placeholders at all, our own ambience.
   String? audioFor(SleepAidItem item) {
     if (item.asset != null &&
-        (freeAudio.contains(item.asset) ||
-            ambienceAudio.contains(item.asset) ||
-            alarmAudio.contains(item.asset))) {
+        (freeAudio.contains(item.asset) || ambienceAudio.contains(item.asset) || alarmAudio.contains(item.asset))) {
       return item.asset;
     }
     final pool = item.minutes == 0
@@ -375,11 +376,13 @@ class AppState extends ChangeNotifier {
     alarmMinute = m;
     notifyListeners();
     if (pref('bedtime_reminder') != 'No reminder') unawaited(rescheduleReminders());
+    if (!tracking) unawaited(publishToWatch());
   }
 
   void setAlarmMode(int m) {
     alarmMode = m;
     notifyListeners();
+    if (!tracking) unawaited(publishToWatch());
   }
 
   int get windowMinutes => int.tryParse(pref('wake_phase')) ?? 30;
@@ -390,8 +393,6 @@ class AppState extends ChangeNotifier {
     'sleep_goal': 'Not set',
     'alarm_sound': 'Soft breeze',
     'wake_phase': '30',
-    'watch_alarm_type': 'Automatic',
-    'watch_auto_start': 'Off',
     'weekly_report': 'On',
     'weekly_report_notify': 'On',
     'bedtime_reminder': 'No reminder',
@@ -400,6 +401,8 @@ class AppState extends ChangeNotifier {
     'online_backup': 'On',
     'sleep_aid_download': 'Wi-Fi only',
     'sleep_aid_keep': '20 nights (recommended)',
+    'wear_alarm_type': 'Automatic',
+    'snore_alert': 'Off',
     'sleep_aid_fade': '30 minutes',
     'sleep_notes': 'Hide',
     'wake_up_mood': 'Hide',
@@ -436,6 +439,7 @@ class AppState extends ChangeNotifier {
     }
     if (key == 'sound_detection') unawaited(pruneClips());
     if (key == 'sleep_aid_keep') unawaited(loadAndPruneDownloads());
+    if (key == 'wear_alarm_type') unawaited(publishToWatch());
     if (Backend.I.user != null) unawaited(_syncPref(key).catchError((_) {}));
     notifyListeners();
   }
@@ -473,6 +477,50 @@ class AppState extends ChangeNotifier {
   ];
   void notesChanged() => notifyListeners();
 
+  // ── watch ─────────────────────────────────────────────────────────────────
+  /// Whether the tracking screen is open (a night is being recorded).
+  bool tracking = false;
+
+  /// The current night was started from the watch (Alarm type › Automatic).
+  bool startedFromWatch = false;
+
+  /// Requests from the watch for the open tracking or alarm screen
+  /// (stop · snooze · stop_alarm); the screen clears it after acting.
+  final ValueNotifier<String?> remote = ValueNotifier(null);
+
+  void _onWatch(String r) {
+    switch (r) {
+      case 'start':
+        if (tracking) return;
+        startedFromWatch = true;
+        Notifications.I.tapped.value = 'start_watch';
+      case 'stop' || 'snooze' || 'stop_alarm':
+        remote.value = r;
+      case 'sync':
+        unawaited(publishToWatch());
+      default:
+        if (r.startsWith('alarm_type:')) setPref('wear_alarm_type', r.substring('alarm_type:'.length));
+    }
+  }
+
+  /// Send the phone's state (tracking, alarm window, alarm type) to the watch.
+  Future<void> publishToWatch({DateTime? since, DateTime? alarmStart, DateTime? alarmEnd}) => Wear.I.publish(
+        tracking: tracking,
+        since: since,
+        alarmStart: alarmStart ??
+            (alarmMode == 2 ? null : bedtimeAlarm().subtract(Duration(minutes: alarmMode == 0 ? windowMinutes : 0))),
+        alarmEnd: alarmEnd ?? (alarmMode == 2 ? null : bedtimeAlarm()),
+        alarmType: pref('wear_alarm_type'),
+      );
+
+  /// The next alarm time from the alarm settings.
+  DateTime bedtimeAlarm() {
+    final now = DateTime.now();
+    var t = DateTime(now.year, now.month, now.day, alarmHour, alarmMinute);
+    if (!t.isAfter(now)) t = t.add(const Duration(days: 1));
+    return t;
+  }
+
   // ── nights ────────────────────────────────────────────────────────────────
   final List<Night> nights = []; // oldest first
   int? selectedNight; // index into nights; null = latest
@@ -497,7 +545,13 @@ class AppState extends ChangeNotifier {
       final overlaps = nights.any((n) => n.wentToBed.isBefore(s.endedAt) && n.wokeUp.isAfter(s.startedAt));
       if (overlaps) continue;
       final n = Night(
-          session: s, weatherF: null, snoreMinutes: 0, coughs: 0, breathingPerHour: 0, regularity: 0, notes: {'Imported'});
+          session: s,
+          weatherF: null,
+          snoreMinutes: 0,
+          coughs: 0,
+          breathingPerHour: 0,
+          regularity: 0,
+          notes: {'Imported'});
       nights.add(n);
       added.add(n);
     }

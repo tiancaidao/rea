@@ -15,6 +15,7 @@ import 'profile_tab.dart';
 import 'programs_tab.dart';
 import 'sleep_tab.dart';
 import 'statistics_tab.dart';
+import 'tracking_screen.dart';
 import 'whats_new.dart';
 import 'widgets/common.dart';
 
@@ -129,6 +130,10 @@ class _MainShellState extends State<MainShell> {
         await showPaywall(context, Placement.campaign);
       case 'gift':
         await showPaywall(context, Placement.giftCards);
+      case 'start_watch':
+        // started from the watch: no placement tips, straight to tracking
+        s.goTab(0);
+        if (!s.tracking) await Navigator.push(context, MaterialPageRoute(builder: (_) => const TrackingScreen()));
       case 'start_alarm' || 'start':
         s.goTab(0);
         if (s.alarmMode == 2) s.setAlarmMode(0);

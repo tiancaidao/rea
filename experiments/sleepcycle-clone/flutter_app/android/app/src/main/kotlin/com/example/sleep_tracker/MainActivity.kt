@@ -11,6 +11,7 @@ class MainActivity : FlutterFragmentActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         flutterEngine.plugins.add(DevicePlugin())
+        flutterEngine.plugins.add(WearPlugin())
         // While the alarm rings, show over the lock screen and wake the display.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "sleepclone/window")
             .setMethodCallHandler { call, result ->

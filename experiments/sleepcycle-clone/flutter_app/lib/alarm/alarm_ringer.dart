@@ -25,12 +25,21 @@ class AlarmRinger {
 
   static const _rampTime = Duration(seconds: 60);
   static const _backupVibrationAfter = Duration(seconds: 45);
+  static const _silentBackupAfter = Duration(minutes: 2);
 
-  Future<void> start() async {
+  /// [silent]: the watch wakes you by vibrating; the phone joins in only
+  /// if the alarm is still ringing after two minutes.
+  Future<void> start({bool silent = false}) async {
     if (ringing) return;
     ringing = true;
     final s = AppState.I;
     await s.pauseSleepAid();
+    if (silent) {
+      _vibrateLater = Timer(_silentBackupAfter, () {
+        if (ringing) unawaited(_playSound(s.pref('alarm_sound')));
+      });
+      return;
+    }
     final vibration = s.pref('vibration');
     if (vibration != 'Only vibration') unawaited(_playSound(s.pref('alarm_sound')));
     if (vibration == 'Only vibration') {
