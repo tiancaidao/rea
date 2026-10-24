@@ -14,6 +14,7 @@ Examples:
 """
 import argparse
 import base64
+import hashlib
 import json
 import os
 import sys
@@ -186,6 +187,37 @@ def sync_localizations(asc, kind: str, parent_rel: str, parent_id: str, current:
             asc.update(f"update {locale} localization", kind, have["id"], attributes)
 
 
+def sync_review_screenshot(asc: AppStoreConnect, sub_id: str, name: str) -> None:
+    """Uploads [name] (next to the definition file) as the subscription's App Review screenshot."""
+    path = os.path.join(products.SCRIPT_DIR, name)
+    if not os.path.isfile(path):
+        products.fail(f"Review screenshot not found: {path}")
+    current = asc.request("GET", f"/v1/subscriptions/{sub_id}/appStoreReviewScreenshot").get("data")
+    if current and (current.get("attributes", {}).get("assetDeliveryState") or {}).get("state") != "FAILED":
+        print(f"  review screenshot exists ({current['attributes'].get('fileName')})")
+        return
+    with open(path, "rb") as f:
+        data = f.read()
+    print(("  " if asc.apply else "  would ") + f"upload review screenshot {name}")
+    if not asc.apply:
+        return
+    if current:
+        asc.request("DELETE", f"/v1/subscriptionAppStoreReviewScreenshots/{current['id']}")
+    shot = asc.create("", "subscriptionAppStoreReviewScreenshots",
+                      {"fileName": os.path.basename(path), "fileSize": len(data)},
+                      {"subscription": ref("subscriptions", sub_id)})
+    for op in shot["attributes"]["uploadOperations"]:
+        part = data[op["offset"]:op["offset"] + op["length"]]
+        headers = {h["name"]: h["value"] for h in op.get("requestHeaders", [])}
+        r = requests.request(op["method"], op["url"], data=part, headers=headers, timeout=120)
+        if r.status_code >= 400:
+            products.fail(f"Uploading {name} failed: {r.status_code} {r.text[:200]}")
+    asc.request("PATCH", f"/v1/subscriptionAppStoreReviewScreenshots/{shot['id']}",
+                json={"data": {"type": "subscriptionAppStoreReviewScreenshots", "id": shot["id"],
+                               "attributes": {"uploaded": True,
+                                              "sourceFileChecksum": hashlib.md5(data).hexdigest()}}})
+
+
 def cmd_list(asc: AppStoreConnect, args) -> None:
     config = products.load(args.file)
     app_id = find_app(asc, args.bundle_id or config["ios_bundle_id"])
@@ -258,6 +290,9 @@ def cmd_sync(asc: AppStoreConnect, args) -> None:
         sync_localizations(asc, "subscriptionLocalizations", "subscription", sub_id,
                            current_locs, sub["localizations"])
 
+        if sub.get("review_screenshot"):
+            sync_review_screenshot(asc, sub_id, sub["review_screenshot"])
+
         if not has_availability(asc, sub_id):
             if territories is None:
                 territories = [t["id"] for t in asc.get_all("/v1/territories")[0]]
@@ -310,8 +345,9 @@ def cmd_sync(asc: AppStoreConnect, args) -> None:
     if not asc.apply:
         print("\nDry run: nothing was changed. Run again with --apply to make these changes.")
     else:
-        print("\nDone. Each new subscription still needs a review screenshot in App Store Connect "
-              "before it can be submitted with an app version.")
+        print("\nDone. New subscriptions go to review with the next app version; add them on its page "
+              "in App Store Connect" + ("." if all(s.get("review_screenshot") for s in config["subscriptions"])
+                                        else ", after adding a review screenshot to each."))
 
 
 def main() -> None:

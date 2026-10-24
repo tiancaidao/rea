@@ -23,14 +23,19 @@
           "play_offer_id": "free-trial-7d",
           "type": "free_trial",
           "duration": "P1W",
-          "stores": ["play", "ios"]
+          "stores": [
+            "play",
+            "ios"
+          ]
         },
         {
           "play_offer_id": "campaign-first-year",
           "type": "pay_as_you_go",
           "price_usd": "19.99",
           "periods": 1,
-          "stores": ["play"]
+          "stores": [
+            "play"
+          ]
         }
       ],
       "localizations": {
@@ -44,7 +49,8 @@
           ]
         }
       },
-      "review_note": "Unlocks Premium: sound recordings, full statistics, sleep aid library, sleep programs and extra alarm sounds. New subscribers get a 7-day free trial."
+      "review_note": "Unlocks Premium: sound recordings, full statistics, sleep aid library, sleep programs and extra alarm sounds. New subscribers get a 7-day free trial.",
+      "review_screenshot": "review_paywall.png"
     },
     {
       "product_id": "lullwake_premium_monthly",
@@ -64,7 +70,8 @@
           ]
         }
       },
-      "review_note": "Unlocks Premium: sound recordings, full statistics, sleep aid library, sleep programs and extra alarm sounds."
+      "review_note": "Unlocks Premium: sound recordings, full statistics, sleep aid library, sleep programs and extra alarm sounds.",
+      "review_screenshot": "review_paywall.png"
     }
   ]
 }
