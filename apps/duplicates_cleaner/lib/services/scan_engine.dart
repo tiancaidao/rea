@@ -16,6 +16,7 @@ class ScanRequest {
     required this.algorithm,
     required this.sizeExclusion,
     this.verifyContent = true,
+    this.extraFiles = const [],
   });
 
   final List<String> roots;
@@ -26,6 +27,10 @@ class ScanRequest {
   /// Confirm "same content" groups byte-for-byte. The original trusts its
   /// sampled hash alone; turning this off reproduces that exactly.
   final bool verifyContent;
+
+  /// Files found outside [roots], such as assets exported from the iOS
+  /// Photos library, scanned together with the walked files.
+  final List<DuplicateItem> extraFiles;
 }
 
 enum ScanPhase { enumerating, analyzing, comparing }
@@ -54,7 +59,7 @@ class ScanEngine {
   bool get _cancelled => isCancelled?.call() ?? false;
 
   Future<List<DuplicateGroup>> run() async {
-    final files = await enumerate();
+    final files = [...await enumerate(), ...request.extraFiles];
     if (_cancelled) return const [];
     final groups = switch (request.algorithm) {
       ScanAlgorithm.sameContent => await _bySameContent(files),
@@ -204,7 +209,7 @@ class ScanEngine {
     final images = files
         .where(
           (f) => AppConstants.decodableImageExtensions.contains(
-            p.extension(f.name).replaceFirst('.', '').toLowerCase(),
+            p.extension(f.path).replaceFirst('.', '').toLowerCase(),
           ),
         )
         .toList();

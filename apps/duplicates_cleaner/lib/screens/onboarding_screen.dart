@@ -22,7 +22,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     (
       AppMark(size: 210),
       'Welcome to the',
-      'Duplicates Cleaner',
+      'Duplicate Sweep',
       'Free up space by removing exact copies of your photos, music, '
           'videos and documents.',
     ),

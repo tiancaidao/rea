@@ -1,8 +1,13 @@
 /// Values recovered from the original app (`Constants`, `StaticDataStore`,
 /// `FilesScanner.FileCanBeProcessed`). See analysis/ANALYSIS.md.
 class AppConstants {
-  static const freeAppName = 'Duplicates Cleaner';
-  static const premiumAppName = 'Duplicates Cleaner Prime';
+  static const freeAppName = 'Duplicate Sweep';
+  static const premiumAppName = 'Duplicate Sweep Prime';
+
+  /// Linked from the paywall, as the stores require for subscriptions.
+  static const privacyPolicyUrl = 'https://www.matchlab.sg/privacy.html';
+  static const termsOfUseUrl =
+      'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
   /// Free users cannot delete a selection totalling this size or more (500 MB).
   static const freeFileSizeLimit = 524288000;
@@ -25,7 +30,17 @@ class AppConstants {
   );
 
   static const imageExtensions = {
-    'jpg', 'jpeg', 'png', 'gif', 'tiff', 'tif', 'bmp', 'heif', 'eps', 'raw', //
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'tiff',
+    'tif',
+    'bmp',
+    'heif',
+    'heic',
+    'eps',
+    'raw', //
   };
   static const audioExtensions = {
     'mp3',

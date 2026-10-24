@@ -50,4 +50,32 @@ void main() {
     c.sort(SortField.nameLength, ascending: true);
     expect(c.groups.map((g) => g.items.first.name), ['a', 'bb', 'ccc']);
   });
+
+  test('Photos items are deleted in one batch through the library', () async {
+    DuplicateItem asset(String id, {bool main = false}) => DuplicateItem(
+      path: '/cache/$id.heic',
+      name: '$id.heic',
+      size: 100,
+      modified: DateTime(2024),
+      assetId: id,
+      isMainFile: main,
+    );
+    final c = ResultsController([
+      DuplicateGroup([asset('a', main: true), asset('b'), asset('c')]),
+    ], autoSelect: true);
+    final batches = <List<String>>[];
+    final outcome = await c.deleteSelected(
+      deleteAssets: (ids) async {
+        batches.add(ids);
+        return ids.where((id) => id == 'b').toList();
+      },
+    );
+    expect(batches, [
+      ['b', 'c'],
+    ]);
+    expect(outcome.deleted, 1);
+    expect(outcome.freedBytes, 100);
+    expect(outcome.failed, ['c.heic']);
+    expect(c.groups.single.items.map((i) => i.assetId), ['a', 'c']);
+  });
 }

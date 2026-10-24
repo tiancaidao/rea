@@ -199,4 +199,32 @@ void main() {
       ['copy.jpg', 'orig.png'],
     ]);
   });
+
+  test('extra files outside the roots are matched with walked files', () async {
+    final data = randomBytes(20000, 7);
+    write('docs/a.bin', data);
+    final outside = Directory.systemTemp.createTempSync('dc_extra');
+    addTearDown(() => outside.deleteSync(recursive: true));
+    final exported = File(p.join(outside.path, 'IMG_0001.HEIC'))
+      ..writeAsBytesSync(data);
+    final groups = await ScanEngine(
+      ScanRequest(
+        roots: [root.path],
+        extensions: const {'bin'},
+        algorithm: ScanAlgorithm.sameContent,
+        sizeExclusion: FileSizeExclusion.none,
+        extraFiles: [
+          DuplicateItem(
+            path: exported.path,
+            name: 'IMG_0001.HEIC',
+            size: data.length,
+            modified: DateTime(2024),
+            assetId: 'asset-1',
+          ),
+        ],
+      ),
+    ).run();
+    expect(groups, hasLength(1));
+    expect(groups.single.items.map((i) => i.assetId), contains('asset-1'));
+  });
 }

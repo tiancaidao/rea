@@ -1,0 +1,1 @@
+storage,space,cleanup,copies,dedupe,photo,music,video,pdf,similar,organizer,remove,folder,cleaner

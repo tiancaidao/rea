@@ -48,7 +48,7 @@ class AppLog {
     final f = await _logFile();
     if (!await f.exists() || await f.length() == 0) return false;
     await SharePlus.instance.share(
-      ShareParams(files: [XFile(f.path)], subject: 'Duplicates Cleaner log'),
+      ShareParams(files: [XFile(f.path)], subject: 'Duplicate Sweep log'),
     );
     return true;
   }

@@ -1,0 +1,43 @@
+Duplicate Sweep finds exact copies of your files and helps you remove them safely, so you get your storage back without losing anything you care about.
+
+Downloads saved twice, photos copied into several folders, the same PDF in three places: duplicates pile up quietly. Pick a folder, tap Smart Scan, and Duplicate Sweep groups every set of identical files together, marks the original, and pre-selects only the extra copies.
+
+MATCHED BY CONTENT, NOT BY NAME
+• Files are compared by their content, so "IMG_2041.jpg" and "IMG_2041 (1).jpg" are recognised as the same photo, while two different files that happen to share a name are left alone.
+• An optional byte-by-byte check confirms every match before anything is offered for deletion.
+
+SCAN EVERY FILE TYPE
+• Photos: jpg, png, gif, heif, tiff, bmp and more
+• Music and audio: mp3, m4a, wav, flac, aac and more
+• Videos: mp4, mov, mkv, avi and more
+• Documents: pdf, docx, xlsx, pptx, epub, zip and more
+• Your own file extensions (Prime)
+
+YOU STAY IN CONTROL
+• The original in every set is always kept and clearly labelled.
+• Tap any file to preview it before you clean.
+• Choose exactly which copies to delete, or let auto-select do it for you.
+• A confirmation step before deletion is on by default.
+
+WHERE IT SCANS
+Duplicate Sweep scans the folders you choose in the Files app, including On My iPhone, iCloud Drive and connected drives, plus its own Duplicate Sweep folder. It does not read your Photos library.
+
+FINE-TUNE EVERY SCAN
+• Match by content, or by name, name and size, or size alone (Prime)
+• Find visually similar images (Prime)
+• Skip files by size: tiny, small, medium or large (Prime)
+• Sort and filter results by size, name, path or date (Prime)
+
+PRIVATE BY DESIGN
+Everything happens on your device. No account, no ads, no tracking, and your files never leave your phone.
+
+FREE AND PRIME
+The free version cleans up to 100 files and up to 500 MB per clean. Duplicate Sweep Prime removes those limits and unlocks every scan type, similar-image matching, custom extensions, and the sort and select filters.
+
+• Prime Lifetime: a one-time purchase.
+• Prime Monthly: an auto-renewing monthly subscription.
+
+Payment is charged to your Apple Account at confirmation of purchase. The subscription renews automatically unless it is cancelled at least 24 hours before the end of the current period, and your account is charged for renewal within 24 hours before the period ends. You can manage or cancel the subscription in your App Store account settings.
+
+Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Privacy Policy: https://www.matchlab.sg/privacy.html

@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../models/enums.dart';
+import 'photo_library.dart';
 
 class StorageUnavailable implements Exception {
   StorageUnavailable(this.title, this.message);
@@ -22,6 +23,9 @@ class StorageUnavailable implements Exception {
 class StorageService {
   static const internalRoot = '/storage/emulated/0';
   static const parallelRoot = '/storage/emulated/999';
+
+  /// On iOS, internal storage also means the Photos library.
+  final photos = PhotoLibraryService();
 
   Future<bool> ensureAccess() async {
     if (!Platform.isAndroid) return true;

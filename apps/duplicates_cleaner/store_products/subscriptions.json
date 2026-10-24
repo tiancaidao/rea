@@ -1,0 +1,68 @@
+{
+  "_comment": "The app's Prime products. play_subscriptions.py and asc_subscriptions.py create the auto-renewing subscriptions in each store; revenuecat_products.py adds every product (subscriptions and the one-time Lifetime purchase) to RevenueCat with the entitlement, offering and packages the app reads. Prime Lifetime is created in the store consoles (see store_listing/). Product ids must match PremiumPlan in lib/services/premium_service.dart. Prices are USD; each store converts them for other countries.",
+  "android_package": "com.matchlab.duplicatesweep",
+  "ios_bundle_id": "com.duplicates-cleaner.ios",
+  "subscription_group": {
+    "reference_name": "Duplicate Sweep Prime",
+    "localizations": {
+      "en-US": {
+        "name": "Duplicate Sweep Prime"
+      },
+      "en-GB": {
+        "name": "Duplicate Sweep Prime"
+      }
+    }
+  },
+  "revenuecat": {
+    "entitlement": {
+      "lookup_key": "prime",
+      "display_name": "Duplicate Sweep Prime"
+    },
+    "offering": {
+      "lookup_key": "default",
+      "display_name": "Default",
+      "make_current": true
+    },
+    "one_time_products": [
+      {
+        "product_id": "prime_lifetime",
+        "display_name": "Prime Lifetime",
+        "revenuecat_package": "$rc_lifetime"
+      }
+    ]
+  },
+  "subscriptions": [
+    {
+      "product_id": "prime_monthly",
+      "play_base_plan_id": "monthly",
+      "period": "P1M",
+      "reference_name": "Prime Monthly",
+      "group_level": 1,
+      "price_usd": "1.99",
+      "localizations": {
+        "en-US": {
+          "name": "Prime Monthly",
+          "description": "Unlimited cleaning and every scan, monthly",
+          "benefits": [
+            "Unlimited files per clean",
+            "SD card, USB and custom folders",
+            "Similar images and APK scans",
+            "Sort and select filters"
+          ]
+        },
+        "en-GB": {
+          "name": "Prime Monthly",
+          "description": "Unlimited cleaning and every scan, monthly",
+          "benefits": [
+            "Unlimited files per clean",
+            "SD card, USB and custom folders",
+            "Similar images and APK scans",
+            "Sort and select filters"
+          ]
+        }
+      },
+      "review_note": "Removes the free limits (100 files and 500 MB per clean) and unlocks every scan type, storage location and filter. Restore is on the paywall.",
+      "revenuecat_package": "$rc_monthly"
+    }
+  ]
+}

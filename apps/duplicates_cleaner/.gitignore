@@ -46,3 +46,17 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+tool/PlusJakartaSans.ttf
+
+# fastlane: local credentials, gems and run output
+/fastlane/.env
+/fastlane/report.xml
+/fastlane/README.md
+/vendor/bundle/
+/.bundle/
+
+# Store scripts: credentials and Python environments
+/google_play/google-play-credentials.json
+/google_play/.venv/
+/store_products/.venv/
+/store_products/.env

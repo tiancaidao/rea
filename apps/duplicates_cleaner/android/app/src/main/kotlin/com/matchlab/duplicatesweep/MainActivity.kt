@@ -1,4 +1,4 @@
-package com.example.duplicates_cleaner
+package com.matchlab.duplicatesweep
 
 import android.app.Activity
 import android.content.Intent

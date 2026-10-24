@@ -7,12 +7,15 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<!-- Photos and videos live in the Photos library, which is scanned as internal storage. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Duplicate Sweep scans your photos and videos to find duplicate copies you can delete.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Duplicates Cleaner</string>
+	<string>Duplicate Sweep</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
