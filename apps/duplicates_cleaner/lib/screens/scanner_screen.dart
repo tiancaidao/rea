@@ -17,6 +17,7 @@ import '../services/scan_engine.dart';
 import '../services/storage_service.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/panel_scaffold.dart';
+import '../widgets/themed.dart';
 
 /// Scan progress, results, selection and deletion (`ScannerPageActivity`).
 class ScannerScreen extends StatefulWidget {
@@ -156,7 +157,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     final blocked = results.freeTierBlockReason(
       isPremium: scope.premium.isPremium,
     );
-    if (blocked != null) return showUpgradeDialog(context, reason: blocked);
+    if (blocked != null) return showPaywall(context, reason: blocked);
     if (scope.settings.promptBeforeDeletion) {
       final ok = await confirm(
         context,
@@ -236,7 +237,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     if (f == null || !mounted) return;
     // Like the original, free users can open the filter; applying it is gated.
     if (!scope.premium.allowsSortAndSelectFilters) {
-      return showUpgradeDialog(
+      return showPaywall(
         context,
         reason: 'Selection filters are a premium feature.',
       );
@@ -259,7 +260,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     );
     if (picked == null || !mounted) return;
     if (!scope.premium.allowsSortAndSelectFilters) {
-      return showUpgradeDialog(
+      return showPaywall(
         context,
         reason: 'Sort filters are a premium feature.',
       );
@@ -274,41 +275,62 @@ class _ScannerScreenState extends State<ScannerScreen> {
       title: results == null
           ? 'Summary'
           : '${results.duplicateCount} duplicates',
+      header: results == null || results.groups.isEmpty
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: ListenableBuilder(
+                listenable: results,
+                builder: (_, _) => GlowOrb(
+                  size: 210,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FittedBox(
+                        child: Text(
+                          formatBytes(results.selectedBytes),
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${results.selectedCount} selected',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
       body: _error != null
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(_error!),
+                child: Text(_error!, textAlign: TextAlign.center),
               ),
             )
           : results == null
           ? _ProgressView(progress: _progress)
           : _ResultsView(results: results, onSelect: _select, onSort: _sort),
-      bottom: results == null
+      bottom: results == null || results.groups.isEmpty
           ? null
           : ListenableBuilder(
               listenable: results,
-              builder: (_, _) => Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: FilledButton.icon(
-                    onPressed: _deleting || results.selectedCount == 0
-                        ? null
-                        : _delete,
-                    icon: _deleting
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.delete_outline),
-                    label: Text(
-                      _deleting
-                          ? 'Deleting files...'
-                          : 'CAN BE DELETED (${formatBytes(results.selectedBytes)})',
-                    ),
-                  ),
+              builder: (_, _) => SizedBox(
+                width: double.infinity,
+                child: PrimaryButton(
+                  loading: _deleting,
+                  onPressed: results.selectedCount == 0 ? null : _delete,
+                  icon: Icons.cleaning_services_outlined,
+                  label: _deleting
+                      ? 'Deleting files...'
+                      : 'Clean Now (${formatBytes(results.selectedBytes)})',
                 ),
               ),
             ),
@@ -336,36 +358,49 @@ class _ProgressView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox.square(
-              dimension: 125,
-              child: Stack(
-                fit: StackFit.expand,
+            ProgressRing(
+              value: determinate ? p.percent / 100 : null,
+              size: 240,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(
-                    value: determinate ? p.percent / 100 : null,
-                    strokeWidth: 10,
-                    backgroundColor: Colors.black12,
-                    color: AppColors.accent,
-                  ),
-                  if (determinate)
-                    Center(
-                      child: Text(
-                        '${p.percent}%',
-                        style: const TextStyle(fontSize: 22),
-                      ),
+                  Text(
+                    determinate ? '${p.percent}%' : '...',
+                    style: const TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w700,
                     ),
+                  ),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-            Text(label, style: const TextStyle(fontSize: 18)),
-            const SizedBox(height: 8),
-            Text(
-              p?.path ?? '',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: AppColors.lightBlack),
+            const SizedBox(height: 32),
+            SoftCard(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  const IconBadge(icon: Icons.folder_open_outlined, size: 40),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      p?.path ?? 'Looking for files...',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -394,10 +429,22 @@ class _ResultsView extends StatelessWidget {
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(24),
-              child: Text(
-                'No duplicates found. Brilliant job done by you!',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconBadge(icon: Icons.check_rounded, size: 88, solid: true),
+                  SizedBox(height: 24),
+                  Text(
+                    'No duplicates found',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Brilliant job done by you!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textMuted),
+                  ),
+                ],
               ),
             ),
           );
@@ -411,37 +458,44 @@ class _ResultsView extends StatelessWidget {
         return Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
               child: Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onSelect,
-                      icon: const Icon(Icons.checklist),
-                      label: const Text('Select'),
-                    ),
+                  _ToolChip(
+                    icon: Icons.checklist,
+                    label: 'Select',
+                    onTap: onSelect,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onSort,
-                      icon: const Icon(Icons.sort),
-                      label: const Text('Sort'),
-                    ),
-                  ),
+                  const SizedBox(width: 10),
+                  _ToolChip(icon: Icons.sort, label: 'Sort', onTap: onSort),
                 ],
               ),
             ),
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                 itemCount: rows.length,
                 itemBuilder: (_, i) => switch (rows[i]) {
                   (String _, int n, DuplicateGroup g) => Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
-                    child: Text(
-                      'Set $n: ${g.items.length} files (${_setSize(g)})',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    padding: const EdgeInsets.fromLTRB(2, 16, 2, 6),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Set $n',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${g.items.length} files · ${_setSize(g)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   DuplicateItem item => _DuplicateTile(
@@ -471,86 +525,150 @@ class _DuplicateTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final thumb = ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: SizedBox.square(
-        dimension: AppConstants.thumbnailSize,
-        child: _isImage
-            ? Image.file(
-                File(item.path),
-                fit: BoxFit.cover,
-                cacheWidth: 120,
-                errorBuilder: (_, _, _) =>
-                    const Icon(Icons.broken_image_outlined),
-              )
-            : const ColoredBox(
-                color: AppColors.primary,
-                child: Icon(Icons.insert_drive_file_outlined),
+    const dim = 48.0;
+    final thumb = _isImage
+        ? ClipOval(
+            child: Image.file(
+              File(item.path),
+              width: dim,
+              height: dim,
+              fit: BoxFit.cover,
+              cacheWidth: 120,
+              errorBuilder: (_, _, _) => const IconBadge(
+                icon: Icons.broken_image_outlined,
+                size: dim,
+                solid: true,
               ),
-      ),
-    );
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(15),
-        onTap: onToggle,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Row(
-            children: [
-              Checkbox(value: item.checked, onChanged: (_) => onToggle()),
-              InkWell(onTap: () => OpenFilex.open(item.path), child: thumb),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 15),
+            ),
+          )
+        : IconBadge(
+            icon: Icons.insert_drive_file_outlined,
+            color:
+                AppColors.badges[p.extension(item.name).hashCode %
+                    AppColors.badges.length],
+            size: dim,
+            solid: true,
+          );
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onToggle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Tooltip(
+              message: 'Open file',
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => OpenFilex.open(item.path),
+                child: thumb,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          item.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        if (item.isMainFile)
-                          const Chip(
-                            label: Text(
-                              'Original',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                      ],
-                    ),
-                    Text(
-                      'Size: ${formatBytes(item.size)}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    Text(
-                      'Modified: ${formatDate(item.modified)}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    Text(
-                      item.path,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.lightBlack,
                       ),
+                      if (item.isMainFile) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'Original',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Modified ${formatDate(item.modified)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textMuted,
                     ),
-                  ],
-                ),
+                  ),
+                  Text(
+                    item.path,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              formatBytes(item.size),
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+            Checkbox(value: item.checked, onChanged: (_) => onToggle()),
+          ],
         ),
       ),
     );
   }
+}
+
+class _ToolChip extends StatelessWidget {
+  const _ToolChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: AppColors.background,
+    shape: const StadiumBorder(),
+    child: InkWell(
+      customBorder: const StadiumBorder(),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: AppColors.primary),
+            const SizedBox(width: 6),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 /// "45 KB each" when every file has the same size (content and size scans),

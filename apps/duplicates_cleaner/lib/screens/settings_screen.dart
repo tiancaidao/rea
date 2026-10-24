@@ -8,6 +8,7 @@ import '../models/enums.dart';
 import '../services/app_log.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/panel_scaffold.dart';
+import '../widgets/themed.dart';
 
 /// Scan location, scan type, size exclusion, toggles and custom extensions
 /// (`SettingsActivity`).
@@ -27,10 +28,11 @@ class SettingsScreen extends StatelessWidget {
         return PanelScaffold(
           title: 'Settings',
           body: ListView(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
             children: [
               _OptionCard(
                 icon: Icons.folder_outlined,
+                color: AppColors.badges[0],
                 title: 'Scan Location',
                 value:
                     settings.storage == StorageSelection.customFolder &&
@@ -48,7 +50,7 @@ class SettingsScreen extends StatelessWidget {
                   );
                   if (s == null || !context.mounted) return;
                   if (!premium.allowsStorage(s)) {
-                    return showUpgradeDialog(context);
+                    return showPaywall(context);
                   }
                   if (s == StorageSelection.customFolder) {
                     final folder = await scope.storage.pickFolder();
@@ -60,6 +62,7 @@ class SettingsScreen extends StatelessWidget {
               ),
               _OptionCard(
                 icon: Icons.manage_search,
+                color: AppColors.badges[3],
                 title: 'Scan Type',
                 value: settings.algorithm.label,
                 onTap: () async {
@@ -73,13 +76,14 @@ class SettingsScreen extends StatelessWidget {
                   );
                   if (a == null || !context.mounted) return;
                   if (!premium.allowsAlgorithm(a)) {
-                    return showUpgradeDialog(context);
+                    return showPaywall(context);
                   }
                   settings.algorithm = a;
                 },
               ),
               _OptionCard(
                 icon: Icons.filter_alt_outlined,
+                color: AppColors.badges[5],
                 title: 'File Size Exclusion',
                 value: settings.sizeExclusion.label,
                 onTap: () async {
@@ -93,14 +97,18 @@ class SettingsScreen extends StatelessWidget {
                   );
                   if (e == null || !context.mounted) return;
                   if (!premium.allowsSizeExclusion(e)) {
-                    return showUpgradeDialog(context);
+                    return showPaywall(context);
                   }
                   settings.sizeExclusion = e;
                 },
               ),
               Card(
                 child: SwitchListTile(
-                  secondary: const Icon(Icons.done_all),
+                  secondary: IconBadge(
+                    icon: Icons.done_all,
+                    color: AppColors.badges[4],
+                    size: 42,
+                  ),
                   title: const Text('Auto Select Duplicates'),
                   value: settings.autoSelectDuplicates,
                   onChanged: (v) => settings.autoSelectDuplicates = v,
@@ -108,7 +116,11 @@ class SettingsScreen extends StatelessWidget {
               ),
               Card(
                 child: SwitchListTile(
-                  secondary: const Icon(Icons.warning_amber_outlined),
+                  secondary: IconBadge(
+                    icon: Icons.warning_amber_outlined,
+                    color: AppColors.badges[2],
+                    size: 42,
+                  ),
                   title: const Text('Prompt Before File Deletion'),
                   value: settings.promptBeforeDeletion,
                   onChanged: (v) => settings.promptBeforeDeletion = v,
@@ -116,7 +128,11 @@ class SettingsScreen extends StatelessWidget {
               ),
               Card(
                 child: SwitchListTile(
-                  secondary: const Icon(Icons.verified_outlined),
+                  secondary: IconBadge(
+                    icon: Icons.verified_outlined,
+                    color: AppColors.badges[1],
+                    size: 42,
+                  ),
                   title: const Text('Confirm Same Content Byte by Byte'),
                   subtitle: const Text(
                     'Slower, but never groups files that only share sampled bytes',
@@ -126,31 +142,22 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                height: 64,
-                child: FilledButton.icon(
-                  icon: const Icon(Icons.add),
-                  label: const Text(
-                    'Custom Extensions',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  onPressed: () => premium.allowsCustomExtensions
-                      ? showDialog(
-                          context: context,
-                          builder: (_) => const _ExtensionsDialog(),
-                        )
-                      : showUpgradeDialog(context),
-                ),
+              PrimaryButton(
+                icon: Icons.add,
+                label: 'Custom Extensions',
+                onPressed: () => premium.allowsCustomExtensions
+                    ? showDialog(
+                        context: context,
+                        builder: (_) => const _ExtensionsDialog(),
+                      )
+                    : showPaywall(context),
               ),
               const SizedBox(height: 12),
               SizedBox(
-                height: 64,
+                height: 54,
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.ios_share),
-                  label: const Text(
-                    'Export Log',
-                    style: TextStyle(fontSize: 18),
-                  ),
+                  label: const Text('Export Log'),
                   onPressed: () async {
                     if (!await AppLog.export() && context.mounted) {
                       await showMessage(
@@ -173,12 +180,14 @@ class SettingsScreen extends StatelessWidget {
 class _OptionCard extends StatelessWidget {
   const _OptionCard({
     required this.icon,
+    required this.color,
     required this.title,
     required this.value,
     required this.onTap,
   });
 
   final IconData icon;
+  final Color color;
   final String title;
   final String value;
   final VoidCallback onTap;
@@ -186,7 +195,7 @@ class _OptionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     child: ListTile(
-      leading: Icon(icon),
+      leading: IconBadge(icon: icon, color: color, size: 42),
       title: Text(title),
       subtitle: Text(value, maxLines: 2, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right),

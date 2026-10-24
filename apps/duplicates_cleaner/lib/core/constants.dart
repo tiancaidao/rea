@@ -62,18 +62,4 @@ class AppConstants {
   static const decodableImageExtensions = {
     'jpg', 'jpeg', 'png', 'gif', 'tiff', 'tif', 'bmp', //
   };
-
-  static const premiumBenefits = [
-    'Delete files without any limit',
-    'Scan SD Card storage',
-    'Scan Similar-Images',
-    'Scan USB storage (Requires Android > 10)',
-    'Scan Parallel storage',
-    'Scan Custom folder',
-    'File size exclusion filter',
-    'Scan duplicates with same name/extension/size',
-    'Scan duplicates with custom extensions',
-    'Advanced sort filters',
-    'Selection filters',
-  ];
 }
