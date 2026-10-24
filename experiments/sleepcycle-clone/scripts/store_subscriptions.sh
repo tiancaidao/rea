@@ -6,6 +6,7 @@
 #        scripts/store_subscriptions.sh <play|ios|revenuecat> <list|sync> [options]
 #   plan   print what the file defines; reads no credentials, calls no store
 #   list   show the subscriptions the store has now
+#   builds (ios) show the latest builds and TestFlight state, read-only
 #   sync   create or update them to match the file (dry run unless --apply)
 # Options: --apply, --only PRODUCT_ID, --update-prices (and for ios
 # --no-preserve-price).
@@ -26,7 +27,7 @@ case "$STORE" in
   play) SCRIPT=play_subscriptions.py ;;
   ios) SCRIPT=asc_subscriptions.py ;;
   revenuecat) SCRIPT=revenuecat_products.py ;;
-  -h|--help|"") sed -n '2,19p' "$0"; exit 0 ;;
+  -h|--help|"") sed -n '2,20p' "$0"; exit 0 ;;
   *) echo "Unknown command '$STORE'. Use plan, play, ios or revenuecat."; exit 1 ;;
 esac
 shift

@@ -235,6 +235,29 @@ def cmd_list(asc: AppStoreConnect, args) -> None:
                   f"US {prices}, {a.get('state')}")
 
 
+def cmd_builds(asc: AppStoreConnect, args) -> None:
+    """Read-only: the app's latest builds, their TestFlight state and beta groups."""
+    config = products.load(args.file)
+    app_id = find_app(asc, args.bundle_id or config["ios_bundle_id"])
+    builds = asc.request("GET", "/v1/builds", params={
+        "filter[app]": app_id, "sort": "-uploadedDate", "limit": 10,
+        "include": "preReleaseVersion,buildBetaDetail"})
+    included = {(i["type"], i["id"]): i["attributes"] for i in builds.get("included", [])}
+    if not builds["data"]:
+        print("No builds yet.")
+    for b in builds["data"]:
+        a, rel = b["attributes"], b["relationships"]
+        version = included.get(("preReleaseVersions", (rel["preReleaseVersion"].get("data") or {}).get("id")), {})
+        beta = included.get(("buildBetaDetails", (rel["buildBetaDetail"].get("data") or {}).get("id")), {})
+        print(f"{version.get('version', '?')} ({a.get('version')}): {a.get('processingState')}, "
+              f"uploaded {a.get('uploadedDate')}, encryption {a.get('usesNonExemptEncryption')}, "
+              f"expired {a.get('expired')}")
+        print(f"  TestFlight internal: {beta.get('internalBuildState')}, external: {beta.get('externalBuildState')}")
+    for g in asc.get_all(f"/v1/apps/{app_id}/betaGroups")[0]:
+        ga = g["attributes"]
+        print(f"Beta group '{ga.get('name')}': {'internal' if ga.get('isInternalGroup') else 'external'}")
+
+
 def cmd_sync(asc: AppStoreConnect, args) -> None:
     config = products.load(args.file)
     app_id = find_app(asc, args.bundle_id or config["ios_bundle_id"])
@@ -352,7 +375,7 @@ def cmd_sync(asc: AppStoreConnect, args) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Create or update App Store subscriptions")
-    parser.add_argument("command", choices=["list", "sync"])
+    parser.add_argument("command", choices=["list", "sync", "builds"])
     parser.add_argument("--file", default=products.DEFAULT_FILE, help="Subscription definition JSON")
     parser.add_argument("--bundle-id", default=os.environ.get("APP_IDENTIFIER"),
                         help="Bundle id (default: ios_bundle_id in the definition file)")
@@ -367,7 +390,7 @@ def main() -> None:
 
     asc = AppStoreConnect(args.apply)
     try:
-        {"list": cmd_list, "sync": cmd_sync}[args.command](asc, args)
+        {"list": cmd_list, "sync": cmd_sync, "builds": cmd_builds}[args.command](asc, args)
     except RuntimeError as e:
         products.fail(str(e))
 
