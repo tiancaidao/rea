@@ -30,7 +30,17 @@ class AppConstants {
   );
 
   static const imageExtensions = {
-    'jpg', 'jpeg', 'png', 'gif', 'tiff', 'tif', 'bmp', 'heif', 'eps', 'raw', //
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'tiff',
+    'tif',
+    'bmp',
+    'heif',
+    'heic',
+    'eps',
+    'raw', //
   };
   static const audioExtensions = {
     'mp3',

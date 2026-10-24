@@ -89,23 +89,53 @@ class ResultsController extends ChangeNotifier {
   }
 
   /// [fallback] is tried when a plain delete is refused, e.g. on an SD card.
+  /// Photos library items are removed in one batch by [deleteAssets], which
+  /// returns the ids it deleted.
   Future<DeletionResult> deleteSelected({
     Future<bool> Function(String path)? fallback,
+    Future<List<String>> Function(List<String> ids)? deleteAssets,
   }) async {
     var deleted = 0, freed = 0;
     final failed = <String>[];
-    for (final item in selected.toList()) {
+    void removed(DuplicateItem item) {
+      deleted++;
+      freed += item.size;
+      for (final g in groups) {
+        g.items.remove(item);
+      }
+    }
+
+    final assets = selected.where((i) => i.assetId != null).toList();
+    if (assets.isNotEmpty) {
+      var gone = const <String>{};
+      if (deleteAssets != null) {
+        try {
+          gone = (await deleteAssets([for (final i in assets) i.assetId!]))
+              .toSet();
+        } catch (_) {}
+      }
+      for (final item in assets) {
+        if (gone.contains(item.assetId)) {
+          removed(item);
+          try {
+            await File(item.path).delete();
+          } on FileSystemException {
+            // Only the exported copy; the asset itself is already gone.
+          }
+        } else {
+          failed.add(item.name);
+        }
+      }
+    }
+
+    for (final item in selected.where((i) => i.assetId == null).toList()) {
       try {
         try {
           await File(item.path).delete();
         } on FileSystemException {
           if (fallback == null || !await fallback(item.path)) rethrow;
         }
-        deleted++;
-        freed += item.size;
-        for (final g in groups) {
-          g.items.remove(item);
-        }
+        removed(item);
       } on FileSystemException {
         failed.add(item.path);
       }
